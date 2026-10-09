@@ -33,12 +33,14 @@ Current focus:
 * React
 * Vite
 * Single Page Application (SPA)
+* Typescript
 
 ### Backend
 
 * Node.js
 * Express
 * REST API
+* Typescript
 
 ### Database
 
