@@ -27,7 +27,7 @@ Why the feature spec (`FEATURE.md`) and database design (`DATABASE.md`) are the 
 | D8 | `offers`: `company_name`, `language`, `salary_period`, `is_public`, `closed_at` added; `user_id` → `created_by_user_id`; `url` nullable; `remote_type`/`contract_type` as enums | Company search; skill extraction language; salary comparability; private user offers; hide expired offers without deleting history; consistent filter values |
 | D9 | `generated_resumes`: `modified` removed; `modification_strength` → `modifier_strength_id` FK; typo `modifer_config` fixed; `resume_id`, `language`, `photo_id`, `match_score`, `ai_model` added | Remove contradictory redundancy; traceability; re-render with another template/photo without regenerating |
 | D10 | `templates.program` → `renderer_key`; `free` → `is_free`; `supports_photo`, `sort_order`, `deleted_at` added | Templates are code in the repo, the DB stores a key; boolean naming; retire templates safely |
-| D11 | `modifier_strengths.code` added | Stable identifier for code/prompts instead of relying on ids or display names |
+| D11 | ~~`modifier_strengths.code` added~~ — superseded by D28 | Stable identifier for code/prompts instead of relying on ids or display names |
 | D12 | `resumes.source_file_key` added | Keep upload for re-parsing when the parser improves |
 | D13 | All timestamps `timestamptz` | Avoid timezone bugs (users in several countries) |
 | D14 | `skill_relationships` / `occupation_relationships` kept in the design, **not** in the first migration | Nothing in the MVP reads them ("don't implement future requirements") |
@@ -71,6 +71,36 @@ Why the feature spec (`FEATURE.md`) and database design (`DATABASE.md`) are the 
 | P15 | Login uses **server-side sessions stored in PostgreSQL**, not JWT | Single API, same-site SPA and one database: JWT's benefit (checking a token without a DB read) disappears once revocation requires a user lookup on every request anyway. Sessions give per-device logout, a possible "active devices" list, and simpler security (no signing secret or algorithm pitfalls) |
 | D24 | `sessions` table restored (with `user_agent`); `users.token_version` removed | Revocation = deleting rows. Cost: one indexed read per request (same as the JWT design) and a daily cleanup of expired rows. Revisit JWT only for mobile apps, third-party API clients or a separate auth service |
 
+## Update 4 — ResumeContent aligned with the existing resume JSON (2026-10-11)
+
+| ID | Change | Why |
+|---|---|---|
+| D25 | ResumeContent v1 now uses the project's existing format: `basics.title`, structured `basics.location` (city/region/country), `workExperience` with `jobTitle` and `responsibilities`, skill `category` (technical/soft), `projects` with `technologies`, `link` and `highlights`, `languages[].language` | Keep names already in use; structured location and skill categories are better than the first draft |
+| D26 | Adjustments to that format: `id` on every list item; responsibilities and highlights become `{id, text}`; one skill per item instead of `"Node.js, JavaScript"`; `endDate: null` + `isCurrent` instead of `"Present"`; `links` is a list of `{id, label, url}` instead of an object; `null` instead of `""`; `technologies` added to work experience; `lang` removed from the JSON (stored in `resumes.language`); `schemaVersion` added | Ids are required for change review; one skill per item is required for catalogue matching; no untranslatable or mixed-type date values; a single source of truth for language |
+| D27 | `modifier_config` keys renamed to the new sections (`summary`, `title`, `skills`, `workExperience`, `projects`) with a permission table; adding is only allowed for skills (hard strength) | Clear limits on what the AI can do per section; adding responsibilities or projects would be inventing experience |
+
+## Update 5 — clarifications (2026-10-11)
+
+No database has been created yet, so `DATABASE.md` now describes the target design directly; "renamed from / new" notes were removed from it (the history stays here).
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P16 | Only generations that **call the AI** count towards quotas | Modifier off costs nothing |
+| P17 | When the offer is in another language than the resume, the user is **asked to translate the resume** (or use an existing resume in that language, or continue anyway) | Generation never changes language (P9); translation is its own reviewable step. Makes T1 a dependency of M1's language check |
+| P18 | The **hard** strength may add skills the offer asks for **even if they are not in the resume**; always flagged `added_skill` for review | Product choice: the user decides in the review |
+| P19 | Unreviewed changes **count as accepted** (confirmed) | VS Code behaviour; warning before download |
+| D28 | `modifier_strengths` table removed → PostgreSQL enum `modifier_strength` (`soft`/`medium`/`hard`) on `users` and `generated_resumes`; rules live in code with the prompt; `generated_resumes.prompt_version` added | Rules evolve with the prompt code that uses them; storing them in the DB let the two drift. `prompt_version` keeps generations traceable |
+| D29 | `offers.description` stored as **simplified Markdown** (CommonMark subset), rendered with HTML escaped | Keeps lists/bold/headings readable; Markdown is the standard format for this; safe rendering protects against scraped HTML |
+| D30 | Change-set application order defined (replace → remove → add → reorder; restored items go after their original predecessor) | Accept/reject decisions inside the same list must combine predictably |
+
+## Update 6 — translation in the MVP (2026-10-11)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P20 | **Resume translation (T1) is part of the MVP** | The M1 language check depends on it; without it users can't apply to offers in another language |
+| D31 | `resumes.translated_from_resume_id` (nullable self-FK, SET NULL) + index; translation quota counted from these rows | A translation is a normal resume with a link to its source; no separate table needed |
+| D32 | Translation fixes what may change (free text) and what must not (names, companies, technical skills, technologies, dates, item ids/count/order); the API restores forbidden changes | Keeps translations checkable, same principle as the generation rules |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.
@@ -78,7 +108,6 @@ Why the feature spec (`FEATURE.md`) and database design (`DATABASE.md`) are the 
 3. Guest/registered limits in `FEATURE.md` G4 are starting values.
 4. AI calls are synchronous (no job queue) in the MVP.
 5. A transactional email provider will be chosen for password reset/verification.
-6. Pending AI changes are **included** in the result until rejected (VS Code behaviour), with a warning before download.
 
 ## Open questions
 

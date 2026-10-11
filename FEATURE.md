@@ -9,7 +9,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 ## G — General principles
 
 ### G1. Use without an account
-* Every feature except password reset, logout and account deletion works for guests.
+* Every feature works for guests except those that need an email or a password: password reset and change, email verification, logout, "log out everywhere" and account deletion.
 * No guest row is created on a simple visit. The guest user and its session are created **lazily** on the first action that writes data (upload resume, save offer, change a setting, generate…). Browsing and searching offers need no session.
 * Guests and registered users share the same tables; a guest is a `users` row with no email.
 
@@ -30,16 +30,17 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 | Resumes stored | 2 | 20 |
 | Photos stored | 3 | 10 |
 | Resume uploads (AI parse) | 3 total | 20 / day |
-| Generated resumes (AI) | 3 total | 30 / day |
+| Generated resumes with AI (modifier on) | 3 total | 30 / day |
+| Resume translations (AI) | 2 total | 20 / day |
 | User-added offers (AI extraction) | 3 total | 30 / day |
 | Saved offers | 50 | 1 000 |
 
-* Counters are computed from existing rows (`created_at`, including soft-deleted), so deleting does not reset a quota. No separate usage table in the MVP.
+* Counters are computed from existing rows (`created_at`, including soft-deleted), so deleting does not reset a quota. Only generations that called the AI count; generating with the modifier off is free. No separate usage table in the MVP.
 * Additional per-IP rate limit on all AI endpoints and on guest creation (prevents quota bypass by clearing cookies).
 * When a limit is reached: HTTP 429 with a machine-readable code; for guests the UI suggests creating an account.
 
 ### G5. AI usage
-* AI is used for: resume parsing (R2), resume generation (M1), user-added offer extraction (O5). Everything else (search, match %) is deterministic.
+* AI is used for: resume parsing (R2), resume generation (M1), resume translation (T1), user-added offer extraction (O5). Everything else (search, match %) is deterministic.
 * Sending resume content to the AI provider is disclosed in the privacy policy.
 * AI calls are synchronous in the MVP (loading state in the UI, server timeout 60 s). Nothing is persisted on failure; the user can retry; failures do not count towards quotas.
 
@@ -94,8 +95,9 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
   * never add or remove work experiences or education entries, and never add responsibilities (reordering and removing responsibilities or highlights is allowed);
   * **soft**: rephrase and reorder to use the offer's vocabulary;
   * **medium**: soft + emphasise relevant work experience and condense the rest (fewer responsibilities), rewrite summary and title freely;
-  * **hard**: medium + may add skills from the offer that are plausibly supported by the resume; such additions are flagged as `added_skill` in the review (M4).
+  * **hard**: medium + may **add skills the offer asks for, even if they appear nowhere in the resume**. Every added skill is flagged `added_skill` in the review (M4) so the user consciously keeps or rejects it. Only the hard strength can add skills.
 * Modifier off → the content is copied as-is and only rendered with the template (no AI call, no AI quota used).
+* The rules of each strength are part of the generation prompt **in code** (not in the database) and are versioned with it; each generated resume records the `prompt_version` used.
 
 ### S2. Templates
 * List all available templates (name, preview image, supports photo), ordered by `sort_order`. Public; no session needed.
@@ -109,7 +111,8 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 ## R — Resumes & photos (user section)
 
 ### R1. List resumes
-* Shows name, language, last updated, and which one is **selected**. Sorted by last updated.
+* Shows name, language, last updated, which one is **selected**, and for translations the resume they were translated from. Sorted by last updated.
+* Actions per resume: edit, select, translate (T1), delete.
 
 ### R2. Add a resume
 * **Upload** PDF or DOCX (≤ 5 MB, ≤ 10 pages) → text extraction → AI converts to ResumeContent v1 → language detected → resume is **saved immediately** and opened in the edit form with a "check the imported data" banner.
@@ -132,7 +135,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Re-download of the original uploaded file: available while the resume exists.
 
 ### R6. Photos — list, add, rename, select, delete
-* Upload JPEG/PNG/WEBP ≤ 5 MB. Server strips EXIF metadata, resizes to max 1000 px, stores in object storage. Name defaults to `Photo {n}`.
+* Upload JPEG/PNG/WEBP ≤ 5 MB. Server strips EXIF metadata, resizes to max 1000 px, stores it through the storage module (local disk in the MVP). Name defaults to `Photo {n}`.
 * Optional square crop in the UI before upload (client-side).
 * Zero or one selected photo. "No photo" is a valid choice. The first uploaded photo is selected automatically.
 * Delete: soft delete; if selected → selection cleared. Generated resumes that used it render without a photo once the file is purged.
@@ -157,7 +160,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Edge cases: no results → suggest widening radius / removing filters; unknown location text without selection → not allowed (must pick from autocomplete).
 
 ### O2. Offer detail
-* Full description, all fields, match details (O4), buttons: Save / status (O3), Generate resume (M1), Open original (O6), list of resumes already generated for this offer.
+* Full description (rendered from simplified Markdown: headings, lists, bold/italic, links), all fields, match details (O4), buttons: Save / status (O3), Generate resume (M1), Open original (O6), list of resumes already generated for this offer.
 * Closed offers are still viewable from saved lists/history with a "no longer available" banner; not reachable from search.
 
 ### O3. Saved offers (personal list + application tracking)
@@ -180,8 +183,8 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 
 ### O5. Add an offer manually *(user-added offers)*
 * Input: an offer URL **or** pasted text (title + description at minimum).
-* URL path: normalize the URL → if an offer with that URL exists, reuse it (just save it for the user) → otherwise fetch the page server-side, extract text, AI-extract fields (title, company, location, contract, remote, salary, description), user reviews/edits the fields, then it is saved. If the page cannot be fetched (login wall, bot protection — e.g. LinkedIn), the user is asked to paste the text instead.
-* Pasted path: AI-extract fields from the text, user reviews, saved with `url = NULL` (optional URL field).
+* URL path: normalize the URL → if an offer with that URL exists, reuse it (just save it for the user) → otherwise fetch the page server-side, convert it to simplified Markdown, AI-extract fields (title, company, location, contract, remote, salary, description), user reviews/edits the fields, then it is saved. If the page cannot be fetched (login wall, bot protection — e.g. LinkedIn), the user is asked to paste the text instead.
+* Pasted path: AI-extract fields from the text, user reviews, saved with `url = NULL` (optional URL field). The description keeps the pasted line breaks.
 * Created with `is_public = false`, `source = 'user'`, `created_by_user_id = user`, and automatically added to saved offers. Skills/occupations extracted like collected offers (M2).
 * Private offers never appear in search. If the collector later finds the same URL, the offer becomes public (same row; users' data unaffected).
 * The creator may edit fields of their private offer; public offers are read-only for users.
@@ -196,10 +199,15 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 ### M1. Generate a resume for an offer
 * Entry points: offer detail, saved offer list.
 * Preconditions: a source resume (defaults to the selected one; selectable on the screen). If none → prompt to add one.
+* **Language check**: if the offer's language is known and differs from the source resume's language, the user is asked to translate the resume first:
+  * if they already have a resume in the offer's language (e.g. a previous translation), it is proposed as the source instead;
+  * otherwise the screen offers "Translate my resume to {language}" (T1), which creates the translated resume and then returns to generation with it as the source;
+  * the user can still choose "Generate in {resume language} anyway".
+  * If the offer's language is unknown, no check is made.
 * Options shown, pre-filled from settings: source resume, modifier on/off, strength, modifiable sections, template, photo (hidden if the template doesn't support photos).
-* Process: snapshot source content → if modifier on, AI rewrites allowed sections per S1 rules → server validates output against ResumeContent v1 and the never-change rules (employers, dates, degrees unchanged; no deleted entries) → forbidden modifications are dropped (see M4) → the API builds the change set → save the `generated_resumes` row (with match score snapshot and model id) → open the **review screen** (M4).
+* Process: snapshot source content → if modifier on, AI rewrites allowed sections per S1 rules → server validates the output against ResumeContent v1 → modifications not allowed by the permission table (DATABASE.md *modifier_config*) are dropped (see M4) → the API builds the change set → save the `generated_resumes` row (with match score snapshot and model id) → open the **review screen** (M4).
 * If every proposed change was forbidden or nothing changed, the row is still saved with an empty change set, and the user sees "No modifications were proposed".
-* Output language is **always** the source resume language. Generating in another language would make the changes impossible to review; to apply in another language, the user first translates the resume (T1, post-MVP) and generates from the translated resume.
+* Output language is **always** the source resume language. Generating in another language would make the changes impossible to review; to apply in another language, the user translates the resume first (language check above, T1).
 * Offer saved automatically (O3).
 * Each generation creates a new row; previous ones for the same offer are kept (history).
 
@@ -220,18 +228,40 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 Goal: the user sees exactly what the AI changed and keeps only what they want.
 
 * **What counts as a change**: one change per rewritten text field (summary, title, a responsibility, a project description or highlight), one per added or removed item (skill, responsibility, highlight, project), and one per reordered list. The API computes them by comparing the original with the AI proposal, matching items by their id. The AI does not describe its own changes, so the list cannot leave anything out.
-* **Review screen**: the resume is shown section by section, with each change inline: removed words in red and added words in green (word-level diff), and **Accept** / **Reject** buttons on each change. Added skills from the hard modifier carry an extra "Not in your original resume" warning.
+* **Review screen**: the resume is shown section by section, with each change inline: removed words in red and added words in green (word-level diff), and **Accept** / **Reject** buttons on each change. Skills added by the hard strength carry an extra "Not in your original resume" warning.
   * "Accept all" / "Reject all", globally and per section.
   * Navigation "next / previous change", and a counter "5 of 12 reviewed".
   * Toggle "Show original / Show result".
-* **Default state**: changes start as `pending` and **are included** in the result, as in VS Code: the result is what the AI proposed until the user rejects something. Rejecting restores the original value instantly; a rejected change can be accepted again later (no limit).
+* **Default state** (confirmed): changes start as `pending` and **count as accepted**, as in VS Code: the result is what the AI proposed until the user rejects something. Rejecting restores the original value instantly; a rejected change can be accepted again later (no limit).
 * Every decision is saved immediately (one API call per decision or batch), so the user can leave and come back.
 * **Manual edits**: the user can also edit any field by hand. If that field has a change, the change becomes `edited` and leaves the accept/reject flow.
+* **Mixed decisions in one list** (e.g. the reorder of the skills is accepted but the removal of one skill is rejected): the restored item goes back right after the item that preceded it in the original. Exact rule in DATABASE.md *Change set*.
 * **Never shown as changes** (dropped by the API, and logged for prompt improvement): modified companies, job titles, dates, technologies, degrees, institutions, certifications, contact details; added or removed work experiences or education entries; added responsibilities; edits to sections the modifier settings did not allow.
 * **Modifier off**: no review step; the generated resume is the original rendered with the template.
 * Edge cases: the AI returns an invalid document → one automatic retry, then error (nothing saved, no quota used). The source resume is edited after generation → no effect (the generated resume uses its snapshot).
 
 ---
+
+## T — Translation
+
+### T1. Translate a resume
+Goal: get the same resume in another language, checked by the user, to apply to offers in that language. Generation (M1) never changes language, so translation is its own step.
+
+* **Entry points**: "Translate" on a resume in the resume list (R1), and the language check of M1 when an offer is in another language than the resume.
+* **Target languages**: French and English in the MVP (same list as the UI, configurable). The source language is excluded.
+* **Result**: a **new resume** named `{source name} ({LANG})`, with `language` = target and `translated_from_resume_id` = source. The source resume is not changed. The new resume is not selected automatically, except when the translation was started from M1 (it then becomes the source of that generation, not the selected resume).
+* **What is translated**: `basics.title`, `summary`, skill names of category `soft`, `jobTitle`, responsibility texts, project `description` and highlight texts, education `degree` and `description`, certification names when they are generic, language names and levels (e.g. "Native" → "Langue maternelle"), `interests`.
+* **What is never translated or changed**: `fullName`, contact details, links, companies, institutions, project names, `technical` skill names, `technologies` lists, dates, `isCurrent`, locations, and the number, order and ids of all items.
+* **Checks by the API**: the AI must return every item with the same id; the API compares the result with the source and **restores the source value** for any field that must not change (and logs it). If items are missing or added, the translation fails (one automatic retry, then error).
+* **Review screen**: because a translation changes every word, a word diff is useless. The screen shows **source and translation side by side, field by field**:
+  * every translated field is editable;
+  * "Re-translate" on a single field asks the AI again for that field only;
+  * a banner "Check the translation" until the user clicks "Mark as reviewed" (stored client-side only in the MVP, it does not block anything).
+* The translated resume is saved **immediately** (like an upload in R2), so nothing is lost if the user leaves. It is then a normal resume: editable (R3), selectable (R4), deletable (R5), usable for generation (M1), with its skills/occupations extracted in its own language (M2).
+* **Source changed later**: no automatic sync. If the source was updated after the translation was created (`source.updated_at > translation.created_at`), the translated resume shows "The original resume changed since this translation" with a "Translate again" action (which creates a new translation; the old one is kept until the user deletes it).
+* **Source deleted**: the translation stays; its link to the source is cleared.
+* **Edge cases**: the target language equals the source language → not offered; the user already has a translation of this resume in that language → the UI proposes to open it or create a new one; resume limit (G4) reached → error with the usual limit message.
+* **Cost**: one AI call per translation (counts towards the translation quota, G4); "Re-translate" on a field counts as a small call covered by the per-IP/per-user rate limit, not by the quota.
 
 ## L — Languages
 
@@ -246,12 +276,7 @@ Goal: the user sees exactly what the AI changed and keeps only what they want.
 
 ---
 
-## Post-MVP features (designed, not built yet)
-
-### T1. Resume translation
-* Translates an **original** resume into another language and creates a **new resume** (`Resume name (EN)`) instead of a generated one. The user can then generate resumes from it like from any resume, and the M4 review applies to that generation as usual.
-* Review: because a translation changes every word, a word-level diff is useless. The review shows **original and translation side by side, field by field**, with each field editable and individual items re-translatable. The same never-change rules apply (dates, employers, item count and order preserved), which the API can check because item ids are kept.
-* Database impact when built: `resumes.translated_from_resume_id` (nullable FK). No other change.
+## Post-MVP / undecided
 
 ### H1. Hide offers from search *(undecided)*
 * Idea: "Not interested" on a search result hides it for that user. If adopted, the simplest option is a `hidden_offers (user_id, offer_id, created_at)` table, kept separate from `saved_offers` so that hidden offers do not show up in the saved list.
@@ -283,11 +308,12 @@ S1 + S2 + R6 ──────────► M1 defaults, M3 rendering
 O5 ────────────────────► O3 (auto-save), M1 on private offers
 Email provider ────────► A4, A6
 M1 ───────────────────► M4 review ─► M3 download
+T1 translation ────────► M1 language check (offer in another language)
 L1 i18n setup ─────────► every UI screen, emails, templates
 ```
 
-Suggested build order: i18n setup + auth & guest sessions → resumes (form, then upload) → templates & PDF rendering → offers search/detail/saved → catalogue + extraction + match % → generation with modifier + change review → user-added offers.
+Suggested build order: i18n setup + auth & guest sessions → resumes (form, then upload) → templates & PDF rendering → offers search/detail/saved → catalogue + extraction + match % → generation with modifier + change review → resume translation → user-added offers.
 
 ## Out of scope for the MVP
 
-Paid plans & billing, OAuth/social login, OCR, resume translation (T1, designed below), cover letters, recommendations/alerts, sorting by match %, application reminders, data export, admin UI (seed via scripts), companies table, multiple locations per offer.
+Paid plans & billing, OAuth/social login, OCR, cover letters, recommendations/alerts, sorting by match %, application reminders, data export, admin UI (seed via scripts), companies table, multiple locations per offer.
