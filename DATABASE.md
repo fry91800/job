@@ -11,10 +11,10 @@ Naming conventions:
 * Keep naming conventions consistent across the entire database.
 
 
-User Table:
+### User Table:
 This table stores information about the users of the system. This also stores the user's preferences and settings related to resume searches / generation such as the selected template, modifier settings, and last search location.
 
-Modifier Strength Table:
+### Modifier Strength Table:
 This table stores information about the different modifier strengths that can be applied to resumes.
 
 Field	Type	Description	Mandatory	Default
@@ -39,7 +39,7 @@ created_at	TIMESTAMP	Date and time the account was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
 
-User photos
+### User photos
 This table stores information about the photos uploaded by users for their resumes.
 A user can have multiple photos, but only one can be active for resume generation at a time.
 
@@ -53,7 +53,7 @@ created_at	TIMESTAMP	Date and time the photo was uploaded	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was updated	Yes	Now
 deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
 
-Resumes
+### Resumes
 This table stores information about the resumes created by users. Each resume belongs to a single user, and users can have multiple resumes.
 
 Field	Type	Description	Mandatory	Default
@@ -66,7 +66,7 @@ created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
 
-Generated Resumes
+### Generated Resumes
 This table stores information about the resumes that have been generated for users. Each generated resume is associated with a specific user and offer, and may include ai-driven modifications based on user-selected settings.
 
 Field	Type	Description	Mandatory	Default
@@ -83,7 +83,7 @@ created_at	TIMESTAMP	Date and time the generated record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the generated record was last updated	Yes	Now
 deleted_at	TIMESTAMP	Date and time the generated record was deleted	No	NULL
 
-Templates:
+### Templates:
 This table stores information about the templates available for generating resumes. Each template has a name, availability status, preview image, and associated rendering program.
 
 Field	Type	Description	Mandatory	Default
@@ -95,7 +95,7 @@ program	TEXT	Path to template rendering program or code	Yes
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Location
+### Location
 
 This table stores information about the locations associated with users, offers, or other entities in the system. For now, it primarily relies on external location providers (geoapify is the main one) to populate location data.
 
@@ -112,7 +112,7 @@ created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
 
-Offer
+### Offer
 This table stores information about job offers collected from various sources. Each offer includes details such as the job title, description, location, salary, and associated user.
 
 Field	Type	Description	Mandatory	Default
@@ -136,7 +136,7 @@ user_id	UUID	ID of the user who generated the offer, if applicable	No
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Skills
+### Skills
 This table stores information about skills that can be associated with job offers or resumes. Skills can originate from various sources, such as manual entry or external catalogues like ESCO.
 
 Field	Type	Description	Mandatory	Default
@@ -147,7 +147,7 @@ created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
 
-Skill Names
+### Skill Names
 This table stores the different names for each skill in various languages. It helps in normalizing and matching skill names across different sources and languages.
 
 Field	Type	Description	Mandatory	Default
@@ -160,7 +160,7 @@ is_canonical	BOOLEAN	Whether this is the preferred name in that language	Yes
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Occupations
+### Occupations
 This table stores information about occupations that can be associated with job offers or resumes. Occupations can originate from various sources, such as manual entry or external catalogues like ESCO.
 
 Field	Type	Description	Mandatory	Default
@@ -170,7 +170,7 @@ external_id 	TEXT	ID in an external catalogue, if applicable 	No	NULL
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Occupation Names
+### Occupation Names
 This table stores the different names for each occupation in various languages. It helps in normalizing and matching occupation names across different sources and languages.
 
 Field	Type	Description	Mandatory	Default
@@ -183,7 +183,7 @@ is_canonical	BOOLEAN	Whether this is the preferred name in that language	Yes
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Resume skills
+### Resume skills
 This table stores the skills associated with each resume. It allows for linking multiple skills to a single resume and supports many-to-many relationships between resumes and skills.
 
 Field	Type	Description	Mandatory	Default
@@ -193,7 +193,7 @@ skill_id	TEXT	Skill linked to the resume; foreign key to Skill.id	Yes
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Offer skills
+### Offer skills
 This table stores the skills associated with each job offer. It allows for linking multiple skills to a single offer and supports many-to-many relationships between offers and skills.
 
 Field	Type	Description	Mandatory	Default
@@ -203,7 +203,7 @@ skill_id	TEXT	Skill linked to the offer; foreign key to Skill.id	Yes
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Resume occupation
+### Resume occupation
 This table stores the occupations associated with each resume. It allows for linking multiple occupations to a single resume and supports many-to-many relationships between resumes and occupations.
 
 Field	Type	Description	Mandatory	Default
@@ -213,7 +213,7 @@ occupation_id	TEXT	Occupation linked to the resume; foreign key to Occupation.id
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Offer occupation
+### Offer occupation
 This table stores the occupations associated with each job offer. It allows for linking multiple occupations to a single offer and supports many-to-many relationships between offers and occupations.
 
 Field	Type	Description	Mandatory	Default
@@ -223,7 +223,7 @@ occupation_id	TEXT	Occupation linked to the offer; foreign key to Occupation.id	
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Skill relationships
+### Skill relationships
 This table stores the relationships between different skills. It allows for defining various types of relationships such as equivalent, related, required, or alternative skills. This will be used to establish connections and dependencies between skills, enabling better skill recommendation.
 
 Field	Type	Description	Mandatory	Default
@@ -233,7 +233,7 @@ relationship_type	TEXT	Equivalent, Related, Requires, Alternative	Yes
 created_at	TIMESTAMP	Date and time the record was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 
-Occupation relationships
+### Occupation relationships
 This table stores the relationships between different occupations. It allows for defining various types of relationships such as equivalent, related, required, or alternative occupations. This will be used to establish connections and dependencies between occupations, enabling better occupation recommendation.
 
 Field	Type	Description	Mandatory	Default
