@@ -1,5 +1,10 @@
-This file contains the architecture and naming conventions for the database.
-Naming conventions:
+# Database design
+
+PostgreSQL + Prisma. The reference schema is `prisma/schema.prisma` (draft reproduced in the appendix). This document explains each table, its constraints, and the rules the API must enforce that the database cannot.
+
+Feature behaviour lives in `FEATURE.md`; the reasoning behind changes is in `claude/DECISIONS.md`.
+
+## Naming conventions
 
 * Use `PascalCase` for Prisma model names (singular).
 * Use `snake_case` for PostgreSQL table names (plural) and column names.
@@ -10,237 +15,426 @@ Naming conventions:
 * Use descriptive, consistent names; avoid unnecessary abbreviations.
 * Keep naming conventions consistent across the entire database.
 
+Additional conventions (new):
 
-### User Table:
-This table stores information about the users of the system. This also stores the user's preferences and settings related to resume searches / generation such as the selected template, modifier settings, and last search location.
+* Booleans start with `is_` / `supports_` (`is_free`, `is_public`) except existing `*_enabled` flags.
+* All timestamps are `timestamptz` (`@db.Timestamptz`), stored in UTC.
+* Enums: Prisma `enum` in PascalCase, values in `snake_case`, mapped with `@@map("snake_case_name")`.
+* Primary key types: **UUID** for user-owned or externally visible rows (users, resumes, offers…); **INTEGER autoincrement** for catalogue/lookup rows (templates, skills, locations…).
+* Pure junction tables use a **composite primary key** and only `created_at` (rows are inserted or deleted, never updated).
+* Soft delete (`deleted_at`) only where users delete their own content and we may need to restore or count it: `users`, `resumes`, `user_photos`, `generated_resumes`, plus admin-managed `templates` and `modifier_strengths`. Every query on these tables must filter `deleted_at IS NULL` unless stated otherwise.
 
+## Entity overview
 
-Field	Type	Description	Mandatory	Default
-id	UUID	Auto-generated primary key	Yes	Auto-generated
-email	TEXT	User's email address; unique and used for login	Yes	
-password_hash	TEXT	Secure password hash; never store the plain-text password	Yes	
-search_location_id	INTEGER	location of the last search; foreign key to location.id		
-modifier_enabled	BOOLEAN	User's modifier state, true if enabled	Yes	False
-modifier_strength_id	INTEGER	Strength of the modifier; foreign id key to modifier id	Yes	1
-modifier_config	JSONB	Tells the modifier what field can be changed in the resume JSON	Yes	{ "summary": true, "skills": true} 
-template_id	INTEGER	User’s selected template ; foreign key to template id	Yes	1
-created_at	TIMESTAMP	Date and time the account was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
-deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
+```text
+users ─┬─< sessions
+       ├─< user_tokens                (password reset, email verification)
+       ├─< user_photos      ◄── users.selected_photo_id
+       ├─< resumes          ◄── users.selected_resume_id
+       │     ├─< resume_skills >── skills ──< skill_names
+       │     └─< resume_occupations >── occupations ──< occupation_names
+       ├─< generated_resumes >── offers, templates, modifier_strengths, user_photos
+       ├─< saved_offers >── offers
+       └─< offers (created_by_user_id, user-added offers)
 
-### Modifier Strength Table:
-This table stores information about the different modifier strengths that can be applied to resumes.
+offers ─┬── locations
+        ├─< offer_skills >── skills
+        └─< offer_occupations >── occupations
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-name	TEXT	Strength name (Soft, Medium, Hard)	Yes	
-rules	TEXT	Rules stored for the AI prompt when generating a resume	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
-deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
+users ── templates, modifier_strengths, locations (settings)
+```
 
+## Tables
 
+Legend: **M** = mandatory (NOT NULL). Defaults in the last column.
 
-### User photos
-This table stores information about the photos uploaded by users for their resumes.
-A user can have multiple photos, but only one can be active for resume generation at a time.
+### users
 
-Field	Type	Description	Mandatory	Default
-id	UUID	Auto-generated primary key	Yes	Auto-generated
-user_id	UUID	User who owns this photo; foreign key to User.id	Yes	
-name	TEXT	Human-readable name displayed in the UI	Yes	Photo [number]
-storage_key	TEXT	Path or object-storage key for the image file; store the file outside the database	Yes	Generated
-is_active	BOOLEAN	True if the photo is the one user for resume generation	Yes	False
-created_at	TIMESTAMP	Date and time the photo was uploaded	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was updated	Yes	Now
-deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
+A person using the app, **registered or guest**. A guest is a row with `email IS NULL`. Signing up fills in `email` and `password_hash` on the same row, so all data is kept.
 
-### Resumes
-This table stores information about the resumes created by users. Each resume belongs to a single user, and users can have multiple resumes.
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | PK |
+| email | TEXT | | NULL | Unique. Trimmed + lowercased before storage. NULL = guest |
+| password_hash | TEXT | | NULL | Argon2id/bcrypt hash. NULL = guest |
+| email_verified_at | TIMESTAMPTZ | | NULL | Not required to use the app in MVP |
+| ui_language | VARCHAR(10) | ✓ | `fr` | *New.* `fr` \| `en`. Set from the language in use when the row is created; used for UI and emails |
+| last_active_at | TIMESTAMPTZ | ✓ | now | Updated when the session is extended (at most once a day); drives guest cleanup |
+| search_location_id | INTEGER | | NULL | FK → locations. Last searched location |
+| modifier_enabled | BOOLEAN | ✓ | false | |
+| modifier_strength_id | INTEGER | ✓ | 1 | FK → modifier_strengths (seed id 1 = soft) |
+| modifier_config | JSONB | ✓ | `{"summary":true,"skills":true,"workExperience":false}` | See *modifier_config format* |
+| template_id | INTEGER | ✓ | 1 | FK → templates (seed id 1 = default template) |
+| selected_resume_id | UUID | | NULL | FK → resumes, ON DELETE SET NULL. Replaces `is_active`-style flags |
+| selected_photo_id | UUID | | NULL | FK → user_photos. NULL = no photo on generated resumes |
+| created_at / updated_at / deleted_at | TIMESTAMPTZ | | | |
 
-Field	Type	Description	Mandatory	Default
-id	UUID	Auto-generated primary key	Yes	Auto-generated
-user_id	UUID	User who owns this resume; foreign key to User.id	Yes	
-name	TEXT	User-defined name to distinguish resumes in the UI	Yes	resume [number]
-content	JSONB	Structured resume data in JSON format	Yes	
-language	VARCHAR(10) 	Language code, e.g. en, fr, en-GB 	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
-deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
+Constraints & rules
+* `UNIQUE (email)`. Postgres treats NULLs as distinct, so any number of guests is fine.
+* App rule: `email` and `password_hash` are both NULL or both set (optional DB `CHECK ((email IS NULL) = (password_hash IS NULL))` via raw SQL).
+* App rule: `selected_resume_id` / `selected_photo_id` must reference a non-deleted row owned by the same user.
+* Account deletion: set `deleted_at`, **immediately** null out `email` and `password_hash` (frees the email for re-signup and removes personal data), delete all sessions; a purge job hard-deletes after 30 days along with stored files.
+* Index on `last_active_at` for the guest cleanup job (`email IS NULL AND last_active_at < now() - 30 days`).
 
-### Generated Resumes
-This table stores information about the resumes that have been generated for users. Each generated resume is associated with a specific user and offer, and may include ai-driven modifications based on user-selected settings.
+### sessions *(new)*
 
-Field	Type	Description	Mandatory	Default
-id	UUID	Auto-generated primary key	Yes	Auto-generated
-user_id	UUID	User who owns this generated resume; foreign key to User.id	Yes	
-offer_id	UUID	Offer that has been read to generate that resume ; foreign key to Offer.id	Yes	
-original_content	JSONB	Structured resume data of the original resume in JSON format	Yes	
-modified	BOOLEAN	If the modifier was used for that resume generation	Yes	
-modification_strength	INTEGER	Modifier strength used for resume generation, null if the modifier was not active	No	
-generated_content	JSONB	Structured resume data of the generated resume in JSON format	Yes	
-template_id	INTEGER	Template used to generated the file	Yes	
-modifer_config	JSONB	Snapshot of the modifier configuration when generating the resume	Yes	
-created_at	TIMESTAMP	Date and time the generated record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the generated record was last updated	Yes	Now
-deleted_at	TIMESTAMP	Date and time the generated record was deleted	No	NULL
+Server-side login sessions, for guests and registered users alike.
 
-### Templates:
-This table stores information about the templates available for generating resumes. Each template has a name, availability status, preview image, and associated rendering program.
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| user_id | UUID | ✓ | | FK → users, CASCADE |
+| token_hash | TEXT | ✓ | | Unique. SHA-256 of the cookie value; the raw token is never stored |
+| user_agent | TEXT | | NULL | Browser info, kept for a future "active devices" list |
+| expires_at | TIMESTAMPTZ | ✓ | | 30 days, sliding |
+| last_used_at | TIMESTAMPTZ | ✓ | now | |
+| created_at | TIMESTAMPTZ | ✓ | now | |
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-name	TEXT	Template name displayed in the UI	Yes	
-free	BOOLEAN	True if the template is available for free users	Yes	Yes
-preview_storage_key	TEXT	Storage path or object-storage key for the single preview image	Yes	generated
-program	TEXT	Path to template rendering program or code	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+Indexes: `user_id`, `expires_at`.
 
-### Location
+How it works
+* At login, sign-up or guest creation, the API generates a random 32-byte token, stores its SHA-256 hash, and sends the token in an `HttpOnly; Secure; SameSite=Lax` cookie (never `localStorage`). CSRF: `SameSite=Lax` + `Origin` header check on state-changing requests.
+* Each authenticated request hashes the cookie value and loads the session with its user (one indexed read). The request is rejected if the session is missing or expired, or if the user is deleted.
+* **Sliding expiry**: when `last_used_at` is more than 1 day old, the API pushes `expires_at` to now + 30 days and updates `last_used_at` and `users.last_active_at`. This limits writes to about one per user per day.
+* Logout deletes the current row. "Log out everywhere", password reset/change and account deletion delete all of the user's rows. Deleting a merged guest removes its sessions by cascade.
+* A daily job deletes expired rows.
 
-This table stores information about the locations associated with users, offers, or other entities in the system. For now, it primarily relies on external location providers (geoapify is the main one) to populate location data.
+### user_tokens *(new)*
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-provider	TEXT	provider, exemple geoapify	Yes	
-external_id	TEXT	id from the external source	No	NULL
-name	TEXT	name of the location	Yes	
-countryCode	VARCHAR(2)	Country Code	Yes	
-admin_area	TEXT		No	
-latitude	FLOAT		No	
-longitude 	FLOAT		No	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+Single-use tokens sent by email.
 
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| user_id | UUID | ✓ | | FK → users, CASCADE |
+| type | `user_token_type` | ✓ | | `password_reset` \| `email_verification` |
+| token_hash | TEXT | ✓ | | Unique, SHA-256 of the emailed token |
+| expires_at | TIMESTAMPTZ | ✓ | | Reset: 1 h. Verification: 48 h |
+| used_at | TIMESTAMPTZ | | NULL | Set on use; a used or expired token is rejected |
+| created_at | TIMESTAMPTZ | ✓ | now | |
 
-### Offer
-This table stores information about job offers collected from various sources. Each offer includes details such as the job title, description, location, salary, and associated user.
+Index `(user_id, type)`. Issuing a new token of a type invalidates (marks used) the previous unused ones of that type.
 
-Field	Type	Description	Mandatory	Default
-id	UUID	Auto-generated primary key	Yes	Auto-generated
-title	TEXT	Job title	Yes	
-description	TEXT	Full job description	Yes	
-url	TEXT	Original job offer URL, must be unique	Yes	
-location_id	TEXT	Job location; foreign key to Location.id	No	NULL
-remote_type	TEXT	Remote / hybrid / onsite	No	NULL
-contract_type	TEXT	CDI / CDD / freelance / internship, etc.	No	NULL
-salary_min	INTEGER	Minimum salary, if available	No	NULL
-salary_max	INTEGER	Maximum salary, if available	No	NULL
-salary_currency	CHAR(3)	Currency, e.g. EUR, CHF, USD	No	NULL
-published_at	TIMESTAMP	Date the job was published, if known	No	NULL
-collected_at	TIMESTAMP	First time the system collected the job	Yes	Now
-last_verified_at	TIMESTAMP	Last time it was verified that the offer was still valid	No	NULL
-source	TEXT	Source name, e.g. LinkedIn, Indeed, company website	Yes	
-external_id	TEXT	ID of the job on the source, if available	No	
-raw_data	JSONB	Original/raw data collected from the source	No	
-user_id	UUID	ID of the user who generated the offer, if applicable	No	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+### modifier_strengths
 
-### Skills
-This table stores information about skills that can be associated with job offers or resumes. Skills can originate from various sources, such as manual entry or external catalogues like ESCO.
+Seeded lookup. Unchanged except: `code` (stable identifier used in code, unique), `sort_order`.
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-source	TEXT	Origin, e.g. manual or ESCO	Yes	
-external_id 	TEXT	ID in an external catalogue, if applicable 	No	NULL
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | INTEGER | ✓ | auto | |
+| code | TEXT | ✓ | | Unique: `soft`, `medium`, `hard` |
+| name | TEXT | ✓ | | Internal/admin label. The UI shows a translated label looked up by `code` |
+| rules | TEXT | ✓ | | Prompt rules for the AI |
+| sort_order | INTEGER | ✓ | 0 | |
+| created_at / updated_at / deleted_at | | | | Never hard-delete (referenced by history) |
 
+### templates
 
-### Skill Names
-This table stores the different names for each skill in various languages. It helps in normalizing and matching skill names across different sources and languages.
+Seeded lookup. Templates are rendering code in the repo; the DB only stores metadata and a key.
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-skill_id	INTEGER	original skill ; foreign key to Skill.id	Yes	
-language	VARCHAR(10) 	Language code, e.g. en, fr, en-GB 	Yes	
-name	TEXT	Normalized form for lookup	Yes	
-normalized_name	TEXT	Standardized name used for matching and deduplication. Trim, lowercase, collapse consecutive spaces, normalize Unicode (NFKC). 	Yes	
-is_canonical	BOOLEAN	Whether this is the preferred name in that language	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | INTEGER | ✓ | auto | |
+| name | TEXT | ✓ | | Internal/admin label. The UI shows a translated label looked up by `renderer_key` |
+| is_free | BOOLEAN | ✓ | true | Renamed from `free`. Ignored in MVP (no paid plan) |
+| supports_photo | BOOLEAN | ✓ | true | *New.* Photo is omitted when false |
+| preview_storage_key | TEXT | ✓ | | Preview image |
+| renderer_key | TEXT | ✓ | | *Renamed from `program`.* Unique id of the renderer in code (e.g. `classic`) |
+| sort_order | INTEGER | ✓ | 0 | Display order |
+| created_at / updated_at / deleted_at | | | | *`deleted_at` new*: retire a template without breaking history |
 
-### Occupations
-This table stores information about occupations that can be associated with job offers or resumes. Occupations can originate from various sources, such as manual entry or external catalogues like ESCO.
+If a user's `template_id` points to a retired template, the API falls back to the first available template.
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-source	TEXT	Origin, e.g. manual or ESCO	Yes	
-external_id 	TEXT	ID in an external catalogue, if applicable 	No	NULL
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+### user_photos
 
-### Occupation Names
-This table stores the different names for each occupation in various languages. It helps in normalizing and matching occupation names across different sources and languages.
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| user_id | UUID | ✓ | | FK → users, CASCADE |
+| name | TEXT | ✓ | `Photo {n}` | Generated by the API |
+| storage_key | TEXT | ✓ | | Unique. Object storage key |
+| mime_type | TEXT | ✓ | | *New.* `image/jpeg`, `image/png`, `image/webp` |
+| size_bytes | INTEGER | ✓ | | *New.* After server-side resize |
+| created_at / updated_at / deleted_at | | | | |
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-occupation_id	INTEGER	original occupation ; foreign key to Occupation.id	Yes
-language	VARCHAR(10) 	Language code, e.g. en, fr, en-GB 	Yes	
-name	TEXT	Normalized form for lookup	Yes	
-normalized_name	TEXT	Standardized name used for matching and deduplication. Trim, lowercase, collapse consecutive spaces, normalize Unicode (NFKC). 	Yes	
-is_canonical	BOOLEAN	Whether this is the preferred name in that language	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+`is_active` is **removed**: the selected photo is `users.selected_photo_id` (see DECISIONS D5).
 
-### Resume skills
-This table stores the skills associated with each resume. It allows for linking multiple skills to a single resume and supports many-to-many relationships between resumes and skills.
+### resumes
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-resume_id	INTEGER	Resume linked to the skill; foreign key to Resume.id	Yes	
-skill_id	TEXT	Skill linked to the resume; foreign key to Skill.id	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+The user's original resume(s).
 
-### Offer skills
-This table stores the skills associated with each job offer. It allows for linking multiple skills to a single offer and supports many-to-many relationships between offers and skills.
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| user_id | UUID | ✓ | | FK → users, CASCADE |
+| name | TEXT | ✓ | `Resume {n}` | |
+| content | JSONB | ✓ | | **ResumeContent v1** (below), validated by the API on every write |
+| language | VARCHAR(10) | ✓ | | BCP 47 (`fr`, `en`, `en-GB`). Detected on parse, editable |
+| source_file_key | TEXT | | NULL | *New.* Uploaded PDF/DOCX kept for re-parsing; NULL for form-created resumes |
+| created_at / updated_at / deleted_at | | | | |
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-offer_id	INTEGER	Offer linked to the skill; foreign key to Offer.id	Yes	
-skill_id	TEXT	Skill linked to the offer; foreign key to Skill.id	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+After every create/update of `content`, the API recomputes `resume_skills` and `resume_occupations` in the same transaction.
 
-### Resume occupation
-This table stores the occupations associated with each resume. It allows for linking multiple occupations to a single resume and supports many-to-many relationships between resumes and occupations.
+### generated_resumes
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-resume_id	INTEGER	Resume linked to the occupation; foreign key to Resume.id	Yes	
-occupation_id	TEXT	Occupation linked to the resume; foreign key to Occupation.id	Yes
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+One AI generation of a resume for an offer. Rows are only written when generation succeeds.
 
-### Offer occupation
-This table stores the occupations associated with each job offer. It allows for linking multiple occupations to a single offer and supports many-to-many relationships between offers and occupations.
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| user_id | UUID | ✓ | | FK → users, CASCADE |
+| offer_id | UUID | ✓ | | FK → offers, RESTRICT (offers are never deleted) |
+| resume_id | UUID | | NULL | *New.* Source resume, SET NULL if purged |
+| language | VARCHAR(10) | ✓ | | *New.* Always equal to the source resume language. Translation is a separate feature (FEATURE T1) |
+| original_content | JSONB | ✓ | | Snapshot of the source resume content |
+| generated_content | JSONB | ✓ | | ResumeContent v1. Equals original + every non-rejected change; also directly **editable** by the user |
+| changes | JSONB | ✓ | `[]` | *New.* Change set for review (see *Change set* below) |
+| modifier_strength_id | INTEGER | | NULL | *Renamed from `modification_strength`, now a FK.* NULL = modifier off |
+| modifier_config | JSONB | | NULL | Snapshot (fixes typo `modifer_config`). NULL = modifier off |
+| template_id | INTEGER | ✓ | | Template last used to render. Changeable without regenerating |
+| photo_id | UUID | | NULL | *New.* Photo last used to render |
+| match_score | INTEGER | | NULL | *New.* 0–100 snapshot at generation time |
+| ai_model | TEXT | | NULL | *New.* `provider:model` (e.g. `openai:…`, `gemini:…`), for debugging/quality tracking. NULL when the modifier was off |
+| created_at / updated_at / deleted_at | | | | |
 
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-offer_id	INTEGER	Offer linked to the occupation; foreign key to Offer.id	Yes	
-occupation_id	TEXT	Occupation linked to the offer; foreign key to Occupation.id	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+* The `modified` boolean is **removed**: `modifier_strength_id IS NOT NULL` carries the same information without risk of contradiction. Optional raw-SQL `CHECK ((modifier_strength_id IS NULL) = (modifier_config IS NULL))`.
+* Indexes: `(user_id, offer_id)` (list generations for an offer), `(user_id, created_at)` (history + quota counting).
+* Quota counting includes soft-deleted rows, so deleting does not refill a quota.
 
-### Skill relationships
-This table stores the relationships between different skills. It allows for defining various types of relationships such as equivalent, related, required, or alternative skills. This will be used to establish connections and dependencies between skills, enabling better skill recommendation.
+### locations
 
-Field	Type	Description	Mandatory	Default
-skill_id	INTEGER	foreign key to skill.id	Yes	
-related_skill_id	INTEGER	foreign key to skill.id	Yes	
-relationship_type	TEXT	Equivalent, Related, Requires, Alternative	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | INTEGER | ✓ | auto | |
+| provider | TEXT | ✓ | | `geoapify`, `manual`… |
+| external_id | TEXT | | NULL | |
+| type | `location_type` | ✓ | `city` | *New.* `city` \| `region` \| `country` \| `other`; decides radius vs area matching |
+| name | TEXT | ✓ | | |
+| country_code | CHAR(2) | ✓ | | *Renamed from `countryCode`* (convention). ISO 3166-1 alpha-2 |
+| admin_area | TEXT | | NULL | Region/department |
+| latitude / longitude | DOUBLE PRECISION | | NULL | |
+| created_at / updated_at | | | | |
 
-### Occupation relationships
-This table stores the relationships between different occupations. It allows for defining various types of relationships such as equivalent, related, required, or alternative occupations. This will be used to establish connections and dependencies between occupations, enabling better occupation recommendation.
+`UNIQUE (provider, external_id)`; indexes on `country_code` and `(latitude, longitude)`. Radius search uses a bounding-box pre-filter on that index plus a haversine distance in SQL; PostGIS is a later option if needed.
 
-Field	Type	Description	Mandatory	Default
-occupation_id	INTEGER	foreign key to occupation.id	Yes	
-related_occupation_id	INTEGER	foreign key to occupation.id	Yes	
-relationship_type	TEXT	Equivalent, Related, Requires, Alternative	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+### offers
+
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| title | TEXT | ✓ | | |
+| company_name | TEXT | | NULL | *New.* Needed for company search. No `companies` table in MVP |
+| description | TEXT | ✓ | | Plain text (HTML stripped by collector/importer) |
+| language | VARCHAR(10) | | NULL | *New.* Detected; used for skill extraction |
+| url | TEXT | | NULL | Unique. Normalized (scheme+host lowercased, tracking params removed). *Now nullable* for pasted-text offers |
+| location_id | INTEGER | | NULL | FK → locations. *Type fixed (was TEXT)* |
+| remote_type | `remote_type` | | NULL | *Now an enum*: `onsite` \| `hybrid` \| `remote` |
+| contract_type | `contract_type` | | NULL | *Now an enum*: `permanent`, `fixed_term`, `temporary`, `freelance`, `internship`, `apprenticeship`, `other` |
+| salary_min / salary_max | INTEGER | | NULL | Whole currency units. Check `salary_min <= salary_max` |
+| salary_currency | CHAR(3) | | NULL | ISO 4217 |
+| salary_period | `salary_period` | | NULL | *New.* `hour` \| `day` \| `month` \| `year`; salary is meaningless without it |
+| is_public | BOOLEAN | ✓ | true | *New.* false = user-added private offer, excluded from search |
+| source | TEXT | ✓ | | `indeed`, `company_site`, `user`… |
+| external_id | TEXT | | NULL | |
+| raw_data | JSONB | | NULL | |
+| created_by_user_id | UUID | | NULL | *Renamed from `user_id`.* Who added it (user-added offers). SET NULL |
+| published_at | TIMESTAMPTZ | | NULL | |
+| collected_at | TIMESTAMPTZ | ✓ | now | |
+| last_verified_at | TIMESTAMPTZ | | NULL | |
+| closed_at | TIMESTAMPTZ | | NULL | *New.* Offer no longer valid → hidden from search, still visible in saved lists/history |
+| created_at / updated_at | | | | Offers are never deleted (referenced by user history) |
+
+Constraints & indexes
+* `UNIQUE (url)`, `UNIQUE (source, external_id)`.
+* `(is_public, closed_at, published_at DESC)` for the default search listing.
+* GIN trigram indexes on `title` and `company_name` (`pg_trgm` extension) for `ILIKE '%…%'` keyword search.
+* `location_id`, `created_by_user_id`.
+* Raw SQL: `CHECK (salary_min IS NULL OR salary_max IS NULL OR salary_min <= salary_max)`.
+
+Offer visibility rule: an offer is visible to a user if `is_public = true`, **or** `created_by_user_id = user`, **or** the user has it in `saved_offers` / `generated_resumes`. When a user adds a URL that already exists, the existing row is reused (see FEATURE O5). When the collector later finds a private offer's URL, it sets `is_public = true` and fills its own `source`/`external_id`.
+
+### saved_offers *(new)*
+
+A user's bookmarked offer, with a lightweight application status.
+
+| Column | Type | M | Default | Notes |
+|---|---|---|---|---|
+| id | UUID | ✓ | gen | |
+| user_id | UUID | ✓ | | FK → users, CASCADE |
+| offer_id | UUID | ✓ | | FK → offers, RESTRICT |
+| status | `saved_offer_status` | ✓ | `saved` | `saved`, `applied`, `interviewing`, `offer_received`, `rejected`, `withdrawn` |
+| notes | TEXT | | NULL | Max 5 000 chars (API) |
+| applied_at | TIMESTAMPTZ | | NULL | Set automatically when status first becomes `applied`; editable |
+| status_changed_at | TIMESTAMPTZ | ✓ | now | |
+| created_at / updated_at | | | | Unsave = hard delete |
+
+`UNIQUE (user_id, offer_id)`, index `(user_id, status)`.
+
+### skills, skill_names, occupations, occupation_names
+
+Kept as designed. Changes:
+* `UNIQUE (source, external_id)` on `skills` and `occupations`.
+* `UNIQUE (skill_id, language, normalized_name)` and index `(language, normalized_name)` on name tables (lookup path for extraction).
+* App rule: at most one `is_canonical = true` per `(skill_id, language)` (optional partial unique index via raw SQL).
+* Description of `name` corrected: `name` is the display form; `normalized_name` is the lookup form (trim, lowercase, collapse spaces, NFKC).
+
+### resume_skills, offer_skills, resume_occupations, offer_occupations
+
+Junction tables. Changes:
+* **Type fixes**: `resume_id`/`offer_id` are UUID (were INTEGER); `skill_id`/`occupation_id` are INTEGER (were TEXT).
+* Composite PK (`resume_id, skill_id`) etc. instead of a surrogate `id`; reverse index on the second column.
+* Only `created_at` (no updates on junction rows).
+* Rows are **derived data**: resume links are recomputed from `resumes.content`; offer links are written by the collector/importer. Neither is edited directly by users.
+
+### skill_relationships, occupation_relationships — *post-MVP*
+
+Kept in the design but **not created in the first migration** (nothing in the MVP reads them). When added: composite PK `(skill_id, related_skill_id, relationship_type)`, `relationship_type` enum, app rule `skill_id <> related_skill_id`, and store `equivalent` in both directions.
+
+## JSON formats
+
+### ResumeContent v1 (`resumes.content`, `generated_resumes.original_content` / `generated_content`)
+
+Based on the format already used in the project, with the changes listed in `claude/DECISIONS.md` (D25).
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "basics": {
+    "fullName": "string",                       // required
+    "title": "string | null",                   // e.g. "Fullstack Software Engineer"
+    "email": "string | null",
+    "phone": "string | null",
+    "location": {                               // or null
+      "city": "string | null",
+      "region": "string | null",
+      "country": "string | null"
+    },
+    "links": [{ "id": "string", "label": "string", "url": "string" }]   // label: "LinkedIn", "GitHub", "Portfolio"…
+  },
+  "summary": "string | null",
+  "skills": [{
+    "id": "string",
+    "name": "string",                           // ONE skill per item ("Node.js", not "Node.js, JavaScript")
+    "category": "technical | soft"
+  }],
+  "workExperience": [{
+    "id": "string",
+    "jobTitle": "string",
+    "company": "string",
+    "location": "string | null",
+    "startDate": "YYYY | YYYY-MM | null",
+    "endDate": "YYYY | YYYY-MM | null",         // null + isCurrent=true for a current job (never "Present")
+    "isCurrent": false,
+    "responsibilities": [{ "id": "string", "text": "string" }],
+    "technologies": ["string"]                  // replaces the "Technologies: …" responsibility line
+  }],
+  "projects": [{
+    "id": "string",
+    "name": "string",
+    "description": "string | null",
+    "technologies": ["string"],
+    "link": "string | null",                    // null, never ""
+    "highlights": [{ "id": "string", "text": "string" }]
+  }],
+  "education": [{
+    "id": "string",
+    "degree": "string",
+    "institution": "string",
+    "location": "string | null",
+    "startDate": "YYYY | YYYY-MM | null",
+    "endDate": "YYYY | YYYY-MM | null",
+    "description": "string | null"
+  }],
+  "languages": [{ "id": "string", "language": "string", "level": "string | null" }],
+  "certifications": [{ "id": "string", "name": "string", "issuer": "string | null", "date": "YYYY | YYYY-MM | null" }],
+  "interests": ["string"]
+}
+```
+
+Rules
+* Every array may be empty; unknown keys are rejected. "No value" is always `null`, never `""`. The API validates with a single shared schema (e.g. Zod) used by parsing, editing, generation and change review.
+* `schemaVersion` allows later migrations of stored JSON without a DB migration.
+* **No language field in the JSON**: the language is `resumes.language` (one source of truth).
+* **Item ids**: every object in an array has a short random `id` (e.g. 8 chars), unique within the document, created by the API when the item is created and never changed. The AI must return the ids it received; new items get no id and the API assigns one. Ids let the API pair an original item with its rewritten version even when items are reordered, which change review (M4) depends on. `technologies` and `interests` stay plain string lists: they are not reviewed item by item.
+* **Dates**: `YYYY` or `YYYY-MM`. `isCurrent: true` requires `endDate: null`. `startDate <= endDate` when both are set.
+* **Skills**: one skill per item, so each one can be looked up in the catalogue. Templates may group them by `category` and print them on one line. Matching (M2) uses `skills[].name` plus `workExperience[].technologies` and `projects[].technologies`; `soft` skills are kept but count only if they exist in the catalogue.
+* **Parsing (R2)**: the AI is asked to split grouped skills ("Node.js, JavaScript"), move "Technologies: …" lines into `technologies`, turn "Present"/"Aujourd'hui" into `isCurrent`, and turn `""` into `null`.
+* Section headings ("Work experience", "Expérience professionnelle"…) are **not** stored; the template prints them in the resume language at render time. The photo is not part of the content either; it is attached at render time.
+
+### modifier_config (`users.modifier_config`, `generated_resumes.modifier_config`)
+
+Which sections the AI may rewrite. Keys are a fixed list; missing keys mean `false`.
+
+```json
+{ "summary": true, "title": false, "skills": true, "workExperience": false, "projects": false }
+```
+
+| Key | What the AI may do when `true` |
+|---|---|
+| `summary` | Rewrite `summary` |
+| `title` | Rewrite `basics.title` |
+| `skills` | Rename, reorder and remove skills; **add** skills only with the hard strength (flagged `added_skill`) |
+| `workExperience` | Rewrite responsibility texts; reorder and remove responsibilities |
+| `projects` | Rewrite `description` and highlight texts; reorder and remove highlights; reorder and remove whole projects |
+
+**Never modifiable**, whatever the settings: the rest of `basics` (name, contact details, location, links), job titles, companies, locations, all dates, `technologies` lists, `education`, `languages`, `certifications`, `interests`; work experiences and education entries can never be removed or added.
+
+### Change set (`generated_resumes.changes`)
+
+The AI's modifications, stored as a list of reviewable changes (see FEATURE M4). The API computes it by comparing `original_content` with the AI's proposal, matching array items by `id`. The AI never writes it directly.
+
+```jsonc
+[
+  {
+    "id": "c1",                                  // unique within the list
+    "op": "replace",                             // replace | add | remove | reorder
+    "path": "workExperience[id=w1].responsibilities[id=r1].text",
+    "before": "Designed and maintained two web applications for the company.",   // null for add
+    "after": "Designed and maintained two Node.js/PostgreSQL web applications used across the company.",  // null for remove
+    "status": "pending",                         // pending | accepted | rejected | edited
+    "flag": null                                 // null | "added_skill" (a skill not in the original resume)
+  }
+]
+```
+
+* **Paths** use the section names of ResumeContent and select array items by id: `summary`, `basics.title`, `skills[id=s3]`, `workExperience[id=w1].responsibilities[id=r2].text`, `projects[id=p1].description`, `projects[id=p1].highlights` (for a reorder).
+* **Granularity**: one change per rewritten text field, one per added or removed item, and one `reorder` per list whose order changed (`before`/`after` are lists of item ids).
+* **Allowed operations** are exactly those in the modifier_config table above. Anything else in the proposal (changed dates, companies, degrees, a removed work experience, an added responsibility…) is a violation: the API drops it and logs it. It is never shown as a change.
+* **Applying changes**: `generated_content` = `original_content` with every change whose status is not `rejected` applied. The API recomputes and saves it whenever a status changes, in the same update.
+* **`edited`**: when the user edits a field by hand that has a change, the change becomes `edited` (resolved, and the manual value wins). It can no longer be accepted or rejected.
+* Empty list (`[]`) when the modifier was off.
+* The text diff shown in the UI (word-level highlighting between `before` and `after`) is computed by the frontend and is not stored.
+
+## File storage
+
+Files never go in the database; tables store a **storage key** (`user_photos.storage_key`, `resumes.source_file_key`, `templates.preview_storage_key`).
+
+* The API accesses files through a small storage module with two implementations behind the same functions (`put`, `get`, `delete`, `getReadUrl`):
+  * **local disk** (MVP and development): files under a configured folder (`STORAGE_LOCAL_DIR`), served only through an authenticated API route;
+  * **S3-compatible** (later, when needed): same keys, objects in a bucket, served with short-lived signed URLs.
+* The storage module is chosen by configuration (`STORAGE_DRIVER=local|s3`). Keys have the same format in both, so moving files between them needs no database change.
+* Key format: `{kind}/{userId}/{uuid}.{ext}` (e.g. `photos/…/….webp`, `resume-sources/…/….pdf`); template previews: `templates/{rendererKey}.png`.
+* User files are never publicly listed or served without an ownership check.
+
+## Languages (i18n)
+
+* **UI**: French and English from the start. All UI text, enum labels (contract type, status…), lookup labels (modifier strengths, templates) and API error messages are translated by the frontend from i18n files. The API returns codes, not sentences. Emails are rendered in `users.ui_language`.
+* **Content** (resumes, offers) keeps its own language (`resumes.language`, `offers.language`), independent of the UI language.
+* **Templates** print section headings in the **resume's** language, so every template ships with fr and en heading strings.
+* **Catalogue**: skill/occupation names are imported in fr and en; search and autocomplete use the UI language, with the other language as a fallback.
+
+## Things Prisma cannot express (raw SQL in migrations)
+
+1. `CREATE EXTENSION IF NOT EXISTS pg_trgm;` (declared via `postgresqlExtensions`).
+2. CHECK constraints: users email/password pairing; offers salary range; generated_resumes modifier pairing.
+3. Optional partial unique index: one canonical name per `(skill_id, language)` / `(occupation_id, language)`.
+
+## Seed data (required)
+
+* `modifier_strengths`: `soft` (id 1), `medium`, `hard`.
+* `templates`: at least one (id 1 = default).
+* Skills/occupations: ESCO import (FR + EN names) — needed before matching or offer skill extraction works.
+
+## Appendix — draft `prisma/schema.prisma`
+
+The full draft is saved in the project as `prisma/schema.prisma`. Copy it into the repo when starting the migration work. It was reviewed by hand but has not yet been run through `prisma validate`, so run that first.
