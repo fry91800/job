@@ -14,17 +14,6 @@ Naming conventions:
 ### User Table:
 This table stores information about the users of the system. This also stores the user's preferences and settings related to resume searches / generation such as the selected template, modifier settings, and last search location.
 
-### Modifier Strength Table:
-This table stores information about the different modifier strengths that can be applied to resumes.
-
-Field	Type	Description	Mandatory	Default
-id	INTEGER	Auto-generated primary key	Yes	Auto-generated
-name	TEXT	Strength name (Soft, Medium, Hard)	Yes	
-rules	TEXT	Rules stored for the AI prompt when generating a resume	Yes	
-created_at	TIMESTAMP	Date and time the record was created	Yes	Now
-updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
-deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
-
 
 Field	Type	Description	Mandatory	Default
 id	UUID	Auto-generated primary key	Yes	Auto-generated
@@ -38,6 +27,19 @@ template_id	INTEGER	User’s selected template ; foreign key to template id	Yes
 created_at	TIMESTAMP	Date and time the account was created	Yes	Now
 updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
 deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
+
+### Modifier Strength Table:
+This table stores information about the different modifier strengths that can be applied to resumes.
+
+Field	Type	Description	Mandatory	Default
+id	INTEGER	Auto-generated primary key	Yes	Auto-generated
+name	TEXT	Strength name (Soft, Medium, Hard)	Yes	
+rules	TEXT	Rules stored for the AI prompt when generating a resume	Yes	
+created_at	TIMESTAMP	Date and time the record was created	Yes	Now
+updated_at	TIMESTAMP	Date and time the record was last updated	Yes	Now
+deleted_at	TIMESTAMP	Date and time the record was deleted	No	NULL
+
+
 
 ### User photos
 This table stores information about the photos uploaded by users for their resumes.
