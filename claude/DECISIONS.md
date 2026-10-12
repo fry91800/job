@@ -101,6 +101,16 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D31 | `resumes.translated_from_resume_id` (nullable self-FK, SET NULL) + index; translation quota counted from these rows | A translation is a normal resume with a link to its source; no separate table needed |
 | D32 | Translation fixes what may change (free text) and what must not (names, companies, technical skills, technologies, dates, item ids/count/order); the API restores forbidden changes | Keeps translations checkable, same principle as the generation rules |
 
+## Update 7 — location search, companies, match % (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D33 | `locations.admin_area` replaced by `region_code`/`region_name` and `county_code`/`county_name`; `location_type` = `city`/`county`/`region`/`country`; index `(country_code, region_code, county_code)` | Area search (department, region, country) must match on stable codes, not on free-text names, and needs two administrative levels |
+| D34 | Search rules: radius only for cities; areas match by code; offers located at a larger level are included and labelled; "include remote offers" option | Lets users search a large area, and still shows offers that only state a region |
+| P21 | **No `companies` table in the MVP** (C1 describes when to add it); collectors keep source company ids in `raw_data` | `company_name` covers search and display; the table only pays off for dedup, company pages or hide/follow |
+| P22 | **Match % computed in the frontend**, with the formula in a new `packages/shared` package also used by the API for the stored snapshot | Instant updates when switching resumes, no server work per search, and one single implementation of the rule |
+| D35 | New `packages/shared` (pure TypeScript, no I/O) for schemas, the match formula and shared types; ARCHITECTURE, AI_CONTEXT and README updated | Avoid duplicating business logic between web and api |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

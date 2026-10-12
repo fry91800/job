@@ -148,14 +148,19 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 ### O1. Search offers
 * Criteria (all optional, combined with AND):
   * **keywords** — matched against title and company name (trigram/ILIKE), and against occupation names linked to the offer;
-  * **location** + **radius** (km, default 25; choices 0/10/25/50/100) — chosen via location autocomplete (Geoapify); city → radius on coordinates; region/country → match by admin area / country code; offers without coordinates match on country only when radius is "whole country";
+  * **location** — chosen via autocomplete (Geoapify), at any level: **city**, **department/county**, **region** or **country** (e.g. "Brunoy", "Essonne", "Île-de-France", "France"). The autocomplete shows the level next to each suggestion;
+    * city → a **radius** applies (km, default 25; choices 0/10/25/50/100);
+    * department, region, country → every offer **inside that area**, no radius (the radius selector is hidden);
+    * offers located only at a larger level (e.g. "Île-de-France" for a search on Brunoy) are included, labelled "whole region", and shown after exact matches;
+    * option **"Include remote offers"** (default on): fully remote offers in the same country are included wherever they are located;
+    * matching uses administrative codes, not names (exact rules in DATABASE.md *locations*);
   * **skills** — one or more from the catalogue (autocomplete over `skill_names`); offers matching at least one; ranked by number matched;
   * **company** — text;
   * filters: remote type, contract type, published within (24 h / 7 d / 30 d), minimum salary (only compares offers with the same currency and period; offers without salary are included unless "salary shown only" is ticked).
 * Only `is_public = true` and `closed_at IS NULL` offers.
 * Sort: most recent (default) or relevance (skill/keyword matches). Sorting by match % is **not** in the MVP (would require scoring every offer).
 * Pagination: 20 per page, offset-based.
-* Results show title, company, location, remote/contract, salary, published date, saved state, and **match %** if the user has a selected resume (O4).
+* Results show title, company, location, remote/contract, salary, published date, saved state, and **match %** if the user has a selected resume (O4). Each result includes the offer's skill and occupation ids so the frontend can compute the match.
 * The last searched location is saved in `users.search_location_id` for existing users (does not create a guest on its own). Other criteria live in the URL query string (shareable, restorable via browser history).
 * Edge cases: no results → suggest widening radius / removing filters; unknown location text without selection → not allowed (must pick from autocomplete).
 
@@ -172,14 +177,16 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Generating a resume for an offer automatically saves it (status `saved`) if not already saved.
 
 ### O4. Match percentage
-* Deterministic, computed on the fly from the **selected resume** vs the offer (no AI, nothing stored except the snapshot in generated resumes).
+* Deterministic, computed from the **selected resume** vs the offer (no AI, nothing stored except the snapshot in generated resumes).
+* **Computed in the frontend**: the API returns the selected resume's skill and occupation ids once, and each offer's ids with the search results and offer detail. Switching the selected resume updates every score instantly with no new request.
+* The formula is written **once**, in the shared package (`packages/shared`, see ARCHITECTURE.md), imported by the web app (display) and by the API (the `match_score` snapshot in M1). It must never be re-implemented elsewhere.
 * Formula (v1):
   * `skillScore = |offerSkills ∩ resumeSkills| / |offerSkills|`
   * `occupationScore = 1` if resume and offer share an occupation, else `0`
   * if the offer has occupations: `match = round(100 × (0.8 × skillScore + 0.2 × occupationScore))`; otherwise `match = round(100 × skillScore)`
 * If the offer has **no extracted skills** → show "Not enough data" instead of a number. No selected resume → show a prompt to add/select one.
 * Detail view lists matched skills and missing skills (explainability).
-* Later improvements (not MVP): weight required vs optional skills, use `equivalent` skill relationships, seniority.
+* Later improvements (not MVP): weight required vs optional skills, use `equivalent` skill relationships, seniority. Sorting or filtering by match % and match alerts would need the score on the server side (SQL), which is why they are out of scope.
 
 ### O5. Add an offer manually *(user-added offers)*
 * Input: an offer URL **or** pasted text (title + description at minimum).
@@ -205,7 +212,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
   * the user can still choose "Generate in {resume language} anyway".
   * If the offer's language is unknown, no check is made.
 * Options shown, pre-filled from settings: source resume, modifier on/off, strength, modifiable sections, template, photo (hidden if the template doesn't support photos).
-* Process: snapshot source content → if modifier on, AI rewrites allowed sections per S1 rules → server validates the output against ResumeContent v1 → modifications not allowed by the permission table (DATABASE.md *modifier_config*) are dropped (see M4) → the API builds the change set → save the `generated_resumes` row (with match score snapshot and model id) → open the **review screen** (M4).
+* Process: snapshot source content → if modifier on, AI rewrites allowed sections per S1 rules → server validates the output against ResumeContent v1 → modifications not allowed by the permission table (DATABASE.md *modifier_config*) are dropped (see M4) → the API builds the change set → save the `generated_resumes` row (with the match score computed by the API with the shared formula, and the model id) → open the **review screen** (M4).
 * If every proposed change was forbidden or nothing changed, the row is still saved with an empty change set, and the user sees "No modifications were proposed".
 * Output language is **always** the source resume language. Generating in another language would make the changes impossible to review; to apply in another language, the user translates the resume first (language check above, T1).
 * Offer saved automatically (O3).
@@ -278,6 +285,11 @@ Goal: get the same resume in another language, checked by the user, to apply to 
 
 ## Post-MVP / undecided
 
+### C1. Companies *(post-MVP)*
+* In the MVP an offer only has `company_name` (text), which is enough for search and display.
+* A `companies` table (plus `offers.company_id`, filled from `company_name`) becomes worth it when one of these is wanted: merging spelling variants ("SAFRAN" / "Safran Landing Systems"), company pages, logos or descriptions, or letting users hide or follow a company.
+* To prepare it, collectors keep any company identifier the source provides (e.g. SIREN in France) in `offers.raw_data`.
+
 ### H1. Hide offers from search *(undecided)*
 * Idea: "Not interested" on a search result hides it for that user. If adopted, the simplest option is a `hidden_offers (user_id, offer_id, created_at)` table, kept separate from `saved_offers` so that hidden offers do not show up in the saved list.
 
@@ -286,7 +298,7 @@ Goal: get the same resume in another language, checked by the user, to apply to 
 ## Cross-cutting requirements
 
 * **Authorization**: every user-owned row is accessed through `user_id = currentUser` — never trust IDs from the client alone. Returns 404 (not 403) for other users' rows.
-* **Validation**: shared schemas (ResumeContent, modifier_config, search params) used by the API; the frontend may reuse them.
+* **Shared code**: the validation schemas (ResumeContent, modifier_config, search params) and the match formula (O4) live in `packages/shared`, used by both the API and the web app.
 * **Files**: stored on **local disk** behind a storage module whose interface is S3-compatible, so S3 (or MinIO, R2…) can be switched on by configuration when needed (see DATABASE.md *File storage*). Keys are random; files are served only after an ownership check. Files are deleted when their row is purged.
 * **i18n**: see L1.
 * **Privacy/GDPR**: account deletion (A5), guest purge (G3), EXIF stripping, AI provider disclosure. Data export is post-MVP.
@@ -316,4 +328,4 @@ Suggested build order: i18n setup + auth & guest sessions → resumes (form, the
 
 ## Out of scope for the MVP
 
-Paid plans & billing, OAuth/social login, OCR, cover letters, recommendations/alerts, sorting by match %, application reminders, data export, admin UI (seed via scripts), companies table, multiple locations per offer.
+Paid plans & billing, OAuth/social login, OCR, cover letters, recommendations/alerts, sorting by match %, application reminders, data export, admin UI (seed via scripts), companies table (C1), multiple locations per offer, searching several locations at once.

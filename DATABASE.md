@@ -202,19 +202,40 @@ One resume generated for an offer (with or without AI). Rows are only written wh
 
 ### locations
 
+A place used by offers (`offers.location_id`) and by the last search (`users.search_location_id`). Filled from Geoapify, which returns the codes below for every result.
+
 | Column | Type | M | Default | Notes |
 |---|---|---|---|---|
 | id | INTEGER | ✓ | auto | |
 | provider | TEXT | ✓ | | `geoapify`, `manual`… |
-| external_id | TEXT | | NULL | |
-| type | `location_type` | ✓ | `city` | `city` \| `region` \| `country` \| `other`; decides radius vs area matching |
-| name | TEXT | ✓ | | |
-| country_code | CHAR(2) | ✓ | | ISO 3166-1 alpha-2 |
-| admin_area | TEXT | | NULL | Region/department |
-| latitude / longitude | DOUBLE PRECISION | | NULL | |
+| external_id | TEXT | | NULL | Provider's place id |
+| type | `location_type` | ✓ | `city` | `city` \| `county` \| `region` \| `country`: the level of this place |
+| name | TEXT | ✓ | | Display name in its own language ("Brunoy", "Île-de-France") |
+| country_code | CHAR(2) | ✓ | | ISO 3166-1 alpha-2 (`FR`) |
+| region_code | TEXT | | NULL | ISO 3166-2 region code (`FR-IDF`). NULL only for `country` |
+| region_name | TEXT | | NULL | Display only |
+| county_code | TEXT | | NULL | County / département code (`91`). NULL for `region` and `country` |
+| county_name | TEXT | | NULL | Display only |
+| latitude / longitude | DOUBLE PRECISION | | NULL | Point for cities; centre for areas (not used for matching areas) |
 | created_at / updated_at | | | | |
 
-`UNIQUE (provider, external_id)`; indexes on `country_code` and `(latitude, longitude)`. Radius search uses a bounding-box pre-filter on that index plus a haversine distance in SQL; PostGIS is a later option if needed.
+Constraints & indexes
+* `UNIQUE (provider, external_id)`.
+* `(country_code, region_code, county_code)` for area matching; `(latitude, longitude)` for radius matching.
+* App rule: every location stores **all its parent codes** (a city has its county, region and country codes). Matching is always done on **codes**, never on names, so spelling or language differences ("Île-de-France" / "Ile de France") don't matter.
+
+**Search matching** (FEATURE O1). With `S` = the searched location and `O` = the offer's location:
+
+| `S.type` | An offer matches when… |
+|---|---|
+| `city` | `O` is a city within the radius of `S` (bounding-box pre-filter on the coordinates index, then haversine distance in SQL); **or** `O` is an area containing `S` (`O` is a county with `S.county_code`, a region with `S.region_code`, or a country with `S.country_code`) |
+| `county` | `O.county_code = S.county_code` (same country); **or** `O` is the region or country containing `S` |
+| `region` | `O.region_code = S.region_code`; **or** `O` is the country containing `S` |
+| `country` | `O.country_code = S.country_code` |
+
+* Offers whose location is a **larger area than the search** (e.g. an offer located in "Île-de-France" for a search on Brunoy) match but are labelled "whole region" in the results and ranked after exact matches.
+* **Remote offers**: when the "include remote offers" option is on, `remote_type = remote` offers in the searched country match whatever their location (or if they have none). Other offers without a location never match a location search.
+* No PostGIS needed; polygons can be added later if users ask for custom areas.
 
 ### offers
 
@@ -222,7 +243,7 @@ One resume generated for an offer (with or without AI). Rows are only written wh
 |---|---|---|---|---|
 | id | UUID | ✓ | gen | |
 | title | TEXT | ✓ | | |
-| company_name | TEXT | | NULL | Needed for company search. No `companies` table in MVP |
+| company_name | TEXT | | NULL | Company as written by the source. No `companies` table in the MVP (see FEATURE C1). Collectors keep any company identifier the source provides (e.g. SIREN) in `raw_data` |
 | description | TEXT | ✓ | | Simplified **Markdown** (see *Offer description format*) |
 | language | VARCHAR(10) | | NULL | Detected; used for skill extraction |
 | url | TEXT | | NULL | Unique. Normalized (scheme+host lowercased, tracking params removed). NULL for pasted-text offers |

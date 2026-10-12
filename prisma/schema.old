@@ -1,0 +1,489 @@
+// Draft schema — reference design, not yet migrated.
+// Conventions: PascalCase singular models -> snake_case plural tables,
+// camelCase fields -> snake_case columns, timestamps as timestamptz.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pg_trgm]
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum UserTokenType {
+  password_reset
+  email_verification
+
+  @@map("user_token_type")
+}
+
+enum ModifierStrength {
+  soft
+  medium
+  hard
+
+  @@map("modifier_strength")
+}
+
+enum RemoteType {
+  onsite
+  hybrid
+  remote
+
+  @@map("remote_type")
+}
+
+enum ContractType {
+  permanent      // CDI
+  fixed_term     // CDD
+  temporary      // intérim
+  freelance
+  internship
+  apprenticeship // alternance
+  other
+
+  @@map("contract_type")
+}
+
+enum SalaryPeriod {
+  hour
+  day
+  month
+  year
+
+  @@map("salary_period")
+}
+
+enum SavedOfferStatus {
+  saved
+  applied
+  interviewing
+  offer_received
+  rejected
+  withdrawn
+
+  @@map("saved_offer_status")
+}
+
+enum LocationType {
+  city
+  region
+  country
+  other
+
+  @@map("location_type")
+}
+
+enum RelationshipType {
+  equivalent
+  related
+  requires
+  alternative
+
+  @@map("relationship_type")
+}
+
+// ───────────────────────────── Users & auth ─────────────────────────────
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String?   @unique // stored trimmed + lowercased; NULL = guest
+  passwordHash       String?   @map("password_hash") // NULL = guest
+  emailVerifiedAt    DateTime? @map("email_verified_at") @db.Timestamptz
+  uiLanguage         String    @default("fr") @map("ui_language") @db.VarChar(10) // fr | en
+  lastActiveAt       DateTime  @default(now()) @map("last_active_at") @db.Timestamptz
+  searchLocationId   Int?      @map("search_location_id")
+  modifierEnabled    Boolean   @default(false) @map("modifier_enabled")
+  modifierStrength   ModifierStrength @default(soft) @map("modifier_strength") // rules live in code
+  modifierConfig     Json      @default("{\"summary\": true, \"skills\": true, \"workExperience\": false}") @map("modifier_config")
+  templateId         Int       @default(1) @map("template_id")
+  selectedResumeId   String?   @unique @map("selected_resume_id") @db.Uuid
+  selectedPhotoId    String?   @unique @map("selected_photo_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  searchLocation   Location?        @relation(fields: [searchLocationId], references: [id], onDelete: SetNull)
+  template         Template         @relation(fields: [templateId], references: [id])
+  selectedResume   Resume?          @relation("UserSelectedResume", fields: [selectedResumeId], references: [id], onDelete: SetNull)
+  selectedPhoto    UserPhoto?       @relation("UserSelectedPhoto", fields: [selectedPhotoId], references: [id], onDelete: SetNull)
+
+  sessions         Session[]
+  tokens           UserToken[]
+  photos           UserPhoto[]       @relation("UserPhotos")
+  resumes          Resume[]          @relation("UserResumes")
+  generatedResumes GeneratedResume[]
+  savedOffers      SavedOffer[]
+  createdOffers    Offer[]
+
+  @@index([lastActiveAt]) // guest cleanup job
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash") // SHA-256 of the cookie value
+  userAgent  String?  @map("user_agent") // for a future "active devices" list
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  lastUsedAt DateTime @default(now()) @map("last_used_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model UserToken {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  type      UserTokenType
+  tokenHash String        @unique @map("token_hash")
+  expiresAt DateTime      @map("expires_at") @db.Timestamptz
+  usedAt    DateTime?     @map("used_at") @db.Timestamptz
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("user_tokens")
+}
+
+// ───────────────────────────── Settings lookups ─────────────────────────────
+
+model Template {
+  id                Int       @id @default(autoincrement())
+  name              String
+  isFree            Boolean   @default(true) @map("is_free")
+  supportsPhoto     Boolean   @default(true) @map("supports_photo")
+  previewStorageKey String    @map("preview_storage_key")
+  rendererKey       String    @unique @map("renderer_key") // identifier of the renderer in code
+  sortOrder         Int       @default(0) @map("sort_order")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+
+  users            User[]
+  generatedResumes GeneratedResume[]
+
+  @@map("templates")
+}
+
+// ───────────────────────────── Resumes ─────────────────────────────
+
+model UserPhoto {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  name       String
+  storageKey String    @unique @map("storage_key")
+  mimeType   String    @map("mime_type")
+  sizeBytes  Int       @map("size_bytes")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  user             User              @relation("UserPhotos", fields: [userId], references: [id], onDelete: Cascade)
+  selectedBy       User?             @relation("UserSelectedPhoto")
+  generatedResumes GeneratedResume[]
+
+  @@index([userId])
+  @@map("user_photos")
+}
+
+model Resume {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  name              String
+  content           Json // ResumeContent v1, see DATABASE.md
+  language          String    @db.VarChar(10)
+  sourceFileKey     String?   @map("source_file_key") // uploaded PDF/DOCX, if any
+  translatedFromResumeId String? @map("translated_from_resume_id") @db.Uuid // set when created by translation (T1)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+
+  user             User               @relation("UserResumes", fields: [userId], references: [id], onDelete: Cascade)
+  selectedBy       User?              @relation("UserSelectedResume")
+  skills           ResumeSkill[]
+  occupations      ResumeOccupation[]
+  generatedResumes GeneratedResume[]
+  translatedFrom   Resume?            @relation("ResumeTranslations", fields: [translatedFromResumeId], references: [id], onDelete: SetNull)
+  translations     Resume[]           @relation("ResumeTranslations")
+
+  @@index([userId])
+  @@index([translatedFromResumeId])
+  @@map("resumes")
+}
+
+model GeneratedResume {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  offerId            String    @map("offer_id") @db.Uuid
+  resumeId           String?   @map("resume_id") @db.Uuid
+  language           String    @db.VarChar(10)
+  originalContent    Json      @map("original_content")
+  generatedContent   Json      @map("generated_content") // original + all non-rejected changes applied
+  changes            Json      @default("[]") // AI change set to review, see DATABASE.md
+  modifierStrength   ModifierStrength? @map("modifier_strength") // NULL = modifier off (no AI call)
+  modifierConfig     Json?     @map("modifier_config") // NULL = modifier off
+  templateId         Int       @map("template_id")
+  photoId            String?   @map("photo_id") @db.Uuid
+  matchScore         Int?      @map("match_score") // 0-100 snapshot at generation time
+  aiModel            String?   @map("ai_model") // provider:model
+  promptVersion      String?   @map("prompt_version") // version of the generation prompt/rules in code
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer            Offer             @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  resume           Resume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  template         Template          @relation(fields: [templateId], references: [id])
+  photo            UserPhoto?        @relation(fields: [photoId], references: [id], onDelete: SetNull)
+
+  @@index([userId, offerId])
+  @@index([userId, createdAt])
+  @@map("generated_resumes")
+}
+
+// ───────────────────────────── Offers ─────────────────────────────
+
+model Location {
+  id          Int          @id @default(autoincrement())
+  provider    String
+  externalId  String?      @map("external_id")
+  type        LocationType @default(city)
+  name        String
+  countryCode String       @map("country_code") @db.Char(2)
+  adminArea   String?      @map("admin_area")
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  offers Offer[]
+  users  User[]
+
+  @@unique([provider, externalId])
+  @@index([countryCode])
+  @@index([latitude, longitude])
+  @@map("locations")
+}
+
+model Offer {
+  id              String        @id @default(uuid()) @db.Uuid
+  title           String
+  companyName     String?       @map("company_name")
+  description     String // simplified Markdown (CommonMark subset)
+  language        String?       @db.VarChar(10)
+  url             String?       @unique // normalized; NULL for pasted-text offers
+  locationId      Int?          @map("location_id")
+  remoteType      RemoteType?   @map("remote_type")
+  contractType    ContractType? @map("contract_type")
+  salaryMin       Int?          @map("salary_min")
+  salaryMax       Int?          @map("salary_max")
+  salaryCurrency  String?       @map("salary_currency") @db.Char(3)
+  salaryPeriod    SalaryPeriod? @map("salary_period")
+  isPublic        Boolean       @default(true) @map("is_public")
+  source          String // e.g. indeed, company_site, user
+  externalId      String?       @map("external_id")
+  rawData         Json?         @map("raw_data")
+  createdByUserId String?       @map("created_by_user_id") @db.Uuid
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz
+  collectedAt     DateTime      @default(now()) @map("collected_at") @db.Timestamptz
+  lastVerifiedAt  DateTime?     @map("last_verified_at") @db.Timestamptz
+  closedAt        DateTime?     @map("closed_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  location         Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  createdByUser    User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  skills           OfferSkill[]
+  occupations      OfferOccupation[]
+  savedBy          SavedOffer[]
+  generatedResumes GeneratedResume[]
+
+  @@unique([source, externalId])
+  @@index([isPublic, closedAt, publishedAt(sort: Desc)])
+  @@index([locationId])
+  @@index([createdByUserId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([companyName(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@map("offers")
+}
+
+model SavedOffer {
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  offerId         String           @map("offer_id") @db.Uuid
+  status          SavedOfferStatus @default(saved)
+  notes           String?
+  appliedAt       DateTime?        @map("applied_at") @db.Timestamptz
+  statusChangedAt DateTime         @default(now()) @map("status_changed_at") @db.Timestamptz
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, offerId])
+  @@index([userId, status])
+  @@map("saved_offers")
+}
+
+// ───────────────────────────── Skills & occupations catalogue ─────────────────────────────
+
+model Skill {
+  id         Int       @id @default(autoincrement())
+  source     String // esco | manual
+  externalId String?   @map("external_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  names        SkillName[]
+  resumes      ResumeSkill[]
+  offers       OfferSkill[]
+  relations    SkillRelationship[] @relation("SkillRelFrom")
+  relatedFrom  SkillRelationship[] @relation("SkillRelTo")
+
+  @@unique([source, externalId])
+  @@map("skills")
+}
+
+model SkillName {
+  id             Int      @id @default(autoincrement())
+  skillId        Int      @map("skill_id")
+  language       String   @db.VarChar(10)
+  name           String
+  normalizedName String   @map("normalized_name")
+  isCanonical    Boolean  @default(false) @map("is_canonical")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, language, normalizedName])
+  @@index([language, normalizedName])
+  @@map("skill_names")
+}
+
+model Occupation {
+  id         Int      @id @default(autoincrement())
+  source     String
+  externalId String?  @map("external_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  names       OccupationName[]
+  resumes     ResumeOccupation[]
+  offers      OfferOccupation[]
+  relations   OccupationRelationship[] @relation("OccRelFrom")
+  relatedFrom OccupationRelationship[] @relation("OccRelTo")
+
+  @@unique([source, externalId])
+  @@map("occupations")
+}
+
+model OccupationName {
+  id             Int      @id @default(autoincrement())
+  occupationId   Int      @map("occupation_id")
+  language       String   @db.VarChar(10)
+  name           String
+  normalizedName String   @map("normalized_name")
+  isCanonical    Boolean  @default(false) @map("is_canonical")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  occupation Occupation @relation(fields: [occupationId], references: [id], onDelete: Cascade)
+
+  @@unique([occupationId, language, normalizedName])
+  @@index([language, normalizedName])
+  @@map("occupation_names")
+}
+
+model ResumeSkill {
+  resumeId  String   @map("resume_id") @db.Uuid
+  skillId   Int      @map("skill_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([resumeId, skillId])
+  @@index([skillId])
+  @@map("resume_skills")
+}
+
+model OfferSkill {
+  offerId   String   @map("offer_id") @db.Uuid
+  skillId   Int      @map("skill_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([offerId, skillId])
+  @@index([skillId])
+  @@map("offer_skills")
+}
+
+model ResumeOccupation {
+  resumeId     String   @map("resume_id") @db.Uuid
+  occupationId Int      @map("occupation_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  resume     Resume     @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  occupation Occupation @relation(fields: [occupationId], references: [id], onDelete: Cascade)
+
+  @@id([resumeId, occupationId])
+  @@index([occupationId])
+  @@map("resume_occupations")
+}
+
+model OfferOccupation {
+  offerId      String   @map("offer_id") @db.Uuid
+  occupationId Int      @map("occupation_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  offer      Offer      @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  occupation Occupation @relation(fields: [occupationId], references: [id], onDelete: Cascade)
+
+  @@id([offerId, occupationId])
+  @@index([occupationId])
+  @@map("offer_occupations")
+}
+
+// Post-MVP: keep in the design, create when recommendations/matching need it.
+model SkillRelationship {
+  skillId          Int              @map("skill_id")
+  relatedSkillId   Int              @map("related_skill_id")
+  relationshipType RelationshipType @map("relationship_type")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  skill        Skill @relation("SkillRelFrom", fields: [skillId], references: [id], onDelete: Cascade)
+  relatedSkill Skill @relation("SkillRelTo", fields: [relatedSkillId], references: [id], onDelete: Cascade)
+
+  @@id([skillId, relatedSkillId, relationshipType])
+  @@index([relatedSkillId])
+  @@map("skill_relationships")
+}
+
+model OccupationRelationship {
+  occupationId        Int              @map("occupation_id")
+  relatedOccupationId Int              @map("related_occupation_id")
+  relationshipType    RelationshipType @map("relationship_type")
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  occupation        Occupation @relation("OccRelFrom", fields: [occupationId], references: [id], onDelete: Cascade)
+  relatedOccupation Occupation @relation("OccRelTo", fields: [relatedOccupationId], references: [id], onDelete: Cascade)
+
+  @@id([occupationId, relatedOccupationId, relationshipType])
+  @@index([relatedOccupationId])
+  @@map("occupation_relationships")
+}

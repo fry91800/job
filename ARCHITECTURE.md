@@ -4,7 +4,7 @@
 
 Job Platform is a web application built around a React frontend, an Express backend, and a PostgreSQL database.
 
-The project is organized as a monorepo with separate applications for the frontend, backend API, and job collector.
+The project is organized as a monorepo with separate applications for the frontend, backend API, and job collector, plus one shared package for code that both the frontend and the backend need.
 
 ## Applications
 
@@ -40,6 +40,22 @@ It runs independently from the web application and communicates directly with th
 
 Its implementation will evolve as the project develops.
 
+## Shared package
+
+The `packages/shared` package contains pure TypeScript code used by more than one application. It has no dependency on React, Express, Prisma or the database.
+
+Contents:
+
+* Validation schemas: ResumeContent, modifier_config, change set, search parameters (see `DATABASE.md`)
+* The match % formula (`FEATURE.md` O4): the web app uses it to display scores, and the API uses it to store the score snapshot on generated resumes
+* Shared types and constants (enum values, limits that the UI must display)
+
+Rules:
+
+* Only put code here when at least two applications need it.
+* No I/O (no HTTP, no database, no file system): only functions and types.
+* A business rule that lives here must not be re-implemented in an application.
+
 ## Database
 
 PostgreSQL is the main database.
@@ -69,11 +85,11 @@ Additional domains may be added as the application grows.
 The frontend communicates with the backend through HTTP requests to the Express REST API.
 
 ```text
-React
-  ↓
-Express API
-  ↓
-Prisma
+React ──────────┐
+  ↓             │ imports
+Express API ────┤
+  ↓             ▼
+Prisma      packages/shared
   ↓
 PostgreSQL
 ```
@@ -95,3 +111,4 @@ PostgreSQL
 * Avoid unnecessary abstractions.
 * Prefer simple solutions that can evolve later.
 * Do not implement future requirements before they are needed.
+* Write shared business rules once, in `packages/shared`.

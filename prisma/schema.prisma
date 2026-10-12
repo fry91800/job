@@ -7,9 +7,9 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
 }
 
+// Prisma 7: the connection URL lives in prisma.config.ts, not here.
 datasource db {
   provider   = "postgresql"
-  url        = env("DATABASE_URL")
   extensions = [pg_trgm]
 }
 
@@ -72,9 +72,9 @@ enum SavedOfferStatus {
 
 enum LocationType {
   city
-  region
+  county  // e.g. French département
+  region  // e.g. French région
   country
-  other
 
   @@map("location_type")
 }
@@ -262,7 +262,10 @@ model Location {
   type        LocationType @default(city)
   name        String
   countryCode String       @map("country_code") @db.Char(2)
-  adminArea   String?      @map("admin_area")
+  regionCode  String?      @map("region_code") // ISO 3166-2, e.g. FR-IDF
+  regionName  String?      @map("region_name")
+  countyCode  String?      @map("county_code") // e.g. 91
+  countyName  String?      @map("county_name")
   latitude    Float?
   longitude   Float?
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
@@ -272,7 +275,7 @@ model Location {
   users  User[]
 
   @@unique([provider, externalId])
-  @@index([countryCode])
+  @@index([countryCode, regionCode, countyCode])
   @@index([latitude, longitude])
   @@map("locations")
 }

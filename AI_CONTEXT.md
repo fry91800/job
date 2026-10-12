@@ -32,10 +32,20 @@ apps/
 ├── api/
 └── job_collector/
 
+packages/
+└── shared/        # pure TypeScript shared by web and api (schemas, match formula)
+
 prisma/
 ├── schema.prisma
 └── migrations/
 ```
+
+## Reference documents
+
+* `FEATURE.md` — feature specification (IDs such as O4, M1 are used in code and reviews)
+* `DATABASE.md` — database design and JSON formats
+* `claude/DECISIONS.md` — decision log
+* `ARCHITECTURE.md` — technical architecture
 
 ## Development rules
 
@@ -47,7 +57,7 @@ Keep the code simple and readable.
 * Prefer small, focused modules.
 * Keep responsibilities separated.
 * Reuse existing code when appropriate.
-* Avoid duplicating business logic.
+* Avoid duplicating business logic. Logic needed by both web and api goes in `packages/shared`.
 * Use clear and descriptive names.
 * Handle errors explicitly.
 
@@ -77,7 +87,7 @@ React is responsible for the user interface.
 
 Keep components reasonably small and focused.
 
-Do not put backend or database logic in the frontend.
+Do not put backend or database logic in the frontend. Pure computations from `packages/shared` (such as the match % formula) are allowed.
 
 The frontend communicates with the backend through the REST API.
 

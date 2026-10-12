@@ -56,7 +56,7 @@ Current focus:
 
 ## Architecture
 
-The project is organized as a monorepo with separate applications for the frontend, backend API, and job collector.
+The project is organized as a monorepo with separate applications for the frontend, backend API, and job collector, and a shared package used by the frontend and the API.
 
 ```text
 .
@@ -79,6 +79,9 @@ The project is organized as a monorepo with separate applications for the fronte
 │       └── src/
 │           ├── crawlers/
 │           └── ...
+│
+├── packages/
+│   └── shared/        # schemas, match formula, shared types (no I/O)
 │
 ├── prisma/
 │   ├── schema.prisma
@@ -180,6 +183,7 @@ The project aims to remain simple and modular.
 * Prisma handles database access.
 * The job collector runs independently from the web application.
 * Business logic should remain separated from UI and data-access code.
+* Logic needed by both the frontend and the API is written once in `packages/shared`.
 * External job sources should be normalized into a common internal format.
 * AI should complement the application rather than become a required part of every operation.
 * Avoid unnecessary abstractions and dependencies until they are actually needed.
@@ -189,3 +193,7 @@ The project aims to remain simple and modular.
 * `README.md` — Project overview, setup, and current status
 * `ARCHITECTURE.md` — Technical architecture and design decisions
 * `AI_CONTEXT.md` — Context and rules for AI-assisted development
+* `FEATURE.md` — MVP feature specification
+* `DATABASE.md` — Database design, JSON formats, search rules
+* `claude/DECISIONS.md` — Decision log
+* `prisma/schema.prisma` — Draft Prisma schema
