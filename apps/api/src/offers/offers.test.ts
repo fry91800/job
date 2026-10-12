@@ -1,19 +1,13 @@
 // Integration tests for GET /api/offers. They run against the development database
 // and expect the seed data: run `npm run db:seed` first.
 import assert from "node:assert/strict";
-import type { AddressInfo } from "node:net";
-import type { Server } from "node:http";
 import { after, before, describe, test } from "node:test";
-import type { OfferSearchResponse, OfferSearchResult } from "@job/shared";
-import { stableUuid } from "../../../../prisma/seed/helpers";
-import { createApp } from "../app";
-import { prisma } from "../lib/prisma";
+import type { OfferDetail, OfferSearchResponse, OfferSearchResult } from "@job/shared";
+import { prisma, seedOfferId as offerId, startTestServer } from "../test/helpers";
 
-let server: Server;
+let server: Awaited<ReturnType<typeof startTestServer>>;
 let baseUrl: string;
 const locationIds = new Map<string, number>();
-
-const offerId = (key: string) => stableUuid(`offer:${key}`);
 
 async function search(query: Record<string, string | number>, session?: string) {
   const url = new URL("/api/offers", baseUrl);
@@ -41,14 +35,11 @@ const location = (key: string) => {
 before(async () => {
   const rows = await prisma.location.findMany({ where: { provider: "seed" }, select: { id: true, externalId: true } });
   for (const row of rows) locationIds.set(row.externalId!, row.id);
-  server = createApp().listen(0);
-  baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
+  server = await startTestServer();
+  baseUrl = server.baseUrl;
 });
 
-after(async () => {
-  server.close();
-  await prisma.$disconnect();
-});
+after(() => server.close());
 
 describe("GET /api/offers", () => {
   test("lists open public offers, 20 per page, most recent first", async () => {
@@ -165,5 +156,50 @@ describe("GET /api/offers", () => {
     const unknown = await search({ locationId: 999999 });
     assert.equal(unknown.status, 400);
     assert.equal(unknown.body.error?.code, "unknown_location");
+  });
+});
+
+describe("GET /api/offers/:id", () => {
+  test("returns the full offer with skill names in the requested language", async () => {
+    const anonymous = server.client();
+    const fr = await anonymous.get<OfferDetail>(`/api/offers/${offerId("edge-brunoy-fullstack")}`);
+    assert.equal(fr.status, 200);
+    assert.match(fr.body.description, /## Vos missions/);
+    assert.equal(fr.body.location?.name, "Brunoy");
+    assert.deepEqual(fr.body.skills.map((skill) => skill.name).sort(), ["Docker", "Express", "Node.js", "PostgreSQL", "React", "TypeScript"]);
+    assert.ok(fr.body.occupations.some((occupation) => occupation.name === "Développeur full stack"));
+    assert.equal(fr.body.saved, null);
+
+    const en = await anonymous.get<OfferDetail>(`/api/offers/${offerId("edge-brunoy-fullstack")}?lang=en`);
+    assert.ok(en.body.occupations.some((occupation) => occupation.name === "Full stack developer"));
+  });
+
+  test("closed offers stay viewable, with closedAt", async () => {
+    const { status, body } = await server.client().get<OfferDetail>(`/api/offers/${offerId("edge-closed")}`);
+    assert.equal(status, 200);
+    assert.ok(body.closedAt);
+  });
+
+  test("private offers are visible to their creator only", async () => {
+    const path = `/api/offers/${offerId("edge-private-user")}`;
+    assert.equal((await server.client().get(path)).status, 404);
+    assert.equal((await server.client("dev-session-alice").get(path)).status, 404);
+
+    const demo = await server.client("dev-session-demo").get<OfferDetail>(path);
+    assert.equal(demo.status, 200);
+    assert.equal(demo.body.isOwn, true);
+    assert.equal(demo.body.saved?.status, "saved");
+  });
+
+  test("includes the user's saved entry", async () => {
+    const { body } = await server.client("dev-session-demo").get<OfferDetail>(`/api/offers/${offerId("edge-brunoy-fullstack")}`);
+    assert.equal(body.saved?.status, "applied");
+    assert.equal(body.saved?.notes, "Candidature envoyée via le site.");
+    assert.deepEqual(body.generatedResumes, []);
+  });
+
+  test("unknown or malformed ids return 404", async () => {
+    assert.equal((await server.client().get(`/api/offers/${offerId("does-not-exist")}`)).status, 404);
+    assert.equal((await server.client().get("/api/offers/not-a-uuid")).status, 404);
   });
 });

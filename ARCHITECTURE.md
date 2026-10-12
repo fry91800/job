@@ -8,9 +8,17 @@ The project is organized as a monorepo with separate applications for the fronte
 
 ## Applications
 
-### Web
+### Test client
 
-The `web` application is the React SPA.
+The `test-client` application is a minimal React + Vite SPA used to try the API by hand while the backend is being built. It is a development tool, not the product:
+
+* One plain page per API feature (search, offer detail, saved offers, login…), showing the API responses with minimal formatting
+* No design work, no i18n, no state management library, no component library
+* It may be replaced or deleted once `web` exists; nothing else depends on it
+
+### Web *(later)*
+
+The `web` application is the complete React SPA, built after the API. The responsibilities below, i18n (FEATURE L1) and the UI details in `FEATURE.md` apply to it, not to the test client.
 
 Responsibilities:
 
@@ -28,12 +36,14 @@ Layout (`apps/api/src`): `app.ts` builds the Express app (used by the server and
 
 Conventions:
 
-* Routes are under `/api` (the web app reaches them through the Vite proxy in development).
+* Routes are under `/api` (the frontends reach them through the Vite proxy in development).
 * Request parameters are validated with the Zod schemas from `packages/shared`.
 * Errors are returned as `{ "error": { "code": "…", "message": "…" } }` with a stable `code`; validation errors also list `issues`.
-* `req.user` is set when the request carries a valid `session` cookie; routes that require a user check it.
+* `req.user` is set when the request carries a valid `session` cookie. Route guards in `auth/session.ts`: `requireUser` (creates a guest on the first write, FEATURE G1), `requireSession` (any user, no guest creation), `requireRegistered` (accounts only).
+* Limits and rate limits live in `apps/api/src/config.ts`. Rate limits are kept in memory (one API process); they move to the database or Redis if the API runs on several processes.
+* State-changing requests carrying an `Origin` header must come from `WEB_ORIGINS` (CSRF check, with the `SameSite=Lax` cookie).
 * SQL that Prisma's query builder cannot express (location matching, trigram search) is written with `Prisma.sql` tagged templates, never by concatenating strings.
-* Tests use Node's test runner (`node --test`) and run against the seeded development database.
+* Tests use Node's test runner (`node --test`) and run against the seeded development database, one file at a time. Helpers in `apps/api/src/test/helpers.ts` start a server, keep cookies like a browser and delete the users a test file created.
 * TypeScript runs directly through `tsx`; there is no build step yet.
 
 Responsibilities:

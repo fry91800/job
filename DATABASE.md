@@ -57,7 +57,7 @@ A person using the app, **registered or guest**. A guest is a row with `email IS
 |---|---|---|---|---|
 | id | UUID | ✓ | gen | PK |
 | email | TEXT | | NULL | Unique. Trimmed + lowercased before storage. NULL = guest |
-| password_hash | TEXT | | NULL | Argon2id/bcrypt hash. NULL = guest |
+| password_hash | TEXT | | NULL | Argon2id hash as a PHC string (`$argon2id$v=19$m=…`). NULL = guest |
 | email_verified_at | TIMESTAMPTZ | | NULL | Not required to use the app in MVP |
 | ui_language | VARCHAR(10) | ✓ | `fr` | `fr` \| `en`. Set from the language in use when the row is created; used for UI and emails |
 | last_active_at | TIMESTAMPTZ | ✓ | now | Updated when the session is extended (at most once a day); drives guest cleanup |
@@ -487,7 +487,7 @@ Rules
 * Seeded offers have `source = 'seed'`, `url = https://jobs.example.com/offers/{external_id}` and fictional company names.
 * `resume_skills` are derived from the resume content (skill names + technologies, looked up in the catalogue) as the API will do; `offer_skills`/`offer_occupations` come from the job profile.
 * Each user has a session whose raw token is fixed (`dev-session-{user}`); `sessions.token_hash` stores its SHA-256 as in production.
-* Passwords are hashed with Node's `scrypt` (`scrypt$salt$hash`) as a placeholder; change `hashPassword` in `seed.ts` if the auth code picks another scheme.
+* Passwords are hashed with the API's `hashPassword` (Argon2id), so seeded users can log in.
 
 ## Appendix — draft `prisma/schema.prisma`
 

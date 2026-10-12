@@ -34,7 +34,8 @@ The frontend and backend are separate applications.
 
 ```text
 apps/
-├── web/
+├── test-client/    # minimal React client to test the API by hand
+├── web/            # complete frontend (later)
 ├── api/            # Express API (see ARCHITECTURE.md for its layout and conventions)
 └── job_collector/
 
@@ -88,6 +89,11 @@ Routes should remain simple and focused.
 Business logic should not be unnecessarily placed directly inside route handlers.
 
 ## Frontend rules
+
+There are two frontends (see ARCHITECTURE.md):
+
+* `apps/test-client` (now): keep it **as simple as possible**. Its only purpose is to call the API and show the results. No styling beyond the bare minimum, no i18n, no extra libraries, no abstractions. Do not spend effort on UX.
+* `apps/web` (later): the real frontend. Do not start it unless explicitly requested. The rules below are for it.
 
 React is responsible for the user interface.
 

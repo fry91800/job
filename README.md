@@ -8,7 +8,7 @@ Early development / MVP.
 
 Current focus:
 
-* Backend API (Express): offer search (`GET /api/offers`) is done; next routes follow `FEATURE.md`
+* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers (see *API* below). Next routes follow `FEATURE.md`
 * Development seed data used to write and test the API
 
 Done:
@@ -19,6 +19,7 @@ Done:
 Postponed:
 
 * Job collector: work starts once the API can search the seeded offers. Until then the database is filled by the development seed.
+* Full frontend (`apps/web`): built after the API. Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
 
 ## Planned features
 
@@ -38,6 +39,9 @@ Postponed:
 
 * React
 * Vite
+* Two frontends, built at different times:
+  * `apps/test-client` (now): a minimal client for testing the API by hand. Throwaway quality, no design work
+  * `apps/web` (later): the real, complete user interface
 * Single Page Application (SPA)
 * Typescript
 
@@ -67,7 +71,9 @@ The project is organized as a monorepo with separate applications for the fronte
 ```text
 .
 ├── apps/
-│   ├── web/
+│   ├── test-client/   # minimal React client for testing the API (now)
+│   │
+│   ├── web/           # complete frontend (later)
 │   │   └── src/
 │   │       ├── jobs/
 │   │       ├── users/
@@ -129,7 +135,7 @@ The collector does not depend on the web application being open or running.
 
 ## Getting started
 
-Requirements: Node.js 20.19 or later (Prisma 7), Docker. The repository pins Node 24 in `.nvmrc`.
+Requirements: Node.js 24.7 or later (built-in Argon2 password hashing), Docker. The repository pins Node 24 in `.nvmrc`.
 
 ```bash
 nvm use
@@ -169,6 +175,28 @@ The session token goes in the `session` cookie:
 ```bash
 curl -H "Cookie: session=dev-session-demo" "http://localhost:3000/api/offers?q=react&locationId=1"
 ```
+
+## API
+
+All routes are under `/api`. Request and response types are in `packages/shared`. Errors are `{ "error": { "code", "message" } }`.
+
+| Route | Feature | Notes |
+|---|---|---|
+| `GET /api/offers` | O1 | Search. Query: `q`, `locationId`, `radius`, `includeRemote`, `skills`, `company`, `remoteType`, `contractType`, `publishedWithin`, `salaryMin`, `salaryCurrency`, `salaryPeriod`, `salaryShownOnly`, `sort`, `page` |
+| `GET /api/offers/:id` | O2 | `?lang=fr\|en` for skill/occupation names |
+| `GET /api/locations?q=` | O1 | Autocomplete from the `locations` table (Geoapify later) |
+| `GET /api/auth/me` | — | Current user (or `null`) with the selected resume's skill/occupation ids |
+| `POST /api/auth/signup` | A1, G2 | Upgrades the current guest if there is one |
+| `POST /api/auth/login` | A2 | Merges the current guest's data into the account |
+| `POST /api/auth/logout`, `/logout-all` | A3 | Registered users only |
+| `POST /api/auth/password` | A7 | Logs out the other devices |
+| `DELETE /api/auth/account` | A5 | Password confirmation |
+| `GET /api/saved-offers` | O3 | `?status=`, `?sort=saved\|status_changed` |
+| `PUT /api/saved-offers/:offerId` | O3 | Save (creates a guest on first write) |
+| `PATCH /api/saved-offers/:offerId` | O3 | `status`, `notes`, `appliedAt` |
+| `DELETE /api/saved-offers/:offerId` | O3 | Unsave |
+
+Not built yet: password reset (A4) and email verification (A6) need an email provider; settings, templates, resumes, generation, translation and user-added offers.
 
 ## Development
 

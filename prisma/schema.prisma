@@ -10,7 +10,7 @@ generator client {
 // Prisma 7: the connection URL lives in prisma.config.ts, not here.
 datasource db {
   provider   = "postgresql"
-  extensions = [pg_trgm]
+  extensions = [pg_trgm, unaccent]
 }
 
 // ───────────────────────────── Enums ─────────────────────────────

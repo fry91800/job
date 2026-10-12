@@ -117,7 +117,7 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 |---|---|---|
 | P23 | **The backend API is built before the job collector**; the collector is postponed | The API (search first) can be written and tested with seeded offers; collector sources are still undecided (P12) |
 | D36 | Development seed in `prisma/seed/`: truncates every table, then inserts locations, a small fr/en skill/occupation catalogue, 200 offers (180 generated with a fixed random seed + 20 hand-written edge cases), users with resumes, saved offers and fixed session tokens | A known, re-creatable data set for writing and testing search, saved offers and match %. Edge cases cover each search rule from DATABASE.md *locations* |
-| D37 | Node.js ≥ 20.19 required (`engines`, `.nvmrc` = 24); npm `db:*` scripts pass `--config prisma7.config.ts` | Prisma 7 does not run on Node 18; the config file has a non-default name |
+| D37 | Node.js ≥ 20.19 required (raised to 24.7 by D43) (`engines`, `.nvmrc` = 24); npm `db:*` scripts pass `--config prisma7.config.ts` | Prisma 7 does not run on Node 18; the config file has a non-default name |
 
 ## Update 9 — constraints and first API route (2026-10-12)
 
@@ -128,6 +128,23 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D40 | API conventions: `/api` prefix, `session` cookie name, `{error: {code, message}}` error format, Node's test runner against the seeded DB, `tsx` without a build step (details in ARCHITECTURE.md) | Smallest setup that works; a build step can be added for deployment |
 | D41 | Search keywords: split on spaces, **every word** must match the title (ILIKE or trigram word similarity ≥ 0.6, which tolerates missing accents and small typos), the company or a linked occupation name | "développeur react" must find "Développeur Front-end React"; scraped titles often lack accents |
 | D42 | Search results: wider-area offers are sorted after all other matches whatever the sort; remote offers from elsewhere are sorted with exact matches and labelled `remote`; `distanceKm` is returned for city offers in a city search; a fully remote offer with no location matches any location search | FEATURE O1 ranks wider areas last; remote offers are as relevant as local ones once the user asked for them |
+
+## Update 10 — test client first, full frontend later (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P24 | The React frontend built now is a **minimal test client** (`apps/test-client`) for trying the API by hand; the complete frontend (`apps/web`) is built later | Focus stays on the backend; the API contract can still change, so polished UI work now would be wasted. UI requirements in FEATURE.md (i18n, UX details) apply to `apps/web` only |
+
+## Update 11 — accounts, offer detail, saved offers (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D43 | Passwords hashed with **Argon2id built into Node** (`crypto.argon2`, Node ≥ 24.7), OWASP parameters (19 MiB, t=2, p=1), stored as a PHC string; the seed uses the same function | Argon2id was the documented choice; the built-in version needs no native dependency. The PHC format lets parameters change later |
+| D44 | Rate limits (login failures per email 5/15 min and per IP, sign-ups and guest creation per IP) are in memory | One API process in the MVP; no extra table or service |
+| D45 | Saved offers are addressed by **offer id** (`PUT/PATCH/DELETE /api/saved-offers/:offerId`); `PUT` is idempotent; `GET` returns an empty list to anonymous visitors instead of creating a guest | One saved entry per user and offer, so the offer id is the natural key; reads never create guests (FEATURE G1) |
+| D46 | Login always replaces the current session; when it belonged to a guest, the guest is merged and deleted even if it has no data | One code path; an empty guest has nothing to lose |
+| D47 | Location autocomplete searches the `locations` table (prefix, accent-insensitive with the `unaccent` extension, then trigram). Geoapify results will be inserted into `locations` to get an id | Search needs a `locationId` now; the seeded locations are enough until Geoapify is set up |
+| D48 | Offer detail takes `?lang=` for skill/occupation names (default: the user's UI language, else `fr`) | Anonymous visitors have no stored language; the web app knows the UI language |
 
 ## Assumptions made (change if wrong)
 

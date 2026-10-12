@@ -2,9 +2,10 @@
 // writing and testing the API (search, offer detail, saved offers, match %).
 // Run with `npm run db:seed`. Never run it against a database you care about.
 import "dotenv/config";
-import { createHash, randomBytes, scryptSync } from "node:crypto";
+import { createHash } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "../../apps/api/src/auth/password";
 import { occupations, skills, type CatalogueEntry } from "./catalogue";
 import { createRandom, normalizeName, stableUuid } from "./helpers";
 import { locations } from "./locations";
@@ -22,12 +23,6 @@ if (!process.env.DATABASE_URL) {
 }
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
-
-// Placeholder until the auth code picks its hashing scheme; reseed after changing it.
-function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  return `scrypt$${salt.toString("hex")}$${scryptSync(password, salt, 64).toString("hex")}`;
-}
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -140,11 +135,12 @@ async function main() {
 
   // Users and their sessions.
   const userId = (key: string) => stableUuid(`user:${key}`);
+  const passwordHashes = await Promise.all(users.map((user) => (user.password ? hashPassword(user.password) : null)));
   await prisma.user.createMany({
-    data: users.map((user) => ({
+    data: users.map((user, index) => ({
       id: userId(user.key),
       email: user.email,
-      passwordHash: user.password ? hashPassword(user.password) : null,
+      passwordHash: passwordHashes[index],
       emailVerifiedAt: user.email ? new Date() : null,
       uiLanguage: user.uiLanguage,
       searchLocationId: locationId(user.searchLocationKey),

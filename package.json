@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=20.19"
+    "node": ">=24.7"
   },
   "scripts": {
     "db:up": "docker compose up -d postgres",
@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "api:dev": "tsx watch apps/api/src/server.ts",
     "api:start": "tsx apps/api/src/server.ts",
-    "api:test": "node --import tsx --test \"apps/api/src/**/*.test.ts\""
+    "api:test": "node --import tsx --test --test-concurrency=1 \"apps/api/src/**/*.test.ts\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

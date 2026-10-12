@@ -2,6 +2,8 @@
 
 Reference for implementation. Each feature has an ID used in code reviews, tickets and `claude/DECISIONS.md`. Tables are described in `DATABASE.md`.
 
+The UI behaviour described here is for the complete frontend (`apps/web`, built later). The current test client (`apps/test-client`) only needs to exercise the API.
+
 Conventions: **Guest** = visitor without an account (server-side guest user). **User** = guest or registered. Limits are configuration values (env/config file), not hard-coded and not stored in the DB; the numbers below are the initial defaults.
 
 ---

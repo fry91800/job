@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LocationSummary } from "../locations";
 
 // Offer search (FEATURE O1). The web app builds the URL query string from these
 // parameters; the API validates the query string with the same schema.
@@ -67,14 +68,7 @@ export type OfferSearchResult = {
   id: string;
   title: string;
   companyName: string | null;
-  location: {
-    id: number;
-    type: "city" | "county" | "region" | "country";
-    name: string;
-    countryCode: string;
-    regionName: string | null;
-    countyName: string | null;
-  } | null;
+  location: LocationSummary | null;
   locationMatch: LocationMatch | null; // null when no location was searched
   distanceKm: number | null; // city search only, for city offers
   remoteType: RemoteType | null;
