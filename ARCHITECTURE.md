@@ -16,6 +16,8 @@ The `test-client` application is a minimal React + Vite SPA used to try the API 
 * No design work, no i18n, no state management library, no component library
 * It may be replaced or deleted once `web` exists; nothing else depends on it
 
+Layout: `src/api.ts` (fetch wrapper that feeds the request log panel), `src/App.tsx` (tabs, current user, request log), one file per page in `src/pages/`. Navigation is plain React state (no router). Vite proxies `/api` to the API, so the session cookie works without CORS.
+
 ### Web *(later)*
 
 The `web` application is the complete React SPA, built after the API. The responsibilities below, i18n (FEATURE L1) and the UI details in `FEATURE.md` apply to it, not to the test client.

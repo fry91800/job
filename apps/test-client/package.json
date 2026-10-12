@@ -1,0 +1,16 @@
+{
+  "name": "@job/test-client",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@job/shared": "*",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
+  }
+}

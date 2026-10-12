@@ -9,5 +9,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["apps", "packages", "prisma", "prisma7.config.ts"]
+  "include": ["apps", "packages", "prisma", "prisma7.config.ts"],
+  "exclude": ["apps/test-client"]
 }

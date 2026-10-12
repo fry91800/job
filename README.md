@@ -148,6 +148,7 @@ npm run db:seed      # empty the database and insert the development data
 Other scripts:
 
 * `npm run api:dev` — start the API on http://localhost:3000 (restarts on change)
+* `npm run client:dev` — start the test client on http://localhost:5173 (needs the API running); it proxies `/api` to the API
 * `npm run api:test` — API integration tests (they expect the seed data: run `npm run db:seed` first)
 * `npm run db:reset` — drop everything, re-apply the migrations and reseed
 * `npm run db:studio` — browse the data in Prisma Studio
@@ -196,7 +197,19 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `PATCH /api/saved-offers/:offerId` | O3 | `status`, `notes`, `appliedAt` |
 | `DELETE /api/saved-offers/:offerId` | O3 | Unsave |
 
-Not built yet: password reset (A4) and email verification (A6) need an email provider; settings, templates, resumes, generation, translation and user-added offers.
+Not built yet: settings, templates, resumes, generation, translation and user-added offers. Password reset (A4) and email verification (A6) are postponed (they need an email provider).
+
+## Test client
+
+`apps/test-client` is a bare React page for trying the API by hand: search (with location autocomplete), offer detail, saved offers (status, notes, applied date) and account actions (sign up, log in as a seeded user, log out, change password, delete account). A side panel lists every API request with its JSON response.
+
+```bash
+npm run api:dev
+```
+
+```bash
+npm run client:dev
+```
 
 ## Development
 

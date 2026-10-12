@@ -145,6 +145,7 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D46 | Login always replaces the current session; when it belonged to a guest, the guest is merged and deleted even if it has no data | One code path; an empty guest has nothing to lose |
 | D47 | Location autocomplete searches the `locations` table (prefix, accent-insensitive with the `unaccent` extension, then trigram). Geoapify results will be inserted into `locations` to get an id | Search needs a `locationId` now; the seeded locations are enough until Geoapify is set up |
 | D48 | Offer detail takes `?lang=` for skill/occupation names (default: the user's UI language, else `fr`) | Anonymous visitors have no stored language; the web app knows the UI language |
+| P25 | Password reset (A4) and email verification (A6) are **postponed** | They need an email provider, not chosen yet |
 
 ## Assumptions made (change if wrong)
 
