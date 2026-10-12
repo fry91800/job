@@ -26,6 +26,8 @@ export const config = {
     resumeUploads: { guestTotal: 3, registeredPerDay: 20 },
     uploadMaxBytes: 5 * 1024 * 1024,
     photos: { guest: 3, registered: 10 },
+    // User-added offers (O5), counted from the created offers (FEATURE G4).
+    userOffers: { guestTotal: 3, registeredPerDay: 30 },
     photoMaxPixels: 1000, // longest side after resizing (R6)
   },
 
@@ -49,5 +51,7 @@ export const config = {
     loginFailuresPerIp: { max: 30, windowMs: 15 * 60 * 1000 },
     signupsPerIp: { max: 10, windowMs: 3600 * 1000 },
     guestsPerIp: { max: 30, windowMs: 3600 * 1000 },
+    // Every endpoint that will call the AI (FEATURE G4).
+    aiPerIp: { max: 60, windowMs: 3600 * 1000 },
   },
 };

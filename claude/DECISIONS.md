@@ -172,6 +172,17 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D60 | Purging a soft-deleted resume removes its row, so a guest's lifetime upload count (G4) can go down after 30 days | Accepted: personal data must go; the per-IP rate limit on guest creation still applies |
 | D61 | The dev seed also empties the local file storage | Files belong to the rows it truncates |
 
+## Update 14 — user-added offers (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P28 | **Offer extraction is a placeholder** (O5): a URL gives a sample offer, pasted text is split into title (first line) and description. The page is **not fetched** yet | The AI does the real extraction. Fetching user-supplied URLs needs SSRF protection; it is built together with the extractor, since the placeholder would ignore the page |
+| D62 | Two steps: `POST /api/user-offers/extract` returns a draft (nothing stored), `POST /api/user-offers` creates the reviewed offer | O5: the user reviews the fields before the offer is saved |
+| D63 | A known URL (after normalization) returns `{ existingOfferId }` and saves that offer for the user, **even if it was another user's private offer**; creating with a known URL answers `409 offer_exists` with the id | O5 "reuse it"; knowing the page's URL is enough to see its content anyway |
+| D64 | URL normalization in `packages/shared` (`normalizeOfferUrl`): http(s) only, no credentials, scheme/host lowercased, default port and fragment removed, tracking parameters (`utm_*`, `gclid`, `fbclid`…) removed, remaining parameters sorted | The collector must produce the same `offers.url` for the same page |
+| D65 | Skills/occupations of user-added offers: dictionary matching of catalogue names as whole words (skills in title + description, occupations in the title) | M2 lets the method be chosen per source; no AI needed. Known limit: short names can match common words ("Go") |
+| D66 | User-added offers quota counted from created offers (guest 3 total, registered 30/day), checked at extract and create; extraction also has a per-IP rate limit (`aiPerIp`) | FEATURE G4: AI endpoints are quota-limited and rate-limited per IP |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

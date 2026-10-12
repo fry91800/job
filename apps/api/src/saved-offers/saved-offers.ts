@@ -48,11 +48,18 @@ export async function listSavedOffers(
 }
 
 // Idempotent: saving an offer twice returns the existing entry.
-export async function saveOffer(user: { id: string; isGuest: boolean }, offerId: string): Promise<{ created: boolean; saved: SavedOfferInfo }> {
+// `requireVisible: false` is for O5: a user who adds the URL of an existing offer gets it
+// saved even if it was another user's private offer (they know the page already).
+export async function saveOffer(
+  user: { id: string; isGuest: boolean },
+  offerId: string,
+  { requireVisible = true }: { requireVisible?: boolean } = {},
+): Promise<{ created: boolean; saved: SavedOfferInfo }> {
   const existing = await prisma.savedOffer.findUnique({ where: { userId_offerId: { userId: user.id, offerId } } });
   if (existing) return { created: false, saved: toSavedOfferInfo(existing) };
 
-  const offer = await prisma.offer.findFirst({ where: { id: offerId, ...visibleOfferWhere(user.id) }, select: { id: true } });
+  const where = requireVisible ? { id: offerId, ...visibleOfferWhere(user.id) } : { id: offerId };
+  const offer = await prisma.offer.findFirst({ where, select: { id: true } });
   if (!offer) throw new HttpError(404, "offer_not_found", "Offer not found");
 
   const limit = user.isGuest ? config.limits.savedOffers.guest : config.limits.savedOffers.registered;

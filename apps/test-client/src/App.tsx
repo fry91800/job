@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MeResponse } from "@job/shared";
 import { api, onApiCall, type LogEntry } from "./api";
+import { AddOfferPage } from "./pages/AddOfferPage";
 import { AuthPage } from "./pages/AuthPage";
 import { GeneratedPage, GeneratedResumePage } from "./pages/GeneratedPages";
 import { OfferPage } from "./pages/OfferPage";
@@ -10,7 +11,7 @@ import { SavedPage } from "./pages/SavedPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
-type Tab = "search" | "saved" | "resumes" | "photos" | "generated" | "settings" | "auth";
+type Tab = "search" | "addOffer" | "saved" | "resumes" | "photos" | "generated" | "settings" | "auth";
 export type Page = { name: Tab } | { name: "offer" | "resume" | "generatedResume"; id: string };
 export type Navigate = (page: Page) => void;
 
@@ -42,7 +43,7 @@ export function App() {
     <div className="layout">
       <main>
         <nav>
-          {tab("search", "Search")} {tab("saved", "Saved offers")} {tab("resumes", "Resumes")} {tab("photos", "Photos")} {tab("generated", "Generated")}{" "}
+          {tab("search", "Search")} {tab("addOffer", "Add offer")} {tab("saved", "Saved offers")} {tab("resumes", "Resumes")} {tab("photos", "Photos")} {tab("generated", "Generated")}{" "}
           {tab("settings", "Settings")} {tab("auth", "Account")}{" "}
           <span className="muted">
             {me ? `${me.isGuest ? "Guest" : me.email} (${me.id.slice(0, 8)})` : "Anonymous"}
@@ -52,6 +53,7 @@ export function App() {
         {page.name === "offer" && <OfferPage key={page.id} id={page.id} me={me} refreshMe={refreshMe} navigate={setPage} />}
         {page.name === "resumes" && <ResumesPage navigate={setPage} refreshMe={refreshMe} />}
         {page.name === "resume" && <ResumePage key={page.id} id={page.id} refreshMe={refreshMe} />}
+        {page.name === "addOffer" && <AddOfferPage navigate={setPage} refreshMe={refreshMe} />}
         {page.name === "photos" && <PhotosPage />}
         {page.name === "generated" && <GeneratedPage navigate={setPage} />}
         {page.name === "generatedResume" && <GeneratedResumePage key={page.id} id={page.id} navigate={setPage} />}

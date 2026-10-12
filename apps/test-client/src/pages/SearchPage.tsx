@@ -49,7 +49,7 @@ export function formatSalary(salary: OfferSearchResult["salary"]): string {
   return `${salary.min ?? "?"}${salary.max !== null && salary.max !== salary.min ? `–${salary.max}` : ""} ${salary.currency}/${salary.period}`;
 }
 
-function LocationPicker({ value, onChange }: { value: LocationSummary | null; onChange: (location: LocationSummary | null) => void }) {
+export function LocationPicker({ value, onChange }: { value: LocationSummary | null; onChange: (location: LocationSummary | null) => void }) {
   const [text, setText] = useState("");
   const [suggestions, setSuggestions] = useState<LocationSummary[]>([]);
 

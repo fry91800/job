@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { computeMatch, type GeneratedResumeDetail, type LanguageMismatchDetails, type MeResponse, type OfferDetail } from "@job/shared";
 import { api, errorText } from "../api";
 import type { Navigate } from "../App";
+import { OfferForm } from "../OfferForm";
 import { GeneratedList } from "./GeneratedPages";
 import { SavedEditor } from "../SavedEditor";
 import { formatLocation, formatSalary } from "./SearchPage";
@@ -10,6 +11,7 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
   const [lang, setLang] = useState("");
   const [offer, setOffer] = useState<OfferDetail | null>(null);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
     const result = await api<OfferDetail>("GET", `/api/offers/${id}${lang ? `?lang=${lang}` : ""}`);
@@ -50,6 +52,34 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
 
   if (!offer) return <p className="error">{error}</p>;
 
+  // The creator edits a private user-added offer (O5).
+  if (editing) {
+    const draft = {
+      title: offer.title, companyName: offer.companyName, description: offer.description, language: offer.language as "fr" | "en" | null,
+      url: offer.url, locationId: offer.location?.id ?? null, remoteType: offer.remoteType, contractType: offer.contractType,
+      salaryMin: offer.salary?.min ?? null, salaryMax: offer.salary?.max ?? null, salaryCurrency: offer.salary?.currency ?? null, salaryPeriod: offer.salary?.period ?? null,
+    };
+    return (
+      <div>
+        <h2>Edit offer</h2> <button onClick={() => setEditing(false)}>Cancel</button>
+        {error && <p className="error">{error}</p>}
+        <OfferForm
+          initial={draft}
+          initialLocation={offer.location}
+          submitLabel="Save"
+          onSubmit={async (reviewed) => {
+            const result = await api<OfferDetail>("PUT", `/api/user-offers/${offer.id}`, reviewed);
+            setError(errorText(result));
+            if (result.ok) {
+              setEditing(false);
+              load();
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   const resume = me?.selectedResume;
   const match = resume && computeMatch({ skillIds: offer.skills.map((skill) => skill.id), occupationIds: offer.occupations.map((item) => item.id) }, resume);
   const skillName = (skillId: number) => offer.skills.find((skill) => skill.id === skillId)?.name ?? skillId;
@@ -58,7 +88,11 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
     <div>
       <h2>{offer.title}</h2>
       {offer.closedAt && <p className="error">No longer available (closed {new Date(offer.closedAt).toLocaleDateString()})</p>}
-      {!offer.isPublic && <p className="muted">Private offer{offer.isOwn ? " (added by you)" : ""}</p>}
+      {!offer.isPublic && (
+        <p className="muted">
+          Private offer{offer.isOwn ? " (added by you)" : ""} {offer.isOwn && <button onClick={() => setEditing(true)}>Edit</button>}
+        </p>
+      )}
       <table>
         <tbody>
           <tr><th>Company</th><td>{offer.companyName ?? "—"}</td></tr>

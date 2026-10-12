@@ -8,7 +8,7 @@ Early development / MVP.
 
 Current focus:
 
-* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload uses a placeholder parser), photos, match %, settings and templates, resume generation without AI and PDF download, cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
+* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload uses a placeholder parser), photos, user-added offers (placeholder extractor), match %, settings and templates, resume generation without AI and PDF download, cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
 * Development seed data used to write and test the API
 
 Done:
@@ -187,6 +187,9 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 |---|---|---|
 | `GET /api/offers` | O1 | Search. Query: `q`, `locationId`, `radius`, `includeRemote`, `skills`, `company`, `remoteType`, `contractType`, `publishedWithin`, `salaryMin`, `salaryCurrency`, `salaryPeriod`, `salaryShownOnly`, `sort`, `page` |
 | `GET /api/offers/:id` | O2 | `?lang=fr\|en` for skill/occupation names |
+| `POST /api/user-offers/extract` | O5 | `{ url }` or `{ text }` → `{ draft }` to review, or `{ existingOfferId }` (known URL, saved for the user). **Placeholder extractor** |
+| `POST /api/user-offers` | O5 | Create the private offer from the reviewed draft (saved automatically) |
+| `PUT /api/user-offers/:id` | O5 | Creator only, while the offer is private |
 | `GET /api/locations?q=` | O1 | Autocomplete from the `locations` table (Geoapify later) |
 | `GET /api/auth/me` | — | Current user (or `null`) with the selected resume's skill/occupation ids |
 | `POST /api/auth/signup` | A1, G2 | Upgrades the current guest if there is one |
@@ -216,11 +219,11 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `DELETE /api/generated-resumes/:id` | M3 | Soft delete |
 | `GET /api/generated-resumes/:id/html`, `/pdf` | M3 | Rendered preview; PDF printed by headless Chromium |
 
-Not built yet: AI (resume parsing, generation with the modifier, change review M4), translation (T1), user-added offers (O5). Password reset (A4) and email verification (A6) are postponed (they need an email provider).
+Not built yet: AI (resume parsing, offer extraction and page fetching for O5, generation with the modifier, change review M4), translation (T1). Password reset (A4) and email verification (A6) are postponed (they need an email provider).
 
 ## Test client
 
-`apps/test-client` is a bare React page for trying the API by hand: search (with location autocomplete and match %), offer detail (match details, generate a resume), saved offers, resumes (JSON editor, upload), photos, generated resumes (preview, template, photo, PDF, JSON editor), settings, and account actions (sign up, log in as a seeded user, log out, change password, delete account). A side panel lists every API request with its JSON response.
+`apps/test-client` is a bare React page for trying the API by hand: search (with location autocomplete and match %), add an offer (URL or pasted text, review, edit), offer detail (match details, generate a resume), saved offers, resumes (JSON editor, upload), photos, generated resumes (preview, template, photo, PDF, JSON editor), settings, and account actions (sign up, log in as a seeded user, log out, change password, delete account). A side panel lists every API request with its JSON response.
 
 ```bash
 npm run api:dev

@@ -51,7 +51,8 @@ Conventions:
 * Resume templates are TypeScript functions returning HTML (`apps/api/src/templates/`, one file per `renderer_key`). Every resume value is escaped; the HTML preview is served with a CSP that blocks scripts. PDFs are printed from that HTML by one shared headless Chromium (`playwright-core`), with network access blocked.
 * Images are processed with `sharp` (EXIF orientation applied, metadata removed, resized, saved as WebP). The template gets the photo as a data URL, so rendering needs no network.
 * Background cleanup (`jobs/cleanup.ts`) runs inside the API every `CLEANUP_INTERVAL_HOURS` (default 24, `0` disables it) and can be run once with `npm run jobs:cleanup` (e.g. from cron). It deletes database rows first, then files.
-* Resume parsing (`resumes/resume-parser.ts`) is a placeholder until the AI provider is chosen: it returns the same sample resume for any file.
+* Resume parsing (`resumes/resume-parser.ts`) and offer extraction (`offers/offer-extractor.ts`) are placeholders until the AI provider is chosen: the parser returns the same sample resume for any file; the extractor returns a sample offer for any URL and splits pasted text into title (first line) and description. Fetching offer pages server-side comes with the real extractor and must block private network addresses (SSRF).
+* Offer skills/occupations of user-added offers are found by dictionary matching of catalogue names as whole words (`offers/offer-catalogue.ts`).
 
 Responsibilities:
 
@@ -78,7 +79,7 @@ Contents:
 * Validation schemas: ResumeContent, modifier_config, change set, search parameters (see `DATABASE.md`)
 * The match % formula (`FEATURE.md` O4): the web app uses it to display scores, and the API uses it to store the score snapshot on generated resumes
 * Request and response types of the API (e.g. `OfferSearchResponse`)
-* The catalogue name normalization (`normalizeCatalogueName`), used by the API, the seed and later the collector
+* The catalogue name normalization (`normalizeCatalogueName`) and the offer URL normalization (`normalizeOfferUrl`), used by the API, the seed and later the collector
 * Shared types and constants (enum values, limits that the UI must display)
 
 Rules:

@@ -6,6 +6,7 @@ import { errorHandler, notFound } from "./lib/error-handler";
 import { checkOrigin } from "./lib/origin-check";
 import { locationsRouter } from "./locations/locations.routes";
 import { offersRouter } from "./offers/offers.routes";
+import { userOffersRouter } from "./offers/user-offers.routes";
 import { photosRouter } from "./photos/photos.routes";
 import { resumesRouter } from "./resumes/resumes.routes";
 import { savedOffersRouter } from "./saved-offers/saved-offers.routes";
@@ -24,6 +25,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/locations", locationsRouter);
   app.use("/api/offers", offersRouter);
+  app.use("/api/user-offers", userOffersRouter);
   app.use("/api/saved-offers", savedOffersRouter);
   app.use("/api/resumes", resumesRouter);
   app.use("/api/photos", photosRouter);

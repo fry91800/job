@@ -5,6 +5,7 @@ export * from "./match";
 export * from "./offers/detail";
 export * from "./offers/saved";
 export * from "./offers/search";
+export * from "./offers/user-offers";
 export * from "./photos";
 export * from "./resumes/api";
 export * from "./resumes/content";
