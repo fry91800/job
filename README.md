@@ -8,11 +8,17 @@ Early development / MVP.
 
 Current focus:
 
-* Job database
-* Job model
-* Job collector architecture
-* PostgreSQL setup
-* Test data insertion
+* Backend API (Express): offer search (`GET /api/offers`) is done; next routes follow `FEATURE.md`
+* Development seed data used to write and test the API
+
+Done:
+
+* Database design, Prisma schema and first migration
+* PostgreSQL setup (Docker)
+
+Postponed:
+
+* Job collector: work starts once the API can search the seeded offers. Until then the database is filled by the development seed.
 
 ## Planned features
 
@@ -121,6 +127,49 @@ PostgreSQL
 
 The collector does not depend on the web application being open or running.
 
+## Getting started
+
+Requirements: Node.js 20.19 or later (Prisma 7), Docker. The repository pins Node 24 in `.nvmrc`.
+
+```bash
+nvm use
+npm install
+npm run db:up        # start PostgreSQL in Docker
+npm run db:migrate   # apply the migrations and generate the Prisma client
+npm run db:seed      # empty the database and insert the development data
+```
+
+Other scripts:
+
+* `npm run api:dev` — start the API on http://localhost:3000 (restarts on change)
+* `npm run api:test` — API integration tests (they expect the seed data: run `npm run db:seed` first)
+* `npm run db:reset` — drop everything, re-apply the migrations and reseed
+* `npm run db:studio` — browse the data in Prisma Studio
+* `npm run typecheck` — type-check the TypeScript code
+
+### Development data
+
+`npm run db:seed` (code in `prisma/seed/`) **empties every table** before inserting a fixed data set, so it can be re-run at any time. It contains:
+
+* French locations at every level (country, regions, departments, cities with coordinates), plus Brussels for the "other country" case
+* A small skill and occupation catalogue with French and English names (stand-in for the ESCO import)
+* 200 offers: 180 generated from 24 job profiles (same data on every run) and 20 hand-written edge cases (region/department/country-level locations, remote offers, a closed offer, a private user offer, no skills, other currency, hourly/daily/monthly salaries, no published date, HTML in the description…). Published dates are relative to the time of seeding
+* Users, each with a ready-made session so the API can be tested before login exists:
+
+| User | Email / password | Session token | Content |
+|---|---|---|---|
+| demo | demo@example.com / demo-password | `dev-session-demo` | French resume (selected) + English translation, 7 saved offers with every status, search location Brunoy |
+| alice | alice@example.com / alice-password | `dev-session-alice` | Nothing yet (no resume) |
+| guest | — | `dev-session-guest` | Guest with one saved offer |
+
+Ids of seeded rows (users, resumes, offers) are the same after every reseed.
+
+The session token goes in the `session` cookie:
+
+```bash
+curl -H "Cookie: session=dev-session-demo" "http://localhost:3000/api/offers?q=react&locationId=1"
+```
+
 ## Development
 
 The applications are developed independently:
@@ -169,7 +218,7 @@ Source-specific information can be preserved as raw data when necessary.
 
 ### Current collector
 
-The collector currently uses hardcoded test data to validate the complete flow from collection to database insertion.
+The collector is postponed until the backend can search offers. Meanwhile the development seed (`prisma/seed/`) provides the offers.
 
 Real crawlers and external job sources will be added later.
 

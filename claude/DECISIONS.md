@@ -111,6 +111,24 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | P22 | **Match % computed in the frontend**, with the formula in a new `packages/shared` package also used by the API for the stored snapshot | Instant updates when switching resumes, no server work per search, and one single implementation of the rule |
 | D35 | New `packages/shared` (pure TypeScript, no I/O) for schemas, the match formula and shared types; ARCHITECTURE, AI_CONTEXT and README updated | Avoid duplicating business logic between web and api |
 
+## Update 8 — backend before the collector (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P23 | **The backend API is built before the job collector**; the collector is postponed | The API (search first) can be written and tested with seeded offers; collector sources are still undecided (P12) |
+| D36 | Development seed in `prisma/seed/`: truncates every table, then inserts locations, a small fr/en skill/occupation catalogue, 200 offers (180 generated with a fixed random seed + 20 hand-written edge cases), users with resumes, saved offers and fixed session tokens | A known, re-creatable data set for writing and testing search, saved offers and match %. Edge cases cover each search rule from DATABASE.md *locations* |
+| D37 | Node.js ≥ 20.19 required (`engines`, `.nvmrc` = 24); npm `db:*` scripts pass `--config prisma7.config.ts` | Prisma 7 does not run on Node 18; the config file has a non-default name |
+
+## Update 9 — constraints and first API route (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D38 | Migration `check_constraints`: the three CHECK constraints and the two "one canonical name" partial unique indexes listed in DATABASE.md | They were documented but missing from the first migration |
+| D39 | npm workspaces (`apps/*`, `packages/*`); `src/lib/prisma.ts` moved to `apps/api/src/lib/`; `packages/shared` created with Zod | Matches the documented monorepo layout; Zod is the schema library DATABASE.md suggested |
+| D40 | API conventions: `/api` prefix, `session` cookie name, `{error: {code, message}}` error format, Node's test runner against the seeded DB, `tsx` without a build step (details in ARCHITECTURE.md) | Smallest setup that works; a build step can be added for deployment |
+| D41 | Search keywords: split on spaces, **every word** must match the title (ILIKE or trigram word similarity ≥ 0.6, which tolerates missing accents and small typos), the company or a linked occupation name | "développeur react" must find "Développeur Front-end React"; scraped titles often lack accents |
+| D42 | Search results: wider-area offers are sorted after all other matches whatever the sort; remote offers from elsewhere are sorted with exact matches and labelled `remote`; `distanceKm` is returned for city offers in a city search; a fully remote offer with no location matches any location search | FEATURE O1 ranks wider areas last; remote offers are as relevant as local ones once the user asked for them |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

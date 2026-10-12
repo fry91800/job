@@ -457,6 +457,8 @@ Files never go in the database; tables store a **storage key** (`user_photos.sto
 
 ## Things Prisma cannot express (raw SQL in migrations)
 
+All three are applied (migration `check_constraints`).
+
 1. `CREATE EXTENSION IF NOT EXISTS pg_trgm;` (declared via `postgresqlExtensions`).
 2. CHECK constraints: users email/password pairing; offers salary range; generated_resumes modifier pairing.
 3. Optional partial unique index: one canonical name per `(skill_id, language)` / `(occupation_id, language)`.
@@ -465,6 +467,27 @@ Files never go in the database; tables store a **storage key** (`user_photos.sto
 
 * `templates`: at least one (id 1 = default).
 * Skills/occupations: ESCO import (FR + EN names) — needed before matching or offer skill extraction works.
+
+## Development seed (`prisma/seed/`)
+
+Run with `npm run db:seed`. It **truncates every table** (except `_prisma_migrations`) and inserts a fixed data set; it refuses to run with `NODE_ENV=production`. Contents are listed in `README.md` (*Development data*).
+
+| File | Contents |
+|---|---|
+| `seed.ts` | Entry point: truncate, insert in dependency order, print the dev session tokens |
+| `locations.ts` | Real French places with codes and coordinates (`provider = 'seed'`, `external_id` = seed key) |
+| `catalogue.ts` | Skills and occupations with fr/en names (`source = 'manual'`); the first name per language is canonical. Stand-in until the ESCO import |
+| `offers.ts` | Job profiles used to generate offers, and hand-written edge cases for the search rules |
+| `users.ts` | Users, resumes (ResumeContent v1), saved offers |
+| `helpers.ts` | Deterministic random generator, stable UUIDs, name normalization |
+
+Rules
+* Generated offers use a fixed random seed: the same offers on every run. Their `published_at` is relative to the time of seeding, so the "published within" filters always have results right after a reseed.
+* Ids are derived from seed keys (`stableUuid`), so offer, user and resume ids don't change between reseeds.
+* Seeded offers have `source = 'seed'`, `url = https://jobs.example.com/offers/{external_id}` and fictional company names.
+* `resume_skills` are derived from the resume content (skill names + technologies, looked up in the catalogue) as the API will do; `offer_skills`/`offer_occupations` come from the job profile.
+* Each user has a session whose raw token is fixed (`dev-session-{user}`); `sessions.token_hash` stores its SHA-256 as in production.
+* Passwords are hashed with Node's `scrypt` (`scrypt$salt$hash`) as a placeholder; change `hashPassword` in `seed.ts` if the auth code picks another scheme.
 
 ## Appendix — draft `prisma/schema.prisma`
 

@@ -1,0 +1,9 @@
+{
+  "name": "@job/shared",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

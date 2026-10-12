@@ -1,0 +1,249 @@
+// Development seed: empties every table, then inserts a deterministic data set for
+// writing and testing the API (search, offer detail, saved offers, match %).
+// Run with `npm run db:seed`. Never run it against a database you care about.
+import "dotenv/config";
+import { createHash, randomBytes, scryptSync } from "node:crypto";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+import { occupations, skills, type CatalogueEntry } from "./catalogue";
+import { createRandom, normalizeName, stableUuid } from "./helpers";
+import { locations } from "./locations";
+import { edgeCaseOffers, generateOffers } from "./offers";
+import { resumes, savedOffers, users } from "./users";
+
+const GENERATED_OFFER_COUNT = 180;
+const RANDOM_SEED = 20261012;
+
+if (process.env.NODE_ENV === "production") {
+  throw new Error("The development seed must not run in production");
+}
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is not defined");
+}
+
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+
+// Placeholder until the auth code picks its hashing scheme; reseed after changing it.
+function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  return `scrypt$${salt.toString("hex")}$${scryptSync(password, salt, 64).toString("hex")}`;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+async function truncateAll() {
+  const tables = await prisma.$queryRaw<{ tablename: string }[]>`
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
+  const list = tables.map(({ tablename }) => `"public"."${tablename}"`).join(", ");
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+}
+
+// Inserts catalogue entries with their fr/en names; returns key -> id.
+async function seedCatalogue(
+  entries: CatalogueEntry[],
+  insertEntries: (rows: { source: string; externalId: string }[]) => Promise<unknown>,
+  findEntries: () => Promise<{ id: number; externalId: string | null }[]>,
+  insertNames: (rows: { ownerId: number; language: string; name: string; normalizedName: string; isCanonical: boolean }[]) => Promise<unknown>,
+): Promise<Map<string, number>> {
+  await insertEntries(entries.map((entry) => ({ source: "manual", externalId: entry.key })));
+  const ids = new Map((await findEntries()).map((row) => [row.externalId!, row.id]));
+
+  const names = entries.flatMap((entry) =>
+    (["fr", "en"] as const).flatMap((language) => {
+      const seen = new Set<string>();
+      return entry[language].flatMap((name, index) => {
+        const normalizedName = normalizeName(name);
+        if (seen.has(normalizedName)) return [];
+        seen.add(normalizedName);
+        return [{ ownerId: ids.get(entry.key)!, language, name, normalizedName, isCanonical: index === 0 }];
+      });
+    }),
+  );
+  await insertNames(names);
+  return ids;
+}
+
+// Name lookup used to link resumes to the catalogue: the resume language first, then any language.
+function buildNameIndex(entries: CatalogueEntry[]) {
+  const index = new Map<string, string>();
+  for (const language of ["fr", "en"] as const) {
+    for (const entry of entries) {
+      for (const name of entry[language]) index.set(`${language}:${normalizeName(name)}`, entry.key);
+    }
+  }
+  return (name: string, language: string): string | undefined =>
+    index.get(`${language}:${normalizeName(name)}`) ?? index.get(`fr:${normalizeName(name)}`) ?? index.get(`en:${normalizeName(name)}`);
+}
+
+// Same inputs as the matching rule (DATABASE.md, ResumeContent "Skills"): skill names
+// plus the technologies of work experience and projects.
+function resumeSkillKeys(content: any, language: string, lookup: (name: string, language: string) => string | undefined): string[] {
+  const names: string[] = [
+    ...content.skills.map((skill: { name: string }) => skill.name),
+    ...content.workExperience.flatMap((item: { technologies: string[] }) => item.technologies),
+    ...content.projects.flatMap((item: { technologies: string[] }) => item.technologies),
+  ];
+  const keys = names.map((name) => lookup(name, language)).filter((key): key is string => key !== undefined);
+  return [...new Set(keys)];
+}
+
+async function main() {
+  await truncateAll();
+
+  // Templates: id 1 is the default referenced by users.template_id.
+  await prisma.template.createMany({
+    data: [
+      { name: "Classic", rendererKey: "classic", previewStorageKey: "templates/classic.png", supportsPhoto: true, sortOrder: 1 },
+      { name: "Modern", rendererKey: "modern", previewStorageKey: "templates/modern.png", supportsPhoto: false, sortOrder: 2 },
+    ],
+  });
+
+  // Locations.
+  await prisma.location.createMany({
+    data: locations.map(({ key, ...location }) => ({ ...location, provider: "seed", externalId: key })),
+  });
+  const locationIds = new Map(
+    (await prisma.location.findMany({ select: { id: true, externalId: true } })).map((row) => [row.externalId!, row.id]),
+  );
+  const locationId = (key: string | null) => {
+    if (key === null) return null;
+    const id = locationIds.get(key);
+    if (id === undefined) throw new Error(`Unknown location key: ${key}`);
+    return id;
+  };
+
+  // Skills and occupations catalogue.
+  const skillIds = await seedCatalogue(
+    skills,
+    (data) => prisma.skill.createMany({ data }),
+    () => prisma.skill.findMany({ select: { id: true, externalId: true } }),
+    (rows) => prisma.skillName.createMany({ data: rows.map(({ ownerId, ...row }) => ({ ...row, skillId: ownerId })) }),
+  );
+  const occupationIds = await seedCatalogue(
+    occupations,
+    (data) => prisma.occupation.createMany({ data }),
+    () => prisma.occupation.findMany({ select: { id: true, externalId: true } }),
+    (rows) => prisma.occupationName.createMany({ data: rows.map(({ ownerId, ...row }) => ({ ...row, occupationId: ownerId })) }),
+  );
+  const skillId = (key: string) => {
+    const id = skillIds.get(key);
+    if (id === undefined) throw new Error(`Unknown skill key: ${key}`);
+    return id;
+  };
+  const occupationId = (key: string) => {
+    const id = occupationIds.get(key);
+    if (id === undefined) throw new Error(`Unknown occupation key: ${key}`);
+    return id;
+  };
+
+  // Users and their sessions.
+  const userId = (key: string) => stableUuid(`user:${key}`);
+  await prisma.user.createMany({
+    data: users.map((user) => ({
+      id: userId(user.key),
+      email: user.email,
+      passwordHash: user.password ? hashPassword(user.password) : null,
+      emailVerifiedAt: user.email ? new Date() : null,
+      uiLanguage: user.uiLanguage,
+      searchLocationId: locationId(user.searchLocationKey),
+      modifierEnabled: user.modifierEnabled,
+      modifierStrength: user.modifierStrength,
+      templateId: 1,
+    })),
+  });
+  await prisma.session.createMany({
+    data: users.map((user) => ({
+      userId: userId(user.key),
+      tokenHash: sha256(user.sessionToken),
+      userAgent: "seed",
+      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+    })),
+  });
+
+  // Resumes, their catalogue links, and the selected resume.
+  const resumeId = (key: string) => stableUuid(`resume:${key}`);
+  const lookupSkill = buildNameIndex(skills);
+  for (const resume of resumes) {
+    await prisma.resume.create({
+      data: {
+        id: resumeId(resume.key),
+        userId: userId(resume.userKey),
+        name: resume.name,
+        language: resume.language,
+        content: resume.content,
+        translatedFromResumeId: resume.translatedFromKey ? resumeId(resume.translatedFromKey) : null,
+        skills: { create: resumeSkillKeys(resume.content, resume.language, lookupSkill).map((key) => ({ skillId: skillId(key) })) },
+        occupations: { create: resume.occupationKeys.map((key) => ({ occupationId: occupationId(key) })) },
+      },
+    });
+    if (resume.selected) {
+      await prisma.user.update({ where: { id: userId(resume.userKey) }, data: { selectedResumeId: resumeId(resume.key) } });
+    }
+  }
+
+  // Offers and their catalogue links.
+  const offers = [...edgeCaseOffers(), ...generateOffers(createRandom(RANDOM_SEED), GENERATED_OFFER_COUNT)];
+  const offerId = (key: string) => stableUuid(`offer:${key}`);
+  await prisma.offer.createMany({
+    data: offers.map((offer) => ({
+      id: offerId(offer.key),
+      title: offer.title,
+      companyName: offer.companyName,
+      description: offer.description,
+      language: offer.language,
+      url: offer.url,
+      locationId: locationId(offer.locationKey),
+      remoteType: offer.remoteType,
+      contractType: offer.contractType,
+      salaryMin: offer.salaryMin,
+      salaryMax: offer.salaryMax,
+      salaryCurrency: offer.salaryCurrency,
+      salaryPeriod: offer.salaryPeriod,
+      isPublic: offer.isPublic,
+      source: offer.source,
+      externalId: offer.externalId,
+      rawData: offer.source === "seed" ? { seed: true } : undefined,
+      createdByUserId: offer.createdByUserKey ? userId(offer.createdByUserKey) : null,
+      publishedAt: offer.publishedAt,
+      collectedAt: offer.publishedAt ?? new Date(),
+      lastVerifiedAt: offer.closedAt ?? new Date(),
+      closedAt: offer.closedAt,
+    })),
+  });
+  await prisma.offerSkill.createMany({
+    data: offers.flatMap((offer) => offer.skillKeys.map((key) => ({ offerId: offerId(offer.key), skillId: skillId(key) }))),
+  });
+  await prisma.offerOccupation.createMany({
+    data: offers.flatMap((offer) => offer.occupationKeys.map((key) => ({ offerId: offerId(offer.key), occupationId: occupationId(key) }))),
+  });
+
+  // Saved offers.
+  await prisma.savedOffer.createMany({
+    data: savedOffers.map((saved) => ({
+      id: stableUuid(`saved:${saved.userKey}:${saved.offerKey}`),
+      userId: userId(saved.userKey),
+      offerId: offerId(saved.offerKey),
+      status: saved.status,
+      notes: saved.notes,
+      appliedAt: saved.appliedAt,
+      statusChangedAt: saved.statusChangedAt,
+    })),
+  });
+
+  const publicOpen = offers.filter((offer) => offer.isPublic && !offer.closedAt).length;
+  console.log(`Seeded ${locations.length} locations, ${skills.length} skills, ${occupations.length} occupations,`);
+  console.log(`${offers.length} offers (${publicOpen} public and open), ${users.length} users, ${resumes.length} resumes, ${savedOffers.length} saved offers.`);
+  console.log("Dev session tokens (send the raw value as the session cookie):");
+  for (const user of users) {
+    console.log(`  ${user.key.padEnd(6)} ${user.sessionToken}${user.email ? `  (${user.email} / ${user.password})` : "  (guest)"}`);
+  }
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

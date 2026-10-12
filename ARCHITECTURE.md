@@ -24,6 +24,18 @@ Responsibilities:
 
 The `api` application is the Express backend.
 
+Layout (`apps/api/src`): `app.ts` builds the Express app (used by the server and the tests), `server.ts` starts it, one folder per domain (`offers/`, `auth/`…) holding its routes, its logic and its tests, and `lib/` for shared helpers (Prisma client, errors).
+
+Conventions:
+
+* Routes are under `/api` (the web app reaches them through the Vite proxy in development).
+* Request parameters are validated with the Zod schemas from `packages/shared`.
+* Errors are returned as `{ "error": { "code": "…", "message": "…" } }` with a stable `code`; validation errors also list `issues`.
+* `req.user` is set when the request carries a valid `session` cookie; routes that require a user check it.
+* SQL that Prisma's query builder cannot express (location matching, trigram search) is written with `Prisma.sql` tagged templates, never by concatenating strings.
+* Tests use Node's test runner (`node --test`) and run against the seeded development database.
+* TypeScript runs directly through `tsx`; there is no build step yet.
+
 Responsibilities:
 
 * REST API
@@ -38,7 +50,7 @@ The `job_collector` application is responsible for collecting job offers.
 
 It runs independently from the web application and communicates directly with the database.
 
-Its implementation will evolve as the project develops.
+Its implementation will evolve as the project develops. It is postponed until the API can search offers; until then the development seed (`prisma/seed/`) fills the database.
 
 ## Shared package
 
@@ -48,6 +60,7 @@ Contents:
 
 * Validation schemas: ResumeContent, modifier_config, change set, search parameters (see `DATABASE.md`)
 * The match % formula (`FEATURE.md` O4): the web app uses it to display scores, and the API uses it to store the score snapshot on generated resumes
+* Request and response types of the API (e.g. `OfferSearchResponse`)
 * Shared types and constants (enum values, limits that the UI must display)
 
 Rules:
@@ -69,6 +82,8 @@ prisma/schema.prisma
 ```
 
 Database changes are managed using Prisma migrations.
+
+Development data comes from `prisma/seed/` (`npm run db:seed`). The seed empties the database first, so it is for development and tests only.
 
 ## Main domains
 
