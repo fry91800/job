@@ -1,18 +1,15 @@
 import { Router } from "express";
-import { z } from "zod";
 import { offerDetailQuerySchema, offerSearchSchema } from "@job/shared";
 import { HttpError } from "../lib/http-error";
+import { parseUuid } from "../lib/ids";
 import { prisma } from "../lib/prisma";
 import { getOfferDetail } from "./offer-detail";
 import { searchOffers } from "./offer-search";
 
 export const offersRouter = Router();
 
-// Offer ids are UUIDs; anything else cannot exist.
 export function parseOfferId(value: unknown): string {
-  const result = z.uuid().safeParse(value);
-  if (!result.success) throw new HttpError(404, "offer_not_found", "Offer not found");
-  return result.data;
+  return parseUuid(value, () => new HttpError(404, "offer_not_found", "Offer not found"));
 }
 
 // GET /api/offers — search public offers (FEATURE O1).

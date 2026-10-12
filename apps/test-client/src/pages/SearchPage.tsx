@@ -5,7 +5,9 @@ import {
   REMOTE_TYPES,
   SALARY_PERIODS,
   SEARCH_RADIUS_CHOICES,
+  computeMatch,
   type LocationAutocompleteResponse,
+  type MeResponse,
   type LocationSummary,
   type OfferSearchResponse,
   type OfferSearchResult,
@@ -79,7 +81,7 @@ function LocationPicker({ value, onChange }: { value: LocationSummary | null; on
   );
 }
 
-export function SearchPage({ openOffer, refreshMe }: { openOffer: (id: string) => void; refreshMe: () => void }) {
+export function SearchPage({ me, openOffer, refreshMe }: { me: MeResponse["user"]; openOffer: (id: string) => void; refreshMe: () => void }) {
   const [form, setForm] = useState<Form>(emptyForm);
   const [location, setLocation] = useState<LocationSummary | null>(null);
   const [page, setPage] = useState(1);
@@ -193,7 +195,7 @@ export function SearchPage({ openOffer, refreshMe }: { openOffer: (id: string) =
           </p>
           <table>
             <thead>
-              <tr><th>Title</th><th>Company</th><th>Location</th><th>Remote / contract</th><th>Salary</th><th>Published</th><th>Skills</th><th>Saved</th></tr>
+              <tr><th>Title</th><th>Company</th><th>Location</th><th>Remote / contract</th><th>Salary</th><th>Published</th><th>Match</th><th>Saved</th></tr>
             </thead>
             <tbody>
               {response.results.map((offer) => (
@@ -207,7 +209,10 @@ export function SearchPage({ openOffer, refreshMe }: { openOffer: (id: string) =
                   <td>{offer.remoteType ?? "—"} / {offer.contractType ?? "—"}</td>
                   <td>{formatSalary(offer.salary)}</td>
                   <td>{offer.publishedAt ? new Date(offer.publishedAt).toLocaleDateString() : "—"}</td>
-                  <td className="muted">{offer.skillIds.join(", ")}</td>
+                  <td>
+                    {me?.selectedResume ? (computeMatch(offer, me.selectedResume).score ?? "n/a") : "—"}
+                    <div className="muted">skills {offer.skillIds.join(", ")}</div>
+                  </td>
                   <td>
                     {offer.saved?.status ?? ""}{" "}
                     <button onClick={() => toggleSave(offer)}>{offer.saved ? "Unsave" : "Save"}</button>

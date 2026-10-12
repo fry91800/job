@@ -1,11 +1,15 @@
 // Helpers for the API integration tests. Tests run against the seeded development
 // database (`npm run db:seed`) and remove the users they create.
 import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { stableUuid } from "../../../../prisma/seed/helpers";
 import { createApp } from "../app";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
+import { closeBrowser } from "../templates/pdf";
 
 export { prisma };
 
@@ -21,6 +25,8 @@ export async function startTestServer() {
   config.rateLimits.signupsPerIp.max = 1000;
   config.rateLimits.guestsPerIp.max = 1000;
   config.rateLimits.loginFailuresPerIp.max = 1000;
+  // Uploaded files go to a temporary folder, removed at the end.
+  config.storage.localDir = await mkdtemp(join(tmpdir(), "job-api-test-"));
   const server = createApp().listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
   const baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
@@ -32,6 +38,8 @@ export async function startTestServer() {
     // guests and deleted accounts). Test files run one at a time (see api:test).
     async close() {
       server.close();
+      await closeBrowser();
+      await rm(config.storage.localDir, { recursive: true, force: true });
       await prisma.user.deleteMany({
         where: {
           createdAt: { gte: startedAt },

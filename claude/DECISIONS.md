@@ -147,6 +147,31 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D48 | Offer detail takes `?lang=` for skill/occupation names (default: the user's UI language, else `fr`) | Anonymous visitors have no stored language; the web app knows the UI language |
 | P25 | Password reset (A4) and email verification (A6) are **postponed** | They need an email provider, not chosen yet |
 
+## Update 12 — resumes, templates, generation without AI (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P26 | **Resume parsing is a placeholder**: every upload returns the same sample resume, whatever the file. The file itself is stored and type-checked | AI parsing is decided later; the rest of the flow (storage, quota, M2, selection) can be built and tested now |
+| P27 | **Templates are HTML/CSS printed to PDF by headless Chromium** (`playwright-core`, browser installed with `npm run api:install-browser`) | Easiest way to design good-looking templates; one shared browser keeps it fast |
+| D49 | Generation (M1) works with the **modifier off only**; with it on the API answers `501 ai_not_available` | The modifier needs the AI provider; modifier off is fully specified and needs nothing else |
+| D50 | Resume upload takes the **raw file as the request body** (`POST /api/resumes/upload`), not multipart; type recognized from the file content (PDF signature, DOCX zip with `word/document.xml`) | No upload library needed; the declared type and file name can't be trusted. The 10-page limit waits for real parsing |
+| D51 | Resume editing is a **whole-document PUT** validated by the shared ResumeContent schema; items without an id get one (8 random characters) | Matches R3 ("server validates the whole document on save"); ids are created server-side as DATABASE.md requires |
+| D52 | M2 for resumes looks up names in the resume language and English (union), skills from `skills` + `technologies`, occupations from `basics.title` + job titles; feminine job titles added to the seed catalogue | Exact-name lookup as specified; the seeded resumes use feminine titles |
+| D53 | The match % formula and catalogue name normalization moved to `packages/shared`; the seed uses the API's extraction | One implementation of each rule |
+| D54 | The HTML preview of a generated resume is served with `Content-Security-Policy: default-src 'none'`; Chromium renders with network blocked | Defence in depth behind template escaping: resume text comes from users and, later, from the AI |
+
+## Update 13 — photos and cleanup jobs (2026-10-12)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D55 | Photos processed with **`sharp`**: EXIF orientation applied, all metadata removed, longest side ≤ 1000 px, stored as **WebP** (`photos/{userId}/{uuid}.webp`); JPEG/PNG/WEBP recognized from the content; upload body = the raw image (like resumes) | R6 requires EXIF stripping and resizing; sharp is the standard library for it. One output format keeps templates and storage simple |
+| D56 | "No photo" = `DELETE /api/photos/selection`; a generated resume's photo can be changed or removed (`PATCH … { photoId }`) | R6 makes "no photo" a valid choice; M3 allows changing the photo without regenerating |
+| D57 | Soft-deleted photos keep rendering in generated resumes until purged; a missing file renders without photo | R6 |
+| D58 | **Cleanup job** (one function, idempotent): expired sessions; used or expired user tokens; guests inactive 30 days (G3); accounts deleted 30 days ago (A5); soft-deleted photos and resumes after 30 days. Files deleted after their rows. Runs in the API every 24 h, or once with `npm run jobs:cleanup` | FEATURE "Background jobs". In-process scheduling is enough for one API process; use the script from cron when there are several |
+| D59 | Soft-deleted **generated** resumes are not purged (only with their user) | They count towards AI quotas (M3) |
+| D60 | Purging a soft-deleted resume removes its row, so a guest's lifetime upload count (G4) can go down after 30 days | Accepted: personal data must go; the per-IP rate limit on guest creation still applies |
+| D61 | The dev seed also empties the local file storage | Files belong to the rows it truncates |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

@@ -8,7 +8,7 @@ Early development / MVP.
 
 Current focus:
 
-* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers (see *API* below). Next routes follow `FEATURE.md`
+* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload uses a placeholder parser), photos, match %, settings and templates, resume generation without AI and PDF download, cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
 * Development seed data used to write and test the API
 
 Done:
@@ -143,6 +143,7 @@ npm install
 npm run db:up        # start PostgreSQL in Docker
 npm run db:migrate   # apply the migrations and generate the Prisma client
 npm run db:seed      # empty the database and insert the development data
+npm run api:install-browser   # headless Chromium for PDF rendering (once)
 ```
 
 Other scripts:
@@ -150,6 +151,7 @@ Other scripts:
 * `npm run api:dev` — start the API on http://localhost:3000 (restarts on change)
 * `npm run client:dev` — start the test client on http://localhost:5173 (needs the API running); it proxies `/api` to the API
 * `npm run api:test` — API integration tests (they expect the seed data: run `npm run db:seed` first)
+* `npm run jobs:cleanup` — run the cleanup job once (the API also runs it every 24 h)
 * `npm run db:reset` — drop everything, re-apply the migrations and reseed
 * `npm run db:studio` — browse the data in Prisma Studio
 * `npm run typecheck` — type-check the TypeScript code
@@ -196,12 +198,29 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `PUT /api/saved-offers/:offerId` | O3 | Save (creates a guest on first write) |
 | `PATCH /api/saved-offers/:offerId` | O3 | `status`, `notes`, `appliedAt` |
 | `DELETE /api/saved-offers/:offerId` | O3 | Unsave |
+| `GET /api/resumes`, `GET /api/resumes/:id` | R1 | Detail includes the catalogue links (M2) |
+| `POST /api/resumes` | R2 | Create from scratch (ResumeContent v1 JSON) |
+| `POST /api/resumes/upload?name=` | R2 | Body = the PDF/DOCX file. **Placeholder parser**: always returns the same sample resume |
+| `PUT /api/resumes/:id` | R3 | Whole resume; re-extracts skills/occupations |
+| `POST /api/resumes/:id/select`, `DELETE /api/resumes/:id` | R4, R5 | |
+| `GET /api/resumes/:id/source` | R5 | Original uploaded file |
+| `GET /api/photos`, `POST /api/photos?name=` | R6 | Upload body = the image (JPEG/PNG/WEBP); stored as WebP ≤ 1000 px without metadata |
+| `PATCH /api/photos/:id`, `POST /api/photos/:id/select`, `DELETE /api/photos/:id` | R6 | Rename, select, soft delete |
+| `DELETE /api/photos/selection` | R6 | "No photo" |
+| `GET /api/photos/:id/file` | R6 | The image, owner only |
+| `GET /api/templates` | S2 | Public |
+| `GET /api/settings`, `PATCH /api/settings` | S1, S2 | Modifier defaults, template, UI language |
+| `POST /api/generated-resumes` | M1 | Modifier off only (`501 ai_not_available` otherwise); `409 language_mismatch` with details |
+| `GET /api/generated-resumes?offerId=`, `GET /api/generated-resumes/:id` | M3 | History and detail |
+| `PATCH /api/generated-resumes/:id` | M3 | Change template or photo, edit content |
+| `DELETE /api/generated-resumes/:id` | M3 | Soft delete |
+| `GET /api/generated-resumes/:id/html`, `/pdf` | M3 | Rendered preview; PDF printed by headless Chromium |
 
-Not built yet: settings, templates, resumes, generation, translation and user-added offers. Password reset (A4) and email verification (A6) are postponed (they need an email provider).
+Not built yet: AI (resume parsing, generation with the modifier, change review M4), translation (T1), user-added offers (O5). Password reset (A4) and email verification (A6) are postponed (they need an email provider).
 
 ## Test client
 
-`apps/test-client` is a bare React page for trying the API by hand: search (with location autocomplete), offer detail, saved offers (status, notes, applied date) and account actions (sign up, log in as a seeded user, log out, change password, delete account). A side panel lists every API request with its JSON response.
+`apps/test-client` is a bare React page for trying the API by hand: search (with location autocomplete and match %), offer detail (match details, generate a resume), saved offers, resumes (JSON editor, upload), photos, generated resumes (preview, template, photo, PDF, JSON editor), settings, and account actions (sign up, log in as a seeded user, log out, change password, delete account). A side panel lists every API request with its JSON response.
 
 ```bash
 npm run api:dev

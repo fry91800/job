@@ -17,8 +17,14 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     });
     return;
   }
+  // Body parser errors (invalid JSON, body too large…) carry their own status.
+  if (typeof error?.status === "number" && error.status < 500 && typeof error.type === "string") {
+    const code = error.type === "entity.too.large" ? "payload_too_large" : error.type === "entity.parse.failed" ? "invalid_json" : "invalid_request";
+    res.status(error.status).json({ error: { code, message: error.message } });
+    return;
+  }
   if (error instanceof HttpError) {
-    res.status(error.status).json({ error: { code: error.code, message: error.message } });
+    res.status(error.status).json({ error: { code: error.code, message: error.message, ...(error.details !== undefined && { details: error.details }) } });
     return;
   }
   console.error(error);

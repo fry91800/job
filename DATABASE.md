@@ -470,7 +470,7 @@ All three are applied (migration `check_constraints`).
 
 ## Development seed (`prisma/seed/`)
 
-Run with `npm run db:seed`. It **truncates every table** (except `_prisma_migrations`) and inserts a fixed data set; it refuses to run with `NODE_ENV=production`. Contents are listed in `README.md` (*Development data*).
+Run with `npm run db:seed`. It **truncates every table** (except `_prisma_migrations`), **empties the local file storage** (`STORAGE_LOCAL_DIR`) and inserts a fixed data set; it refuses to run with `NODE_ENV=production`. Contents are listed in `README.md` (*Development data*).
 
 | File | Contents |
 |---|---|
@@ -485,7 +485,7 @@ Rules
 * Generated offers use a fixed random seed: the same offers on every run. Their `published_at` is relative to the time of seeding, so the "published within" filters always have results right after a reseed.
 * Ids are derived from seed keys (`stableUuid`), so offer, user and resume ids don't change between reseeds.
 * Seeded offers have `source = 'seed'`, `url = https://jobs.example.com/offers/{external_id}` and fictional company names.
-* `resume_skills` are derived from the resume content (skill names + technologies, looked up in the catalogue) as the API will do; `offer_skills`/`offer_occupations` come from the job profile.
+* Seeded resumes are validated against the shared ResumeContent schema, and their `resume_skills`/`resume_occupations` are created by the API's own extraction (`syncResumeLinks`, M2); `offer_skills`/`offer_occupations` come from the job profile.
 * Each user has a session whose raw token is fixed (`dev-session-{user}`); `sessions.token_hash` stores its SHA-256 as in production.
 * Passwords are hashed with the API's `hashPassword` (Argon2id), so seeded users can log in.
 

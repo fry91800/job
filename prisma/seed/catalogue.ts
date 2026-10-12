@@ -81,10 +81,10 @@ export const skills: CatalogueEntry[] = [
 ];
 
 export const occupations: CatalogueEntry[] = [
-  { key: "software-developer", fr: ["Développeur logiciel", "Développeuse logicielle", "Développeur informatique"], en: ["Software developer", "Software engineer"] },
-  { key: "frontend-developer", fr: ["Développeur front-end", "Développeur frontend"], en: ["Front-end developer", "Frontend developer"] },
-  { key: "backend-developer", fr: ["Développeur back-end", "Développeur backend"], en: ["Back-end developer", "Backend developer"] },
-  { key: "fullstack-developer", fr: ["Développeur full stack", "Développeur fullstack"], en: ["Full stack developer", "Fullstack developer"] },
+  { key: "software-developer", fr: ["Développeur logiciel", "Développeuse logicielle", "Développeur informatique", "Développeur web", "Développeuse web"], en: ["Software developer", "Software engineer", "Web developer"] },
+  { key: "frontend-developer", fr: ["Développeur front-end", "Développeur frontend", "Développeuse front-end"], en: ["Front-end developer", "Frontend developer"] },
+  { key: "backend-developer", fr: ["Développeur back-end", "Développeur backend", "Développeuse back-end"], en: ["Back-end developer", "Backend developer"] },
+  { key: "fullstack-developer", fr: ["Développeur full stack", "Développeur fullstack", "Développeuse full stack"], en: ["Full stack developer", "Fullstack developer"] },
   { key: "mobile-developer", fr: ["Développeur mobile"], en: ["Mobile developer"] },
   { key: "devops-engineer", fr: ["Ingénieur DevOps"], en: ["DevOps engineer"] },
   { key: "sysadmin", fr: ["Administrateur systèmes et réseaux"], en: ["System administrator"] },

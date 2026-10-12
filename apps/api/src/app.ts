@@ -1,11 +1,15 @@
 import express from "express";
 import { authRouter } from "./auth/auth.routes";
 import { loadSession } from "./auth/session";
+import { generatedResumesRouter } from "./generated-resumes/generated-resumes.routes";
 import { errorHandler, notFound } from "./lib/error-handler";
 import { checkOrigin } from "./lib/origin-check";
 import { locationsRouter } from "./locations/locations.routes";
 import { offersRouter } from "./offers/offers.routes";
+import { photosRouter } from "./photos/photos.routes";
+import { resumesRouter } from "./resumes/resumes.routes";
 import { savedOffersRouter } from "./saved-offers/saved-offers.routes";
+import { settingsRouter, templatesRouter } from "./settings/settings.routes";
 
 export function createApp() {
   const app = express();
@@ -21,6 +25,11 @@ export function createApp() {
   app.use("/api/locations", locationsRouter);
   app.use("/api/offers", offersRouter);
   app.use("/api/saved-offers", savedOffersRouter);
+  app.use("/api/resumes", resumesRouter);
+  app.use("/api/photos", photosRouter);
+  app.use("/api/generated-resumes", generatedResumesRouter);
+  app.use("/api/templates", templatesRouter);
+  app.use("/api/settings", settingsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

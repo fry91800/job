@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import type { OfferDetail } from "@job/shared";
+import { computeMatch, type GeneratedResumeDetail, type LanguageMismatchDetails, type MeResponse, type OfferDetail } from "@job/shared";
 import { api, errorText } from "../api";
+import type { Navigate } from "../App";
+import { GeneratedList } from "./GeneratedPages";
 import { SavedEditor } from "../SavedEditor";
 import { formatLocation, formatSalary } from "./SearchPage";
 
-export function OfferPage({ id, refreshMe }: { id: string; refreshMe: () => void }) {
+export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeResponse["user"]; refreshMe: () => void; navigate: Navigate }) {
   const [lang, setLang] = useState("");
   const [offer, setOffer] = useState<OfferDetail | null>(null);
   const [error, setError] = useState("");
@@ -26,7 +28,31 @@ export function OfferPage({ id, refreshMe }: { id: string; refreshMe: () => void
     load();
   }
 
+  // M1 with the modifier off (AI not available yet). A language mismatch asks what to do.
+  async function generate(options: { resumeId?: string; ignoreLanguageMismatch?: boolean } = {}) {
+    const result = await api<GeneratedResumeDetail>("POST", "/api/generated-resumes", { offerId: id, modifierEnabled: false, ...options });
+    if (result.ok) {
+      refreshMe();
+      return navigate({ name: "generatedResume", id: result.data.id });
+    }
+    if (result.error.code === "language_mismatch") {
+      const details = result.error.details as LanguageMismatchDetails;
+      if (details.alternativeResumeId && confirm(`The offer is in ${details.offerLanguage}. Use your ${details.offerLanguage} resume instead?`)) {
+        return generate({ resumeId: details.alternativeResumeId });
+      }
+      if (confirm(`The offer is in ${details.offerLanguage}, your resume in ${details.resumeLanguage}. Generate in ${details.resumeLanguage} anyway?`)) {
+        return generate({ ...options, ignoreLanguageMismatch: true });
+      }
+      return;
+    }
+    setError(errorText(result));
+  }
+
   if (!offer) return <p className="error">{error}</p>;
+
+  const resume = me?.selectedResume;
+  const match = resume && computeMatch({ skillIds: offer.skills.map((skill) => skill.id), occupationIds: offer.occupations.map((item) => item.id) }, resume);
+  const skillName = (skillId: number) => offer.skills.find((skill) => skill.id === skillId)?.name ?? skillId;
 
   return (
     <div>
@@ -54,7 +80,25 @@ export function OfferPage({ id, refreshMe }: { id: string; refreshMe: () => void
             </td>
           </tr>
           <tr><th>Occupations</th><td>{offer.occupations.map((occupation) => occupation.name).join(", ") || "none"}</td></tr>
-          <tr><th>Generated resumes</th><td>{offer.generatedResumes.length}</td></tr>
+          <tr>
+            <th>Match (O4)</th>
+            <td>
+              {!match ? "Select a resume to see the match" : match.score === null ? "Not enough data" : `${match.score} %`}
+              {match && (
+                <div className="muted">
+                  matched: {match.matchedSkillIds.map(skillName).join(", ") || "none"} · missing: {match.missingSkillIds.map(skillName).join(", ") || "none"} ·
+                  occupation {match.sharesOccupation ? "shared" : "not shared"}
+                </div>
+              )}
+            </td>
+          </tr>
+          <tr>
+            <th>Generated resumes</th>
+            <td>
+              <button onClick={() => generate()}>Generate with selected resume (modifier off)</button>
+              <GeneratedList key={offer.generatedResumes.length} offerId={offer.id} navigate={navigate} />
+            </td>
+          </tr>
           <tr>
             <th>Saved</th>
             <td>{offer.saved ? <SavedEditor key={JSON.stringify(offer.saved)} offerId={offer.id} saved={offer.saved} onChange={load} /> : <button onClick={save}>Save</button>}</td>

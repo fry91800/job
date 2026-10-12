@@ -47,6 +47,11 @@ Conventions:
 * SQL that Prisma's query builder cannot express (location matching, trigram search) is written with `Prisma.sql` tagged templates, never by concatenating strings.
 * Tests use Node's test runner (`node --test`) and run against the seeded development database, one file at a time. Helpers in `apps/api/src/test/helpers.ts` start a server, keep cookies like a browser and delete the users a test file created.
 * TypeScript runs directly through `tsx`; there is no build step yet.
+* Files go through `lib/storage.ts` (local disk under `STORAGE_LOCAL_DIR`, default `./storage`; S3 later behind the same functions).
+* Resume templates are TypeScript functions returning HTML (`apps/api/src/templates/`, one file per `renderer_key`). Every resume value is escaped; the HTML preview is served with a CSP that blocks scripts. PDFs are printed from that HTML by one shared headless Chromium (`playwright-core`), with network access blocked.
+* Images are processed with `sharp` (EXIF orientation applied, metadata removed, resized, saved as WebP). The template gets the photo as a data URL, so rendering needs no network.
+* Background cleanup (`jobs/cleanup.ts`) runs inside the API every `CLEANUP_INTERVAL_HOURS` (default 24, `0` disables it) and can be run once with `npm run jobs:cleanup` (e.g. from cron). It deletes database rows first, then files.
+* Resume parsing (`resumes/resume-parser.ts`) is a placeholder until the AI provider is chosen: it returns the same sample resume for any file.
 
 Responsibilities:
 
@@ -73,6 +78,7 @@ Contents:
 * Validation schemas: ResumeContent, modifier_config, change set, search parameters (see `DATABASE.md`)
 * The match % formula (`FEATURE.md` O4): the web app uses it to display scores, and the API uses it to store the score snapshot on generated resumes
 * Request and response types of the API (e.g. `OfferSearchResponse`)
+* The catalogue name normalization (`normalizeCatalogueName`), used by the API, the seed and later the collector
 * Shared types and constants (enum values, limits that the UI must display)
 
 Rules:

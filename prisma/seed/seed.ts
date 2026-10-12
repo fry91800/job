@@ -3,11 +3,16 @@
 // Run with `npm run db:seed`. Never run it against a database you care about.
 import "dotenv/config";
 import { createHash } from "node:crypto";
+import { rm } from "node:fs/promises";
+import { resolve } from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../../apps/api/src/auth/password";
 import { occupations, skills, type CatalogueEntry } from "./catalogue";
-import { createRandom, normalizeName, stableUuid } from "./helpers";
+import { normalizeCatalogueName, resumeContentSchema, withItemIds } from "@job/shared";
+import { config } from "../../apps/api/src/config";
+import { syncResumeLinks } from "../../apps/api/src/resumes/catalogue-links";
+import { createRandom, stableUuid } from "./helpers";
 import { locations } from "./locations";
 import { edgeCaseOffers, generateOffers } from "./offers";
 import { resumes, savedOffers, users } from "./users";
@@ -49,7 +54,7 @@ async function seedCatalogue(
     (["fr", "en"] as const).flatMap((language) => {
       const seen = new Set<string>();
       return entry[language].flatMap((name, index) => {
-        const normalizedName = normalizeName(name);
+        const normalizedName = normalizeCatalogueName(name);
         if (seen.has(normalizedName)) return [];
         seen.add(normalizedName);
         return [{ ownerId: ids.get(entry.key)!, language, name, normalizedName, isCanonical: index === 0 }];
@@ -60,32 +65,10 @@ async function seedCatalogue(
   return ids;
 }
 
-// Name lookup used to link resumes to the catalogue: the resume language first, then any language.
-function buildNameIndex(entries: CatalogueEntry[]) {
-  const index = new Map<string, string>();
-  for (const language of ["fr", "en"] as const) {
-    for (const entry of entries) {
-      for (const name of entry[language]) index.set(`${language}:${normalizeName(name)}`, entry.key);
-    }
-  }
-  return (name: string, language: string): string | undefined =>
-    index.get(`${language}:${normalizeName(name)}`) ?? index.get(`fr:${normalizeName(name)}`) ?? index.get(`en:${normalizeName(name)}`);
-}
-
-// Same inputs as the matching rule (DATABASE.md, ResumeContent "Skills"): skill names
-// plus the technologies of work experience and projects.
-function resumeSkillKeys(content: any, language: string, lookup: (name: string, language: string) => string | undefined): string[] {
-  const names: string[] = [
-    ...content.skills.map((skill: { name: string }) => skill.name),
-    ...content.workExperience.flatMap((item: { technologies: string[] }) => item.technologies),
-    ...content.projects.flatMap((item: { technologies: string[] }) => item.technologies),
-  ];
-  const keys = names.map((name) => lookup(name, language)).filter((key): key is string => key !== undefined);
-  return [...new Set(keys)];
-}
-
 async function main() {
   await truncateAll();
+  // Uploaded files belong to the rows just deleted.
+  await rm(resolve(config.storage.localDir), { recursive: true, force: true });
 
   // Templates: id 1 is the default referenced by users.template_id.
   await prisma.template.createMany({
@@ -158,22 +141,24 @@ async function main() {
     })),
   });
 
-  // Resumes, their catalogue links, and the selected resume.
+  // Resumes, their catalogue links (same extraction as the API, M2), and the selected resume.
   const resumeId = (key: string) => stableUuid(`resume:${key}`);
-  const lookupSkill = buildNameIndex(skills);
   for (const resume of resumes) {
+    // Fails the seed if the sample content drifts from ResumeContent v1.
+    const content = withItemIds(resumeContentSchema.parse(resume.content), () => {
+      throw new Error(`Seed resume ${resume.key} has an item without id`);
+    });
     await prisma.resume.create({
       data: {
         id: resumeId(resume.key),
         userId: userId(resume.userKey),
         name: resume.name,
         language: resume.language,
-        content: resume.content,
+        content,
         translatedFromResumeId: resume.translatedFromKey ? resumeId(resume.translatedFromKey) : null,
-        skills: { create: resumeSkillKeys(resume.content, resume.language, lookupSkill).map((key) => ({ skillId: skillId(key) })) },
-        occupations: { create: resume.occupationKeys.map((key) => ({ occupationId: occupationId(key) })) },
       },
     });
+    await syncResumeLinks(prisma, resumeId(resume.key), content, resume.language);
     if (resume.selected) {
       await prisma.user.update({ where: { id: userId(resume.userKey) }, data: { selectedResumeId: resumeId(resume.key) } });
     }

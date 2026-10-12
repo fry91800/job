@@ -1,6 +1,6 @@
 // fetch wrapper that records every call for the request log panel.
 
-export type ApiError = { code: string; message: string; issues?: { path: string; message: string }[] };
+export type ApiError = { code: string; message: string; issues?: { path: string; message: string }[]; details?: unknown };
 export type ApiResult<T> = { ok: true; status: number; data: T } | { ok: false; status: number; error: ApiError };
 
 export type LogEntry = { id: number; method: string; path: string; body?: unknown; status: number; response: unknown };

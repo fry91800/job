@@ -29,7 +29,6 @@ export type SeedResume = {
   language: "fr" | "en";
   translatedFromKey: string | null;
   selected: boolean;
-  occupationKeys: string[];
   content: object;
 };
 
@@ -145,8 +144,8 @@ const demoResumeEn = {
 };
 
 export const resumes: SeedResume[] = [
-  { key: "demo-fr", userKey: "demo", name: "CV Full Stack", language: "fr", translatedFromKey: null, selected: true, occupationKeys: ["fullstack-developer"], content: demoResumeFr },
-  { key: "demo-en", userKey: "demo", name: "CV Full Stack (EN)", language: "en", translatedFromKey: "demo-fr", selected: false, occupationKeys: ["fullstack-developer"], content: demoResumeEn },
+  { key: "demo-fr", userKey: "demo", name: "CV Full Stack", language: "fr", translatedFromKey: null, selected: true, content: demoResumeFr },
+  { key: "demo-en", userKey: "demo", name: "CV Full Stack (EN)", language: "en", translatedFromKey: "demo-fr", selected: false, content: demoResumeEn },
 ];
 
 export type SeedSavedOffer = {

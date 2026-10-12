@@ -7,11 +7,6 @@ export function stableUuid(name: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-// Lookup form of a catalogue name (DATABASE.md: trim, lowercase, collapse spaces, NFKC).
-export function normalizeName(name: string): string {
-  return name.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 // Small deterministic PRNG (mulberry32): the generated offers are the same on every run.
 export function createRandom(seed: number) {
   let state = seed;

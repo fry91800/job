@@ -21,6 +21,27 @@ export const config = {
 
   limits: {
     savedOffers: { guest: 50, registered: 1000 },
+    resumes: { guest: 2, registered: 20 },
+    // Uploads count every uploaded resume, deleted ones included (FEATURE G4).
+    resumeUploads: { guestTotal: 3, registeredPerDay: 20 },
+    uploadMaxBytes: 5 * 1024 * 1024,
+    photos: { guest: 3, registered: 10 },
+    photoMaxPixels: 1000, // longest side after resizing (R6)
+  },
+
+  // Background cleanup (FEATURE "Background jobs", G3, A5). Runs inside the API process
+  // every `intervalHours` (0 disables it); `npm run jobs:cleanup` runs it once.
+  cleanup: {
+    intervalHours: Number(process.env.CLEANUP_INTERVAL_HOURS ?? 24),
+    guestInactiveDays: 30,
+    deletedAccountDays: 30,
+    // Soft-deleted resumes and photos are purged with their files after this delay.
+    deletedItemDays: 30,
+  },
+
+  storage: {
+    // Local-disk driver only for now; S3 comes later behind the same functions.
+    localDir: process.env.STORAGE_LOCAL_DIR ?? "storage",
   },
 
   rateLimits: {
