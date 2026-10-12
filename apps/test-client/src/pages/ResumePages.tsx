@@ -34,7 +34,7 @@ export function ResumesPage({ navigate, refreshMe }: { navigate: Navigate; refre
   async function upload(file: File) {
     const response = await fetch(`/api/resumes/upload?name=${encodeURIComponent(file.name.replace(/\.\w+$/, ""))}`, { method: "POST", body: file });
     const json = await response.json();
-    setMessage(response.ok ? "Uploaded (placeholder parser: always the same resume)" : `${response.status} ${json.error?.code}: ${json.error?.message}`);
+    setMessage(response.ok ? "Uploaded and parsed: check the imported data" : `${response.status} ${json.error?.code}: ${json.error?.message}`);
     refreshMe();
     load();
   }
@@ -46,7 +46,7 @@ export function ResumesPage({ navigate, refreshMe }: { navigate: Navigate; refre
           {RESUME_LANGUAGES.map((value) => <option key={value}>{value}</option>)}
         </select>{" "}
         <button onClick={createEmpty}>Create empty resume</button>{" "}
-        Upload PDF/DOCX: <input type="file" accept=".pdf,.docx" onChange={(event) => event.target.files?.[0] && upload(event.target.files[0])} />
+        Upload PDF/DOCX (parsed by the AI): <input type="file" accept=".pdf,.docx" onChange={(event) => event.target.files?.[0] && upload(event.target.files[0])} />
       </p>
       {message && <p className={message.match(/^\d{3} /) ? "error" : undefined}>{message}</p>}
       <table>

@@ -6,22 +6,31 @@ import {
   type GeneratedResumeListItem,
   type GeneratedResumeListResponse,
   type LanguageMismatchDetails,
+  type ModifierConfig,
+  type ModifierStrength,
+  type ResumeChange,
   type ResumeContent,
   type ResumeContentInput,
 } from "@job/shared";
+import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { newItemId } from "../lib/ids";
 import { prisma } from "../lib/prisma";
+import { RateLimiter } from "../lib/rate-limit";
 import { visibleOfferWhere } from "../offers/offer-access";
 import { photoDataUrl } from "../photos/photos";
 import { saveOffer } from "../saved-offers/saved-offers";
 import { availableTemplate } from "../settings/settings";
 import { renderPdf } from "../templates/pdf";
 import { renderResumeHtml } from "../templates/render";
+import { applyChanges, ChangeSetError, computeChanges, markEditedChanges, setChangeStatus } from "./change-set";
+import { enabledSections, GENERATE_RESUME_PROMPT_VERSION, proposeModifications } from "./resume-modifier";
 
-// Generated resumes (FEATURE M1, M3). Only the "modifier off" path exists for now: the
-// source resume is copied as-is and rendered with a template. AI generation (modifier on)
-// and change review (M4) come with the AI provider.
+// Generated resumes (FEATURE M1, M3, M4). Modifier off: the source resume is copied and
+// rendered with a template. Modifier on: the AI proposes modifications, the API turns them
+// into a change set the user reviews (accept / reject each change).
+
+const aiLimiter = new RateLimiter(config.rateLimits.aiPerIp);
 
 type SessionUser = { id: string; isGuest: boolean };
 
@@ -62,17 +71,39 @@ type GenerateInput = {
   resumeId?: string;
   templateId?: number;
   modifierEnabled?: boolean;
+  modifierStrength?: ModifierStrength;
+  modifierConfig?: ModifierConfig;
+  remember?: boolean;
   ignoreLanguageMismatch?: boolean;
 };
 
-export async function generateResume(user: SessionUser, input: GenerateInput): Promise<GeneratedResumeDetail> {
+// Only generations that call the AI count (FEATURE G4, P16), deleted ones included.
+async function checkGenerationQuota(user: SessionUser): Promise<void> {
+  const { guestTotal, registeredPerDay } = config.limits.aiGenerations;
+  const since = user.isGuest ? undefined : new Date(Date.now() - 24 * 3600 * 1000);
+  const count = await prisma.generatedResume.count({
+    where: { userId: user.id, modifierStrength: { not: null }, ...(since && { createdAt: { gte: since } }) },
+  });
+  if (count >= (user.isGuest ? guestTotal : registeredPerDay)) {
+    throw new HttpError(429, "limit_reached", user.isGuest ? "Create an account to generate more resumes" : "Daily generation limit reached");
+  }
+}
+
+export async function generateResume(user: SessionUser, input: GenerateInput, ip: string): Promise<GeneratedResumeDetail> {
   const settings = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },
-    select: { selectedResumeId: true, templateId: true, modifierEnabled: true, selectedPhotoId: true },
+    select: { selectedResumeId: true, templateId: true, modifierEnabled: true, modifierStrength: true, modifierConfig: true, selectedPhotoId: true },
   });
 
-  if (input.modifierEnabled ?? settings.modifierEnabled) {
-    throw new HttpError(501, "ai_not_available", "AI generation is not available yet: generate with the modifier off");
+  // The settings are the defaults; the request may override them once (M1).
+  const modifierEnabled = input.modifierEnabled ?? settings.modifierEnabled;
+  const strength = input.modifierStrength ?? (settings.modifierStrength as ModifierStrength);
+  const sections = input.modifierConfig ?? (settings.modifierConfig as ModifierConfig);
+  if (input.remember) {
+    await prisma.user.update({ where: { id: user.id }, data: { modifierEnabled, modifierStrength: strength, modifierConfig: sections } });
+  }
+  if (modifierEnabled && enabledSections(sections).length === 0) {
+    throw new HttpError(400, "no_section_selected", "Choose at least one section the AI may modify");
   }
 
   const resumeId = input.resumeId ?? settings.selectedResumeId;
@@ -114,16 +145,51 @@ export async function generateResume(user: SessionUser, input: GenerateInput): P
     { skillIds: resume.skills.map((link) => link.skillId), occupationIds: resume.occupations.map((link) => link.occupationId) },
   );
 
+  const original = resume.content as ResumeContent;
+  let generated = original;
+  let changes: ResumeChange[] = [];
+  let aiModel: string | null = null;
+
+  if (modifierEnabled) {
+    if (aiLimiter.isLimited(ip)) throw new HttpError(429, "rate_limited", "Too many requests, try again later");
+    await checkGenerationQuota(user);
+    aiLimiter.record(ip);
+
+    const offerSkills = await prisma.skillName.findMany({
+      where: { skillId: { in: offer.skills.map((link) => link.skillId) }, isCanonical: true, language: resume.language },
+      select: { name: true },
+    });
+    const { proposal, model } = await proposeModifications({
+      resume: original,
+      language: resume.language,
+      offer: { title: offer.title, companyName: offer.companyName, description: offer.description, skillNames: offerSkills.map((skill) => skill.name) },
+      strength,
+      sections,
+    });
+    const result = computeChanges(original, proposal, sections, strength, newItemId);
+    if (result.violations.length > 0) {
+      // Logged for prompt improvement (M4); never the content itself.
+      console.warn(`generate-resume: ${result.violations.length} modification(s) dropped`, result.violations.slice(0, 10));
+    }
+    changes = result.changes;
+    generated = applyChanges(original, changes);
+    aiModel = model;
+  }
+
   const row = await prisma.generatedResume.create({
     data: {
       userId: user.id,
       offerId: offer.id,
       resumeId: resume.id,
       language: resume.language,
-      originalContent: resume.content as Prisma.InputJsonValue,
-      generatedContent: resume.content as Prisma.InputJsonValue,
-      changes: [],
-      modifierStrength: null, // modifier off; modifier_config stays NULL with it
+      originalContent: original as Prisma.InputJsonValue,
+      generatedContent: generated as Prisma.InputJsonValue,
+      changes: changes as unknown as Prisma.InputJsonValue,
+      // Modifier off: strength, config, model and prompt version all stay NULL.
+      modifierStrength: modifierEnabled ? strength : null,
+      modifierConfig: modifierEnabled ? (sections as Prisma.InputJsonValue) : undefined,
+      aiModel,
+      promptVersion: modifierEnabled ? GENERATE_RESUME_PROMPT_VERSION : null,
       templateId: template.id,
       photoId: template.supportsPhoto ? settings.selectedPhotoId : null,
       matchScore: match.score,
@@ -155,20 +221,22 @@ export async function getGeneratedResume(userId: string, id: string): Promise<Ge
     ...toListItem(row),
     originalContent: row.originalContent as ResumeContent,
     generatedContent: row.generatedContent as ResumeContent,
-    changes: row.changes as unknown[],
+    changes: row.changes as ResumeChange[],
+    modifierConfig: row.modifierConfig as Record<string, boolean> | null,
+    aiModel: row.aiModel,
     photoId: row.photoId,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-// M3: change the template (re-render only) or edit the generated content by hand.
-// When AI change sets exist, editing a field with a pending change will mark it `edited` (M4).
+// M3: change the template or photo (re-render only) or edit the generated content by hand.
+// Editing a field that has a change makes that change `edited`: the manual value wins (M4).
 export async function updateGeneratedResume(
   userId: string,
   id: string,
   input: { templateId?: number; photoId?: string | null; generatedContent?: ResumeContentInput },
 ): Promise<GeneratedResumeDetail> {
-  await findOwn(userId, id);
+  const row = await findOwn(userId, id);
   const data: Prisma.GeneratedResumeUpdateInput = {};
   if (input.templateId !== undefined) {
     const template = await prisma.template.findFirst({ where: { id: input.templateId, deletedAt: null } });
@@ -182,8 +250,42 @@ export async function updateGeneratedResume(
     }
     data.photo = input.photoId === null ? { disconnect: true } : { connect: { id: input.photoId } };
   }
-  if (input.generatedContent !== undefined) data.generatedContent = withItemIds(input.generatedContent, newItemId);
+  if (input.generatedContent !== undefined) {
+    const next = withItemIds(input.generatedContent, newItemId);
+    data.generatedContent = next;
+    data.changes = markEditedChanges(row.generatedContent as ResumeContent, next, row.changes as ResumeChange[]) as unknown as Prisma.InputJsonValue;
+  }
   await prisma.generatedResume.update({ where: { id }, data });
+  return getGeneratedResume(userId, id);
+}
+
+// Accept or reject changes (M4), saved immediately. The content is updated in the same
+// write, from its current state, so manual edits elsewhere are kept.
+export async function decideChanges(
+  userId: string,
+  id: string,
+  decisions: { id: string; status: "accepted" | "rejected" }[],
+): Promise<GeneratedResumeDetail> {
+  const row = await findOwn(userId, id);
+  let content = row.generatedContent as ResumeContent;
+  let changes = row.changes as ResumeChange[];
+  try {
+    for (const decision of decisions) {
+      ({ content, changes } = setChangeStatus(content, row.originalContent as ResumeContent, changes, decision.id, decision.status));
+    }
+  } catch (error) {
+    if (error instanceof ChangeSetError) {
+      throw new HttpError(error.code === "change_not_found" ? 404 : 409, error.code, error.message);
+    }
+    throw error;
+  }
+  // Only this request's view of the row is used: a concurrent decision on the same
+  // resume is rejected instead of being silently overwritten.
+  const { count } = await prisma.generatedResume.updateMany({
+    where: { id, updatedAt: row.updatedAt },
+    data: { generatedContent: content as Prisma.InputJsonValue, changes: changes as unknown as Prisma.InputJsonValue },
+  });
+  if (count === 0) throw new HttpError(409, "conflict", "This resume was changed meanwhile, reload it");
   return getGeneratedResume(userId, id);
 }
 

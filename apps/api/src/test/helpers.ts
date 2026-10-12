@@ -6,10 +6,13 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stableUuid } from "../../../../prisma/seed/helpers";
+import { useFakeAi } from "../ai/run";
 import { createApp } from "../app";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
 import { closeBrowser } from "../templates/pdf";
+import { sampleExtractedOffer } from "./fixtures/sample-offer";
+import { sampleParsedResume } from "./fixtures/sample-resume";
 
 export { prisma };
 
@@ -25,6 +28,11 @@ export async function startTestServer() {
   config.rateLimits.signupsPerIp.max = 1000;
   config.rateLimits.guestsPerIp.max = 1000;
   config.rateLimits.loginFailuresPerIp.max = 1000;
+  // Never call a real AI provider from tests. Default answers per task; tests use
+  // `ai.with(task, handler, run)` for other answers.
+  const ai = useFakeAi();
+  ai.handlers["parse-resume"] = () => sampleParsedResume;
+  ai.handlers["extract-offer"] = () => sampleExtractedOffer;
   // Uploaded files go to a temporary folder, removed at the end.
   config.storage.localDir = await mkdtemp(join(tmpdir(), "job-api-test-"));
   const server = createApp().listen(0);
@@ -33,6 +41,7 @@ export async function startTestServer() {
 
   return {
     baseUrl,
+    ai,
     client: (session?: string) => new TestClient(baseUrl, session),
     // Deletes the users created since the server started (registered test users,
     // guests and deleted accounts). Test files run one at a time (see api:test).

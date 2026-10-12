@@ -2,13 +2,17 @@
   "name": "@job/api",
   "private": true,
   "dependencies": {
+    "@google/genai": "^2.28.0",
     "@job/shared": "*",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
+    "mammoth": "^1.13.0",
+    "node-html-parser": "^9.0.4",
     "playwright-core": "^1.64.0",
     "sharp": "^0.35.5",
+    "unpdf": "^1.8.1",
     "zod": "^4.6.7"
   }
 }

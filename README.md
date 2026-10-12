@@ -8,7 +8,7 @@ Early development / MVP.
 
 Current focus:
 
-* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload uses a placeholder parser), photos, user-added offers (placeholder extractor), match %, settings and templates, resume generation without AI and PDF download, cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
+* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload parsed by Gemini), photos, user-added offers (page fetched and read by Gemini), match %, settings and templates, resume generation with the AI modifier and change review, PDF download, cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
 * Development seed data used to write and test the API
 
 Done:
@@ -142,6 +142,7 @@ nvm use
 npm install
 npm run db:up        # start PostgreSQL in Docker
 npm run db:migrate   # apply the migrations and generate the Prisma client
+cp .env.example .env # then fill in GEMINI_API_KEY (see .env.example)
 npm run db:seed      # empty the database and insert the development data
 npm run api:install-browser   # headless Chromium for PDF rendering (once)
 ```
@@ -151,6 +152,7 @@ Other scripts:
 * `npm run api:dev` — start the API on http://localhost:3000 (restarts on change)
 * `npm run client:dev` — start the test client on http://localhost:5173 (needs the API running); it proxies `/api` to the API
 * `npm run api:test` — API integration tests (they expect the seed data: run `npm run db:seed` first)
+* `npm run ai:check` — one tiny request to the configured AI provider/model (checks the key, the model and the latency; uses one request of the quota)
 * `npm run jobs:cleanup` — run the cleanup job once (the API also runs it every 24 h)
 * `npm run db:reset` — drop everything, re-apply the migrations and reseed
 * `npm run db:studio` — browse the data in Prisma Studio
@@ -187,7 +189,7 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 |---|---|---|
 | `GET /api/offers` | O1 | Search. Query: `q`, `locationId`, `radius`, `includeRemote`, `skills`, `company`, `remoteType`, `contractType`, `publishedWithin`, `salaryMin`, `salaryCurrency`, `salaryPeriod`, `salaryShownOnly`, `sort`, `page` |
 | `GET /api/offers/:id` | O2 | `?lang=fr\|en` for skill/occupation names |
-| `POST /api/user-offers/extract` | O5 | `{ url }` or `{ text }` → `{ draft }` to review, or `{ existingOfferId }` (known URL, saved for the user). **Placeholder extractor** |
+| `POST /api/user-offers/extract` | O5 | `{ url }` (page fetched server-side, private addresses refused) or `{ text }` → `{ draft }` read by the AI, to review; or `{ existingOfferId }` (known URL, saved for the user) |
 | `POST /api/user-offers` | O5 | Create the private offer from the reviewed draft (saved automatically) |
 | `PUT /api/user-offers/:id` | O5 | Creator only, while the offer is private |
 | `GET /api/locations?q=` | O1 | Autocomplete from the `locations` table (Geoapify later) |
@@ -203,7 +205,7 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `DELETE /api/saved-offers/:offerId` | O3 | Unsave |
 | `GET /api/resumes`, `GET /api/resumes/:id` | R1 | Detail includes the catalogue links (M2) |
 | `POST /api/resumes` | R2 | Create from scratch (ResumeContent v1 JSON) |
-| `POST /api/resumes/upload?name=` | R2 | Body = the PDF/DOCX file. **Placeholder parser**: always returns the same sample resume |
+| `POST /api/resumes/upload?name=` | R2 | Body = the PDF/DOCX file (≤ 10 pages, with a text layer). Text extracted, then parsed by the AI |
 | `PUT /api/resumes/:id` | R3 | Whole resume; re-extracts skills/occupations |
 | `POST /api/resumes/:id/select`, `DELETE /api/resumes/:id` | R4, R5 | |
 | `GET /api/resumes/:id/source` | R5 | Original uploaded file |
@@ -213,13 +215,14 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `GET /api/photos/:id/file` | R6 | The image, owner only |
 | `GET /api/templates` | S2 | Public |
 | `GET /api/settings`, `PATCH /api/settings` | S1, S2 | Modifier defaults, template, UI language |
-| `POST /api/generated-resumes` | M1 | Modifier off only (`501 ai_not_available` otherwise); `409 language_mismatch` with details |
+| `POST /api/generated-resumes` | M1 | Modifier on/off, strength and sections default to the settings (one-off overrides, `remember` to save them); `409 language_mismatch` with details |
+| `PATCH /api/generated-resumes/:id/changes` | M4 | `{ decisions: [{ id, status: accepted\|rejected }] }`, one or many |
 | `GET /api/generated-resumes?offerId=`, `GET /api/generated-resumes/:id` | M3 | History and detail |
 | `PATCH /api/generated-resumes/:id` | M3 | Change template or photo, edit content |
 | `DELETE /api/generated-resumes/:id` | M3 | Soft delete |
 | `GET /api/generated-resumes/:id/html`, `/pdf` | M3 | Rendered preview; PDF printed by headless Chromium |
 
-Not built yet: AI (resume parsing, offer extraction and page fetching for O5, generation with the modifier, change review M4), translation (T1). Password reset (A4) and email verification (A6) are postponed (they need an email provider).
+Not built yet: translation (T1). Password reset (A4) and email verification (A6) are postponed (they need an email provider).
 
 ## Test client
 

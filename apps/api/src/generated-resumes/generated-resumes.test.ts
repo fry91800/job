@@ -5,12 +5,15 @@ import {
   emptyResumeContent,
   type GeneratedResumeDetail,
   type GeneratedResumeListResponse,
+  type ResumeChange,
   type OfferDetail,
   type ResumeDetail,
   type SavedOfferListResponse,
   type Settings,
   type TemplateListResponse,
 } from "@job/shared";
+import type { AiJsonRequest } from "../ai/provider";
+import { config } from "../config";
 import { prisma, seedOfferId, startTestServer, TestClient, TEST_PASSWORD, uniqueEmail } from "../test/helpers";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -72,13 +75,6 @@ describe("generate a resume (M1, modifier off)", () => {
     await client.put(`/api/resumes/${resume.id}`, { name: "x", language: "fr", content: emptyResumeContent("Someone Else") });
     const again = (await client.get<GeneratedResumeDetail>(`/api/generated-resumes/${generated.id}`)).body;
     assert.equal(again.generatedContent.basics.fullName, "Camille Martin");
-  });
-
-  test("the modifier needs AI, which is not available yet", async () => {
-    const { client } = await userWithResume();
-    const { status, body } = await generate(client, { offerId: frenchOffer, modifierEnabled: true });
-    assert.equal(status, 501);
-    assert.equal(body.error.code, "ai_not_available");
   });
 
   test("needs a resume", async () => {
@@ -201,5 +197,135 @@ describe("settings and templates (S1, S2)", () => {
     } finally {
       await prisma.template.update({ where: { id: 2 }, data: { deletedAt: null } });
     }
+  });
+});
+
+// The resume the AI received, to build a proposal with its real item ids.
+function resumeSent(request: AiJsonRequest) {
+  const text = (request.parts[0] as { text: string }).text;
+  return JSON.parse(text.slice(text.indexOf("<resume>") + 8, text.indexOf("</resume>")));
+}
+
+// Rewrites the summary, reverses the skills and adds "TypeScript".
+function proposal(request: AiJsonRequest) {
+  const resume = resumeSent(request);
+  return {
+    summary: "Développeuse full stack orientée React et Node.js.",
+    skills: [...resume.skills].reverse().concat([{ name: "TypeScript", category: "technical" }]),
+  };
+}
+
+const modifier = { modifierEnabled: true, modifierStrength: "hard", modifierConfig: { summary: true, skills: true } };
+
+describe("generation with the modifier (M1) and change review (M4)", () => {
+  test("the AI proposal becomes a reviewable change set, applied by default", async () => {
+    const { client, resume } = await userWithResume("fr", "Développeuse web.");
+    const { status, body } = await server.ai.with("generate-resume", proposal, () => generate(client, { offerId: frenchOffer, ...modifier }));
+    assert.equal(status, 201);
+    const detail = body as GeneratedResumeDetail;
+    assert.equal(detail.modified, true);
+    assert.equal(detail.modifierStrength, "hard");
+    assert.deepEqual(detail.modifierConfig, { summary: true, skills: true });
+    assert.equal(detail.aiModel, "fake:fake-model");
+    assert.deepEqual(detail.changes.map((change) => change.op).sort(), ["add", "reorder", "replace"]);
+    assert.equal(detail.changes.find((change) => change.op === "add")!.flag, "added_skill");
+    assert.equal(detail.pendingChanges, 3);
+    assert.equal(detail.generatedContent.summary, "Développeuse full stack orientée React et Node.js.");
+    assert.deepEqual(detail.generatedContent.skills.map((skill) => skill.name), ["React", "Node.js", "TypeScript"]);
+    assert.deepEqual(detail.originalContent, resume.content);
+
+    const row = await prisma.generatedResume.findUniqueOrThrow({ where: { id: detail.id } });
+    assert.ok(row.promptVersion);
+
+    // The AI was asked for the allowed sections only, with the strength rules.
+    const request = server.ai.requests.at(-1)!;
+    assert.deepEqual(Object.keys((request.jsonSchema as any).properties).sort(), ["skills", "summary"]);
+    assert.match(request.system, /Strength HARD/);
+    assert.match(request.system, /Never invent or change employers/);
+  });
+
+  test("accept and reject changes; rejected ones are undone in the content", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    const generated = (await server.ai.with("generate-resume", proposal, () => generate(client, { offerId: frenchOffer, ...modifier }))).body as GeneratedResumeDetail;
+    const changeId = (op: string) => generated.changes.find((change) => change.op === op)!.id;
+    const decide = (decisions: object[]) => client.patch<GeneratedResumeDetail>(`/api/generated-resumes/${generated.id}/changes`, { decisions });
+
+    let result = await decide([{ id: changeId("add"), status: "rejected" }, { id: changeId("reorder"), status: "rejected" }]);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body.generatedContent.skills.map((skill) => skill.name), ["Node.js", "React"]);
+    assert.equal(result.body.pendingChanges, 1);
+
+    result = await decide([{ id: changeId("replace"), status: "rejected" }, { id: changeId("add"), status: "accepted" }]);
+    assert.equal(result.body.generatedContent.summary, "Développeuse web.");
+    assert.deepEqual(result.body.generatedContent.skills.map((skill) => skill.name), ["Node.js", "React", "TypeScript"]);
+    assert.equal(result.body.pendingChanges, 0);
+
+    assert.equal((await decide([{ id: "c99", status: "accepted" }])).status, 404);
+    assert.equal((await decide([{ id: changeId("add"), status: "maybe" }])).status, 400);
+  });
+
+  test("a manual edit of a changed field makes the change edited", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    const generated = (await server.ai.with("generate-resume", proposal, () => generate(client, { offerId: frenchOffer, ...modifier }))).body as GeneratedResumeDetail;
+    const content = { ...generated.generatedContent, summary: "Écrit à la main." };
+    const edited = await client.patch<GeneratedResumeDetail>(`/api/generated-resumes/${generated.id}`, { generatedContent: content });
+    const replace = edited.body.changes.find((change: ResumeChange) => change.op === "replace")!;
+    assert.equal(replace.status, "edited");
+    assert.equal(edited.body.generatedContent.summary, "Écrit à la main.");
+
+    const decision = await client.patch(`/api/generated-resumes/${generated.id}/changes`, { decisions: [{ id: replace.id, status: "rejected" }] });
+    assert.equal(decision.status, 409);
+    assert.equal(decision.body.error.code, "change_edited");
+  });
+
+  test("modifications outside the allowed sections are dropped", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    const sneaky = (request: AiJsonRequest) => ({ summary: "Résumé réécrit.", skills: resumeSent(request).skills.slice(1), basics: { fullName: "Someone Else" } });
+    const { body } = await server.ai.with("generate-resume", sneaky, () =>
+      generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierStrength: "soft", modifierConfig: { summary: true } }),
+    );
+    assert.deepEqual(body.changes.map((change: ResumeChange) => change.path), ["summary"]);
+    assert.equal(body.generatedContent.basics.fullName, "Camille Martin");
+    assert.equal(body.generatedContent.skills.length, 2);
+  });
+
+  test("an empty proposal is saved with no changes", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    const { status, body } = await server.ai.with("generate-resume", () => ({ summary: "Développeuse web." }), () =>
+      generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierStrength: "soft", modifierConfig: { summary: true } }),
+    );
+    assert.equal(status, 201);
+    assert.equal(body.modified, true);
+    assert.deepEqual(body.changes, []);
+  });
+
+  test("needs at least one section; `remember` saves the overrides as defaults", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    const none = await generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierConfig: {} });
+    assert.equal(none.body.error.code, "no_section_selected");
+
+    await server.ai.with("generate-resume", proposal, () => generate(client, { offerId: frenchOffer, ...modifier, remember: true }));
+    const settings = (await client.get<Settings>("/api/settings")).body;
+    assert.deepEqual([settings.modifierEnabled, settings.modifierStrength, settings.modifierConfig], [true, "hard", { summary: true, skills: true }]);
+  });
+
+  test("AI failures save nothing and use no quota", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    const failed = await server.ai.with("generate-resume", () => "not json", () => generate(client, { offerId: frenchOffer, ...modifier }));
+    assert.equal(failed.status, 502);
+    assert.deepEqual((await client.get<GeneratedResumeListResponse>("/api/generated-resumes")).body.results, []);
+  });
+
+  test("guests can generate with the AI a limited number of times; modifier off stays free", async () => {
+    const client = server.client();
+    await client.post("/api/resumes", { language: "fr", content: { ...emptyResumeContent("Camille"), summary: "Développeuse web." } });
+    await server.ai.with("generate-resume", proposal, async () => {
+      for (let i = 0; i < config.limits.aiGenerations.guestTotal; i++) {
+        assert.equal((await generate(client, { offerId: frenchOffer, ...modifier })).status, 201);
+      }
+      const over = await generate(client, { offerId: frenchOffer, ...modifier });
+      assert.equal(over.status, 429);
+    });
+    assert.equal((await generate(client, { offerId: frenchOffer, modifierEnabled: false })).status, 201);
   });
 });

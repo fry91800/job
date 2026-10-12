@@ -20,7 +20,8 @@
     "api:test": "node --import tsx --test --test-concurrency=1 \"packages/shared/src/**/*.test.ts\" \"apps/api/src/**/*.test.ts\"",
     "client:dev": "vite apps/test-client",
     "api:install-browser": "playwright-core install chromium-headless-shell",
-    "jobs:cleanup": "tsx apps/api/src/jobs/run-cleanup.ts"
+    "jobs:cleanup": "tsx apps/api/src/jobs/run-cleanup.ts",
+    "ai:check": "tsx apps/api/src/ai/check.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

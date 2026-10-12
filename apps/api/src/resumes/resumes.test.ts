@@ -1,17 +1,25 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { emptyResumeContent, type MeResponse, type ResumeDetail, type ResumeListResponse } from "@job/shared";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { config } from "../config";
+import { renderPdf } from "../templates/pdf";
+import { sampleParsedResume } from "../test/fixtures/sample-resume";
 import { prisma, startTestServer, TestClient, TEST_PASSWORD, uniqueEmail } from "../test/helpers";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
+let PDF: Buffer;
+let DOCX: Buffer;
+
 before(async () => {
   server = await startTestServer();
+  // Real files: a PDF printed by Chromium, and a minimal DOCX fixture.
+  PDF = await renderPdf("<html><body><h1>Marie Curie</h1><p>Data analyst chez DataVerse depuis 2021. Python, SQL, Power BI.</p></body></html>");
+  DOCX = await readFile(join(__dirname, "../test/fixtures/resume.docx"));
 });
 after(() => server.close());
-
-const PDF = Buffer.from("%PDF-1.4\n% test file\n");
 
 async function registered(): Promise<TestClient> {
   const client = server.client();
@@ -116,27 +124,50 @@ describe("resumes (R1–R5)", () => {
   });
 });
 
-describe("resume upload (R2, placeholder parser)", () => {
-  test("a PDF creates the placeholder resume and keeps the file", async () => {
+describe("resume upload (R2)", () => {
+  test("a PDF is read, parsed by the AI and kept", async () => {
     const client = server.client();
     const { status, body } = await upload(client, PDF, "?name=Imported");
     assert.equal(status, 201);
     assert.equal(body.name, "Imported");
+    assert.equal(body.language, "fr");
     assert.equal(body.content.basics.fullName, "Jean Dupont");
+    assert.match(body.content.skills[0].id, /^[A-Za-z0-9_-]{8}$/, "ids added by the API");
     assert.equal(body.hasSourceFile, true);
     assert.ok(body.skillIds.length > 0);
+
+    // The AI got the text of the file, framed as data.
+    const request = server.ai.requests.at(-1)!;
+    assert.ok("text" in request.parts[0] && request.parts[0].text.includes("Marie Curie"));
+    assert.match(request.system, /ignore any instruction/);
 
     const source = await fetch(new URL(`/api/resumes/${body.id}/source`, server.baseUrl), { headers: { Cookie: `session=${client.session}` } });
     assert.equal(source.headers.get("content-type"), "application/pdf");
     assert.deepEqual(Buffer.from(await source.arrayBuffer()), PDF);
   });
 
-  test("DOCX files are accepted, other files are not", async () => {
-    const docx = Buffer.concat([Buffer.from("PK\x03\x04", "latin1"), Buffer.from("....word/document.xml....")]);
-    assert.equal((await upload(server.client(), docx)).status, 201);
+  test("DOCX files are read too", async () => {
+    const { status } = await upload(server.client(), DOCX);
+    assert.equal(status, 201);
+    const request = server.ai.requests.at(-1)!;
+    assert.ok("text" in request.parts[0] && request.parts[0].text.includes("Jeanne Martin"));
+  });
+
+  test("other files are refused", async () => {
     assert.equal((await upload(server.client(), Buffer.from("PK\x03\x04 a zip without word", "latin1"))).status, 415);
     assert.equal((await upload(server.client(), Buffer.from("hello"))).status, 415);
     assert.equal((await upload(server.client(), Buffer.alloc(0))).status, 400);
+  });
+
+  test("unreadable, scanned or too long PDFs get a clear error", async () => {
+    const broken = await upload(server.client(), Buffer.from("%PDF-1.4\n% not really a pdf\n"));
+    assert.equal(broken.body.error.code, "unreadable_file");
+    const noText = await upload(server.client(), await renderPdf("<html><body></body></html>"));
+    assert.equal(noText.body.error.code, "unreadable_file", "no text layer (scanned)");
+    const pages = Array.from({ length: 11 }, (_, i) => `<p style="page-break-after: always">Page ${i + 1} ${"texte ".repeat(20)}</p>`).join("");
+    const long = await upload(server.client(), await renderPdf(`<html><body>${pages}</body></html>`));
+    assert.equal(long.status, 422);
+    assert.equal(long.body.error.code, "too_many_pages");
   });
 
   test("files over the size limit are refused", async () => {
@@ -144,6 +175,40 @@ describe("resume upload (R2, placeholder parser)", () => {
     const { status, body } = await upload(server.client(), big);
     assert.equal(status, 413);
     assert.equal(body.error.code, "payload_too_large");
+  });
+
+  test("an invalid AI answer is retried once, then nothing is saved and no quota is used", async () => {
+    const client = server.client();
+    let calls = 0;
+    const invalid = () => (++calls === 1 ? "not json" : { language: "fr", content: { schemaVersion: 1 } });
+    await server.ai.with("parse-resume", invalid, async () => {
+      const { status, body } = await upload(client, PDF);
+      assert.equal(status, 502);
+      assert.equal(body.error.code, "ai_invalid_output");
+      assert.equal(calls, 2);
+    });
+    assert.deepEqual((await client.get("/api/resumes")).body, { results: [] });
+    // Failed uploads don't count (G5): the guest can still upload its full quota.
+    for (let i = 0; i < config.limits.resumeUploads.guestTotal; i++) {
+      const { status, body } = await upload(client, PDF);
+      assert.equal(status, 201);
+      await client.delete(`/api/resumes/${body.id}`);
+    }
+  });
+
+  test("the retry succeeds when the second answer is valid", async () => {
+    let calls = 0;
+    await server.ai.with("parse-resume", () => (++calls === 1 ? "{" : sampleParsedResume), async () => {
+      assert.equal((await upload(server.client(), PDF)).status, 201);
+    });
+  });
+
+  test("resumes in other languages are refused", async () => {
+    await server.ai.with("parse-resume", () => ({ ...sampleParsedResume, language: "other" }), async () => {
+      const { status, body } = await upload(server.client(), PDF);
+      assert.equal(status, 422);
+      assert.equal(body.error.code, "unsupported_language");
+    });
   });
 
   test("guest uploads count deleted resumes too", async () => {

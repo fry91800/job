@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { GeneratedResumeDetail, GeneratedResumeListResponse, PhotoListResponse, TemplateListResponse } from "@job/shared";
+import type { GeneratedResumeDetail, GeneratedResumeListResponse, PhotoListResponse, ResumeChange, TemplateListResponse } from "@job/shared";
 import { api, errorText } from "../api";
 import type { Navigate } from "../App";
 import { JsonEditor } from "../JsonEditor";
@@ -90,14 +90,71 @@ export function GeneratedResumePage({ id, navigate }: { id: string; navigate: Na
           {item.photoId && !photos.some((photo) => photo.id === item.photoId) && <option value={item.photoId}>(deleted photo)</option>}
           {photos.map((photo) => <option key={photo.id} value={photo.id}>{photo.name}</option>)}
         </select>{" "}
-        <a href={`/api/generated-resumes/${id}/pdf`}>Download PDF</a>{" "}
+        <a
+          href={`/api/generated-resumes/${id}/pdf`}
+          onClick={(event) => {
+            if (item.pendingChanges > 0 && !confirm(`${item.pendingChanges} changes not reviewed: they will be included. Download anyway?`)) event.preventDefault();
+          }}
+        >
+          Download PDF
+        </a>{" "}
         <a href={`/api/generated-resumes/${id}/html`} target="_blank">Open HTML</a>{" "}
         <button onClick={remove}>Delete</button>
       </p>
       {message && <p className="error">{message}</p>}
+      {item.modified && <Review item={item} onDecide={async (decisions) => {
+        const result = await api<GeneratedResumeDetail>("PATCH", `/api/generated-resumes/${id}/changes`, { decisions });
+        setMessage(errorText(result));
+        if (result.ok) load();
+      }} />}
       <iframe key={version} title="preview" src={`/api/generated-resumes/${id}/html`} style={{ width: 794, height: 600, border: "1px solid #ccc" }} />
       <h3>Generated content (M3 edit)</h3>
       <JsonEditor key={item.updatedAt} value={item.generatedContent} onSave={(generatedContent) => patch({ generatedContent })} />
+    </div>
+  );
+}
+
+type Decision = { id: string; status: "accepted" | "rejected" };
+
+const show = (value: unknown) => (value === null || value === undefined ? "—" : typeof value === "string" ? value : JSON.stringify(value));
+
+// Change review (M4): each change with before → after, accept / reject, all at once.
+function Review({ item, onDecide }: { item: GeneratedResumeDetail; onDecide: (decisions: Decision[]) => void }) {
+  const changes = item.changes;
+  if (changes.length === 0) return <p>No modifications were proposed.</p>;
+  const reviewed = changes.filter((change) => change.status !== "pending").length;
+  const all = (status: Decision["status"]) => changes.filter((change) => change.status !== "edited").map((change) => ({ id: change.id, status }));
+
+  return (
+    <div>
+      <h3>Review: {reviewed} of {changes.length} reviewed</h3>
+      <p>
+        <button onClick={() => onDecide(all("accepted"))}>Accept all</button> <button onClick={() => onDecide(all("rejected"))}>Reject all</button>{" "}
+        <span className="muted">Pending changes count as accepted.</span>
+      </p>
+      <table>
+        <tbody>
+          {changes.map((change: ResumeChange) => (
+            <tr key={change.id}>
+              <td className="muted">{change.id} · {change.op}<div>{change.path}</div></td>
+              <td>
+                {change.flag === "added_skill" && <div className="error">Not in your original resume</div>}
+                {change.op !== "add" && <div style={{ color: "#b00", textDecoration: change.op === "remove" ? "line-through" : undefined }}>{show(change.before)}</div>}
+                {change.op !== "remove" && <div style={{ color: "#070" }}>{show(change.after)}</div>}
+              </td>
+              <td>
+                <strong>{change.status}</strong>
+                {change.status !== "edited" && (
+                  <div>
+                    <button disabled={change.status === "accepted"} onClick={() => onDecide([{ id: change.id, status: "accepted" }])}>Accept</button>{" "}
+                    <button disabled={change.status === "rejected"} onClick={() => onDecide([{ id: change.id, status: "rejected" }])}>Reject</button>
+                  </div>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

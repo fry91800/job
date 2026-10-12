@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { computeMatch, type GeneratedResumeDetail, type LanguageMismatchDetails, type MeResponse, type OfferDetail } from "@job/shared";
 import { api, errorText } from "../api";
 import type { Navigate } from "../App";
+import { GenerateOptions, type GenerateRequestOptions } from "../GenerateOptions";
 import { OfferForm } from "../OfferForm";
 import { GeneratedList } from "./GeneratedPages";
 import { SavedEditor } from "../SavedEditor";
@@ -31,8 +32,9 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
   }
 
   // M1 with the modifier off (AI not available yet). A language mismatch asks what to do.
-  async function generate(options: { resumeId?: string; ignoreLanguageMismatch?: boolean } = {}) {
-    const result = await api<GeneratedResumeDetail>("POST", "/api/generated-resumes", { offerId: id, modifierEnabled: false, ...options });
+  async function generate(options: Partial<GenerateRequestOptions> & { resumeId?: string; ignoreLanguageMismatch?: boolean }) {
+    setError("Generating…");
+    const result = await api<GeneratedResumeDetail>("POST", "/api/generated-resumes", { offerId: id, ...options });
     if (result.ok) {
       refreshMe();
       return navigate({ name: "generatedResume", id: result.data.id });
@@ -40,12 +42,12 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
     if (result.error.code === "language_mismatch") {
       const details = result.error.details as LanguageMismatchDetails;
       if (details.alternativeResumeId && confirm(`The offer is in ${details.offerLanguage}. Use your ${details.offerLanguage} resume instead?`)) {
-        return generate({ resumeId: details.alternativeResumeId });
+        return generate({ ...options, resumeId: details.alternativeResumeId });
       }
       if (confirm(`The offer is in ${details.offerLanguage}, your resume in ${details.resumeLanguage}. Generate in ${details.resumeLanguage} anyway?`)) {
         return generate({ ...options, ignoreLanguageMismatch: true });
       }
-      return;
+      return setError("");
     }
     setError(errorText(result));
   }
@@ -129,7 +131,7 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
           <tr>
             <th>Generated resumes</th>
             <td>
-              <button onClick={() => generate()}>Generate with selected resume (modifier off)</button>
+              <GenerateOptions onGenerate={(options) => generate(options)} />
               <GeneratedList key={offer.generatedResumes.length} offerId={offer.id} navigate={navigate} />
             </td>
           </tr>

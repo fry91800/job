@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { MODIFIER_STRENGTHS, modifierConfigSchema } from "../settings";
+import type { ResumeChange } from "./changes";
 import { resumeContentSchema, type ResumeContent } from "./content";
 
 // Generated resumes (FEATURE M1, M3).
@@ -8,6 +10,10 @@ export const generateResumeSchema = z.strictObject({
   resumeId: z.uuid().optional(), // defaults to the selected resume
   templateId: z.number().int().positive().optional(), // defaults to the user's template
   modifierEnabled: z.boolean().optional(), // defaults to the user's setting
+  // One-off overrides of the modifier settings (M1); saved as the new defaults if `remember`.
+  modifierStrength: z.enum(MODIFIER_STRENGTHS).optional(),
+  modifierConfig: modifierConfigSchema.optional(),
+  remember: z.boolean().optional(),
   // Generate even though the offer is in another language than the resume (M1).
   ignoreLanguageMismatch: z.boolean().optional(),
 });
@@ -49,7 +55,9 @@ export type GeneratedResumeListResponse = { results: GeneratedResumeListItem[] }
 export type GeneratedResumeDetail = GeneratedResumeListItem & {
   originalContent: ResumeContent;
   generatedContent: ResumeContent;
-  changes: unknown[]; // change set (DATABASE.md), filled once AI generation exists
+  changes: ResumeChange[]; // change set to review (M4); empty when the modifier was off
+  modifierConfig: Record<string, boolean> | null;
+  aiModel: string | null;
   photoId: string | null;
   updatedAt: string;
 };

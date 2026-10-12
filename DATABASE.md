@@ -409,15 +409,15 @@ The AI's modifications, stored as a list of reviewable changes (see FEATURE M4).
     "id": "c1",                                  // unique within the list
     "op": "replace",                             // replace | add | remove | reorder
     "path": "workExperience[id=w1].responsibilities[id=r1].text",
-    "before": "Designed and maintained two web applications for the company.",   // null for add
-    "after": "Designed and maintained two Node.js/PostgreSQL web applications used across the company.",  // null for remove
+    "before": "Designed and maintained two web applications for the company.",   // null for add; the removed item for remove; original ids for reorder
+    "after": "Designed and maintained two Node.js/PostgreSQL web applications used across the company.",  // null for remove; the added item for add; proposed ids for reorder
     "status": "pending",                         // pending | accepted | rejected | edited
     "flag": null                                 // null | "added_skill" (a skill not in the original resume)
   }
 ]
 ```
 
-* **Paths** use the section names of ResumeContent and select array items by id: `summary`, `basics.title`, `skills[id=s3]`, `workExperience[id=w1].responsibilities[id=r2].text`, `projects[id=p1].description`, `projects[id=p1].highlights` (for a reorder).
+* **Paths** use the section names of ResumeContent and select array items by id: `summary`, `basics.title`, `skills[id=s3]` (add/remove), `skills[id=s3].name` (rename), `workExperience[id=w1].responsibilities[id=r2].text`, `projects[id=p1].description`, `projects[id=p1].highlights` (for a reorder). Implemented in `apps/api/src/generated-resumes/change-set.ts`.
 * **Granularity**: one change per rewritten text field, one per added or removed item, and one `reorder` per list whose order changed (`before`/`after` are lists of item ids).
 * **Allowed operations** are exactly those in the modifier_config table above. Anything else in the proposal (changed dates, companies, degrees, a removed work experience, an added responsibility…) is a violation: the API drops it and logs it. It is never shown as a change.
 * **Applying changes**: `generated_content` = `original_content` with every change whose status is not `rejected` applied. The API recomputes and saves it whenever a status changes, in the same update.

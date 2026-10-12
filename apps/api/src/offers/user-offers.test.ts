@@ -1,15 +1,42 @@
 import assert from "node:assert/strict";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import type { OfferDetail, OfferSearchResponse, SavedOfferListResponse } from "@job/shared";
 import { config } from "../config";
+import { sampleExtractedOffer } from "../test/fixtures/sample-offer";
 import { prisma, seedOfferId, startTestServer, TestClient, TEST_PASSWORD, uniqueEmail } from "../test/helpers";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
+let site: http.Server;
+let siteUrl: string;
+
+// A job site serving one offer page, with navigation, scripts and JobPosting data.
+const OFFER_PAGE = `<html><head><title>Développeur React H/F - Exemple SA</title>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting","title":"Développeur React H/F","hiringOrganization":{"name":"Exemple SA"}}</script>
+<script>trackVisitor("secret-tracking-code")</script></head>
+<body><nav>Accueil · Offres · Connexion</nav>
+<main><h1>Développeur React H/F</h1><p>Exemple SA recrute un développeur <strong>React</strong> à Brunoy.</p>
+<h2>Missions</h2><ul><li>Développer en React et Node.js</li><li>Revoir le code</li></ul>
+<p>${"Description détaillée du poste. ".repeat(12)}</p></main>
+<footer>Mentions légales</footer></body></html>`;
 
 before(async () => {
   server = await startTestServer();
+  site = http.createServer((req, res) => {
+    if (req.url?.startsWith("/offer")) res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(OFFER_PAGE);
+    else if (req.url === "/login") res.writeHead(403).end();
+    else res.writeHead(404).end();
+  });
+  site.listen(0, "127.0.0.1");
+  await new Promise((resolve) => site.once("listening", resolve));
+  siteUrl = `http://127.0.0.1:${(site.address() as AddressInfo).port}`;
+  config.fetch.allowedPrivateAddresses = ["127.0.0.1"];
 });
 after(async () => {
+  config.fetch.allowedPrivateAddresses = [];
+  site.closeAllConnections();
+  site.close();
   // User-added offers are never deleted by the app; remove the ones these tests created
   // (saved entries first: they reference the offers).
   try {
@@ -38,21 +65,69 @@ const draft = (fields: object = {}) => ({
 });
 
 describe("user-added offers (O5)", () => {
-  test("pasted text: first line is the title, line breaks are kept", async () => {
+  test("pasted text: the AI extracts the fields, the text stays the description", async () => {
     const client = server.client();
-    const text = "\n  [test] Développeur Vue.js  \nChez Exemple\n\n- missions\n- profil";
+    const text = "  [test] Développeur React  \nChez Exemple SA, à Brunoy.\n\n- React\n- Node.js\nSalaire : 45-55 k€";
     const { status, body } = await client.post("/api/user-offers/extract", { text });
     assert.equal(status, 200);
-    assert.equal(body.draft.title, "[test] Développeur Vue.js");
-    assert.equal(body.draft.description, "Chez Exemple\n\n- missions\n- profil");
+    assert.equal(body.draft.title, sampleExtractedOffer.title);
+    assert.equal(body.draft.description, text.trim(), "pasted line breaks kept");
     assert.equal(body.draft.url, null);
+    assert.equal(body.draft.salaryCurrency, "EUR");
+    const brunoy = await prisma.location.findFirstOrThrow({ where: { name: "Brunoy" } });
+    assert.equal(body.draft.locationId, brunoy.id, "location matched to the locations table");
     assert.ok(client.session, "extraction creates the guest");
+
+    const request = server.ai.requests.at(-1)!;
+    assert.equal(request.task, "extract-offer");
+    assert.ok("text" in request.parts[0] && request.parts[0].text.includes("<offer>"));
+    assert.ok(!("description" in (request.jsonSchema as any).properties), "no description asked for pasted text");
   });
 
-  test("URL: a new page gives the placeholder draft with the normalized URL", async () => {
-    const { body } = await server.client().post("/api/user-offers/extract", { url: "HTTPS://Test.Example/new-offer?utm_source=x" });
-    assert.equal(body.draft.url, "https://test.example/new-offer");
-    assert.ok(body.draft.title);
+  test("URL: the page is fetched and reduced to its content for the AI", async () => {
+    const { status, body } = await server.client().post("/api/user-offers/extract", { url: `${siteUrl}/offer?utm_source=mail` });
+    assert.equal(status, 200);
+    assert.equal(body.draft.url, `${siteUrl}/offer`, "normalized URL kept");
+    assert.equal(body.draft.description, sampleExtractedOffer.description);
+
+    const content = (server.ai.requests.at(-1)!.parts[0] as { text: string }).text;
+    assert.match(content, /<page title="Développeur React H\/F - Exemple SA">/);
+    assert.match(content, /## Missions/);
+    assert.match(content, /- Développer en React et Node.js/);
+    assert.match(content, /\*\*React\*\*/);
+    assert.match(content, /<structured-data>\n\[\{"@context":"https:\/\/schema.org","@type":"JobPosting"/);
+    assert.doesNotMatch(content, /secret-tracking-code|Mentions légales|Connexion/, "scripts, navigation and footer removed");
+  });
+
+  test("URL: unreadable pages and non-offers ask to paste the text", async () => {
+    const forbidden = await server.client().post("/api/user-offers/extract", { url: `${siteUrl}/login` });
+    assert.equal(forbidden.status, 422);
+    assert.equal(forbidden.body.error.code, "page_unavailable");
+
+    await server.ai.with("extract-offer", () => ({ ...sampleExtractedOffer, isJobOffer: false }), async () => {
+      const notOffer = await server.client().post("/api/user-offers/extract", { url: `${siteUrl}/offer` });
+      assert.equal(notOffer.body.error.code, "not_a_job_offer");
+    });
+  });
+
+  test("URL: private network addresses are never fetched", async () => {
+    const { status, body } = await server.client().post("/api/user-offers/extract", { url: "http://169.254.169.254/latest/meta-data" });
+    assert.equal(status, 422);
+    assert.equal(body.error.code, "blocked_address");
+  });
+
+  test("inconsistent salaries are fixed or dropped", async () => {
+    const text = "[test] Une offre avec un salaire étrange et assez de texte.";
+    const swapped = { ...sampleExtractedOffer, salary: { min: 60000, max: 50000, currency: "EUR", period: "year" } };
+    await server.ai.with("extract-offer", () => swapped, async () => {
+      const { body } = await server.client().post("/api/user-offers/extract", { text });
+      assert.deepEqual([body.draft.salaryMin, body.draft.salaryMax], [50000, 60000]);
+    });
+    const noPeriod = { ...sampleExtractedOffer, salary: { min: 50000, max: null, currency: "EUR", period: null } };
+    await server.ai.with("extract-offer", () => noPeriod, async () => {
+      const { body } = await server.client().post("/api/user-offers/extract", { text });
+      assert.equal(body.draft.salaryMin, null);
+    });
   });
 
   test("URL: a known page reuses the existing offer and saves it", async () => {

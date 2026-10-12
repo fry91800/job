@@ -28,7 +28,28 @@ export const config = {
     photos: { guest: 3, registered: 10 },
     // User-added offers (O5), counted from the created offers (FEATURE G4).
     userOffers: { guestTotal: 3, registeredPerDay: 30 },
+    // Generations with the modifier on (AI); modifier off is free (FEATURE G4, P16).
+    aiGenerations: { guestTotal: 3, registeredPerDay: 30 },
     photoMaxPixels: 1000, // longest side after resizing (R6)
+  },
+
+  // AI (FEATURE G5). The provider is chosen here; features never depend on a provider.
+  ai: {
+    provider: process.env.AI_PROVIDER ?? "gemini", // gemini | fake (tests)
+    model: process.env.AI_MODEL ?? "gemini-3.8-flash",
+    timeoutMs: 60 * 1000,
+    geminiApiKey: process.env.GEMINI_API_KEY,
+  },
+
+  // Fetching offer pages from user-supplied URLs (O5). Private and internal network
+  // addresses are always refused (SSRF). `allowedPrivateAddresses` is for tests that serve
+  // pages from a local server (e.g. ["127.0.0.1"]); keep it empty otherwise.
+  fetch: {
+    timeoutMs: 10 * 1000,
+    maxBytes: 2 * 1024 * 1024,
+    maxRedirects: 5,
+    userAgent: "JobPlatformBot/0.1 (offer import requested by a user)",
+    allowedPrivateAddresses: [] as string[],
   },
 
   // Background cleanup (FEATURE "Background jobs", G3, A5). Runs inside the API process

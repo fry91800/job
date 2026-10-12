@@ -33,7 +33,7 @@ export function AddOfferPage({ navigate, refreshMe }: { navigate: Navigate; refr
 
   return (
     <div>
-      <p className="muted">Placeholder extraction: a URL gives a sample offer, pasted text uses its first line as the title.</p>
+      <p className="muted">The page (or the pasted text) is read by the AI; check every field before creating the offer. Sites with a login wall (e.g. LinkedIn) can't be read: paste the text instead.</p>
       <fieldset>
         <legend>From a URL</legend>
         <input size={70} value={url} onChange={(event) => setUrl(event.target.value)} /> <button onClick={() => extract({ url })}>Extract</button>

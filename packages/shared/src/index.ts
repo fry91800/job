@@ -8,6 +8,7 @@ export * from "./offers/search";
 export * from "./offers/user-offers";
 export * from "./photos";
 export * from "./resumes/api";
+export * from "./resumes/changes";
 export * from "./resumes/content";
 export * from "./resumes/generated";
 export * from "./settings";

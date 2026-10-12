@@ -183,6 +183,43 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D65 | Skills/occupations of user-added offers: dictionary matching of catalogue names as whole words (skills in title + description, occupations in the title) | M2 lets the method be chosen per source; no AI needed. Known limit: short names can match common words ("Go") |
 | D66 | User-added offers quota counted from created offers (guest 3 total, registered 30/day), checked at extract and create; extraction also has a per-IP rate limit (`aiPerIp`) | FEATURE G4: AI endpoints are quota-limited and rate-limited per IP |
 
+## Update 15 — AI layer and Gemini (2026-10-13)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P29 | **Gemini** is the first AI provider; the code supports several (`AI_PROVIDER`). **Free tier in development, paid tier before real users** | Free-tier requests may be used by Google to improve its products, which is not acceptable for real resumes (G5) |
+| D67 | One function for every AI task: `runAiJson` (instructions + content + Zod schema → validated data, one retry on invalid answer). Providers implement `generateJson` | One place for validation, retries and error mapping; adding OpenAI = one file |
+| D68 | Default model `gemini-3.8-flash` (`AI_MODEL`), with low thinking effort for extraction tasks | Fast and cheap; a test parse took 42 s with default thinking. The low-effort setting is not yet verified live (free quota exhausted during setup): run `npm run ai:check` |
+| D69 | The provider gets a **simplified JSON Schema** (no lengths, patterns, list sizes; `const` → `enum`); the full Zod schema validates the answer | Gemini answered 400 to the full resume schema and hung on a numeric `const` |
+| D70 | Resume parsing sends the **extracted text**, not the file: `unpdf` (PDF, also enforces ≤ 10 pages and detects files without a text layer) and `mammoth` (DOCX). The AI does not produce item ids or `schemaVersion` | Same path for PDF and DOCX, fewer tokens; the R2 errors (scanned, protected, too long) are detected before any AI cost |
+| D71 | Retries: temporary errors (503 "high demand", per-minute 429) twice with 2 s / 5 s pauses inside the 60 s budget; an exhausted quota is not retried | 503 happened during setup; retrying a daily quota only wastes time |
+| D72 | Tests use a fake provider (`useFakeAi`); `npm run ai:check` makes one real request | No cost, no network, deterministic tests |
+
+## Update 16 — offer extraction with Gemini (2026-10-13)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D73 | **SSRF-safe fetcher** (`lib/safe-fetch.ts`, Node built-ins only): http(s), ports 80/443, no credentials; every resolved address must be public (private, loopback, link-local incl. cloud metadata, CGNAT, multicast, reserved, IPv6 local and IPv4-mapped forms refused) — checked in the connection's own DNS lookup; redirects (max 5) re-checked; 10 s, 2 MB, HTML/text only; gzip/deflate/br; declared charset honoured | User-supplied URLs are the classic SSRF entry point; checking at connection time also defeats DNS rebinding |
+| D74 | The bot sends an honest User-Agent; sites that refuse it (403, login walls) get `page_unavailable` and the user pastes the text | O5 already plans this fallback; impersonating a browser to bypass protections is not acceptable |
+| D75 | The AI receives the page as simplified Markdown of the main content (scripts, navigation, footer… removed, 40 000 characters max) plus the page's schema.org `JobPosting` JSON-LD | Fewer tokens, less noise; JSON-LD is the most reliable source of fields on job sites |
+| D76 | URL path: the AI writes the description as simplified Markdown, copied faithfully. Text path: the pasted text is the description, the AI only extracts the other fields | O5 rules; the AI never rewrites what the user pasted |
+| D77 | The AI also says whether the content is a job offer (`not_a_job_offer` otherwise). Inconsistent salaries are fixed (min/max swapped) or dropped (no currency or period) instead of failing | Login and error pages must not become offers; one bad field shouldn't lose the rest |
+| D78 | Extracted places are matched to `locations` by name, accents ignored (city, then region, then country); otherwise the user picks it | Until Geoapify is set up |
+| D79 | The fake AI answers per task name (`ai.with(task, handler, run)` in tests) | Tests of different AI tasks don't interfere |
+
+## Update 17 — generation with the modifier and change review (2026-10-13)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D80 | The AI returns **only the allowed sections**, items identified by their ids (summary, title, skills, responsibilities per job, projects with description and highlights); its output schema is built from the modifier settings | Forbidden modifications (companies, dates, education…) cannot even be expressed; less output, faster |
+| D81 | The API computes the change set by comparing ids; dropped and logged (count + kind, never content): sections not allowed, unknown ids, added responsibilities/highlights/projects/experiences, new text for an empty field, renamed projects, added skills already present | M4: the API builds the change set, the AI never describes its own changes |
+| D82 | Strength enforcement in the API: **soft** = rewrite and reorder only; **medium** = also remove (never every responsibility of a job); **hard** = also add skills (`added_skill`) | S1 wording: soft "rephrase and reorder", medium "condense", hard "may add skills" |
+| D83 | Decisions are applied to the **current** generated content (not recomputed from the original), restoring positions with the D30 rules, so manual edits elsewhere survive; a decision request is rejected (`409 conflict`) if the resume changed meanwhile | M3 allows manual edits and M4 decisions on the same document |
+| D84 | A manual edit marks `edited` every change whose target changed (text value, item presence/content, list order); edited changes can no longer be decided (`409 change_edited`) | M4 "the manual value wins" |
+| D85 | Generation options default to the settings and can be overridden per request (`modifierEnabled`, `modifierStrength`, `modifierConfig`); `remember: true` saves them; no section selected → `400 no_section_selected` | M1 / S1 |
+| D86 | AI generations count towards the quota (guest 3 total, registered 30/day, deleted included); modifier off is free; failed AI calls save nothing and use no quota | G4, P16, G5 |
+| D87 | Generation uses low thinking effort and temperature 0.4 | Keeps within the 60 s timeout (a parse took 42 s with default effort); some rewording freedom |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

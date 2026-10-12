@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { generatedResumeListSchema, generatedResumeUpdateSchema, generateResumeSchema } from "@job/shared";
+import { changeDecisionsSchema, generatedResumeListSchema, generatedResumeUpdateSchema, generateResumeSchema } from "@job/shared";
 import { requireSession, requireUser } from "../auth/session";
 import { parseUuid } from "../lib/ids";
 import {
+  decideChanges,
   deleteGeneratedResume,
   generatedResumeNotFound,
   generateResume,
@@ -26,7 +27,7 @@ generatedResumesRouter.get("/", async (req, res) => {
 // POST /api/generated-resumes — generate for an offer (M1).
 generatedResumesRouter.post("/", requireUser, async (req, res) => {
   const input = generateResumeSchema.parse(req.body);
-  res.status(201).json(await generateResume(req.user!, input));
+  res.status(201).json(await generateResume(req.user!, input, req.ip ?? "unknown"));
 });
 
 generatedResumesRouter.get("/:id", requireSession, async (req, res) => {
@@ -37,6 +38,12 @@ generatedResumesRouter.get("/:id", requireSession, async (req, res) => {
 generatedResumesRouter.patch("/:id", requireSession, async (req, res) => {
   const input = generatedResumeUpdateSchema.parse(req.body);
   res.json(await updateGeneratedResume(req.user!.id, id(req.params.id), input));
+});
+
+// PATCH /api/generated-resumes/:id/changes — accept or reject changes (M4).
+generatedResumesRouter.patch("/:id/changes", requireSession, async (req, res) => {
+  const { decisions } = changeDecisionsSchema.parse(req.body);
+  res.json(await decideChanges(req.user!.id, id(req.params.id), decisions));
 });
 
 generatedResumesRouter.delete("/:id", requireSession, async (req, res) => {
