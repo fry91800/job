@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { config } from "./config";
 import { scheduleCleanup } from "./jobs/cleanup";
 import { prisma } from "./lib/prisma";
+import { stopQueue } from "./lib/queue";
 import { closeBrowser } from "./templates/pdf";
 
 const server = createApp().listen(config.port, () => {
@@ -15,6 +16,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     stopCleanup?.();
     server.close(async () => {
       await closeBrowser();
+      await stopQueue();
       await prisma.$disconnect();
       process.exit(0);
     });

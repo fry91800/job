@@ -10,6 +10,7 @@ import { useFakeAi } from "../ai/run";
 import { createApp } from "../app";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
+import { stopQueue } from "../lib/queue";
 import { closeBrowser } from "../templates/pdf";
 import { sampleExtractedOffer } from "./fixtures/sample-offer";
 import { sampleParsedResume } from "./fixtures/sample-resume";
@@ -34,6 +35,8 @@ export async function startTestServer() {
   const ai = useFakeAi();
   ai.handlers["parse-resume"] = () => sampleParsedResume;
   ai.handlers["extract-offer"] = () => sampleExtractedOffer;
+  // No real Geoapify calls (tests that need it serve fake answers locally).
+  config.geoapify.apiKey = undefined;
   // Emails are kept in memory (sentMails), never sent.
   config.mail.transport = "memory";
   // Uploaded files go to a temporary folder, removed at the end.
@@ -51,6 +54,7 @@ export async function startTestServer() {
     async close() {
       server.close();
       await closeBrowser();
+      await stopQueue();
       await rm(config.storage.localDir, { recursive: true, force: true });
       await prisma.user.deleteMany({
         where: {

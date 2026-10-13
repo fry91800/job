@@ -5,7 +5,7 @@ import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
 import { saveOffer } from "../saved-offers/saved-offers";
-import { syncOfferLinks } from "./offer-catalogue";
+import { syncOfferLinks } from "@job/backend";
 import { getOfferDetail } from "./offer-detail";
 import { extractOfferDraft } from "./offer-extractor";
 

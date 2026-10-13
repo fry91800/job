@@ -1,5 +1,6 @@
 import express from "express";
 import { authRouter } from "./auth/auth.routes";
+import { ingestRouter } from "./collector/ingest.routes";
 import { loadSession } from "./auth/session";
 import { generatedResumesRouter } from "./generated-resumes/generated-resumes.routes";
 import { errorHandler, notFound } from "./lib/error-handler";
@@ -15,6 +16,8 @@ import { settingsRouter, templatesRouter } from "./settings/settings.routes";
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
+  // The ingestion endpoint takes batches of up to 100 offers.
+  app.use("/api/collector", express.json({ limit: "5mb" }));
   app.use(express.json({ limit: "100kb" }));
   app.use(checkOrigin);
   app.use(loadSession);
@@ -23,6 +26,7 @@ export function createApp() {
     res.json({ status: "ok" });
   });
   app.use("/api/auth", authRouter);
+  app.use("/api/collector", ingestRouter);
   app.use("/api/locations", locationsRouter);
   app.use("/api/offers", offersRouter);
   app.use("/api/user-offers", userOffersRouter);

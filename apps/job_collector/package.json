@@ -1,0 +1,10 @@
+{
+  "name": "@job/job-collector",
+  "private": true,
+  "dependencies": {
+    "@job/backend": "*",
+    "@job/shared": "*",
+    "fflate": "^0.8.3",
+    "pg-boss": "^12.37.1"
+  }
+}

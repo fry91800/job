@@ -18,7 +18,7 @@ Done:
 
 Postponed:
 
-* Job collector: work starts once the API can search the seeded offers. Until then the database is filled by the development seed.
+* Job collector (`apps/job_collector`, plan in `COLLECTOR.md`): phase 1 done (pipeline, deduplication, ingestion endpoint, ROME + ESCO catalogue); phase 2 is France Travail. The development seed still provides the test offers.
 * Full frontend (`apps/web`): built after the API. Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
 
 ## Planned features
@@ -153,6 +153,8 @@ Other scripts:
 * `npm run client:dev` — start the test client on http://localhost:5173 (needs the API running); it proxies `/api` to the API
 * `npm run api:test` — API integration tests (they expect the seed data: run `npm run db:seed` first)
 * `npm run ai:check` — one tiny request to the configured AI provider/model (checks the key, the model and the latency; uses one request of the quota)
+* `npm run collector -- catalogue [--esco data/esco]` — import the ROME + ESCO catalogue (run again after `db:seed`, which empties it; see COLLECTOR.md §8.1)
+* `npm run collector:start` — job collector worker; `npm run collector -- run <connector> | metrics | token <source> <name> | contract`
 * `npm run jobs:cleanup` — run the cleanup job once (the API also runs it every 24 h)
 * `npm run db:reset` — drop everything, re-apply the migrations and reseed
 * `npm run db:studio` — browse the data in Prisma Studio
@@ -192,7 +194,7 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `POST /api/user-offers/extract` | O5 | `{ url }` (page fetched server-side, private addresses refused) or `{ text }` → `{ draft }` read by the AI, to review; or `{ existingOfferId }` (known URL, saved for the user) |
 | `POST /api/user-offers` | O5 | Create the private offer from the reviewed draft (saved automatically) |
 | `PUT /api/user-offers/:id` | O5 | Creator only, while the offer is private |
-| `GET /api/locations?q=` | O1 | Autocomplete from the `locations` table (Geoapify later) |
+| `GET /api/locations?q=` | O1 | Autocomplete: the `locations` table, completed by Geoapify (results stored in the table) |
 | `GET /api/auth/me` | — | Current user (or `null`) with the selected resume's skill/occupation ids |
 | `POST /api/auth/signup` | A1, G2 | Upgrades the current guest if there is one |
 | `POST /api/auth/login` | A2 | Merges the current guest's data into the account |
@@ -213,6 +215,7 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `POST /api/resumes/:id/select`, `DELETE /api/resumes/:id` | R4, R5 | |
 | `GET /api/resumes/:id/source` | R5 | Original uploaded file |
 | `POST /api/resumes/:id/translations` | T1 | `{ language, force? }` → new linked resume; `409 translation_exists` with its id unless `force` |
+| `POST /api/collector/ingest` | COLLECTOR | Bearer source token; `{ offers: CollectedOffer[] }` (≤ 100), validated and queued for the collector |
 | `POST /api/resumes/:id/translate-field` | T1 | `{ path }` → the field re-translated from the source (not saved) |
 | `GET /api/photos`, `POST /api/photos?name=` | R6 | Upload body = the image (JPEG/PNG/WEBP); stored as WebP ≤ 1000 px without metadata |
 | `PATCH /api/photos/:id`, `POST /api/photos/:id/select`, `DELETE /api/photos/:id` | R6 | Rename, select, soft delete |
@@ -227,7 +230,7 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `DELETE /api/generated-resumes/:id` | M3 | Soft delete |
 | `GET /api/generated-resumes/:id/html`, `/pdf` | M3 | Rendered preview; PDF printed by headless Chromium |
 
-Every MVP feature of `FEATURE.md` is built in the API. Still to come: the job collector, the ESCO catalogue import, Geoapify, and production readiness.
+Every MVP feature of `FEATURE.md` is built in the API. Still to come: the job collector, the ESCO catalogue import, and production readiness.
 
 ## Test client
 
@@ -315,5 +318,6 @@ The project aims to remain simple and modular.
 * `AI_CONTEXT.md` — Context and rules for AI-assisted development
 * `FEATURE.md` — MVP feature specification
 * `DATABASE.md` — Database design, JSON formats, search rules
+* `COLLECTOR.md` — Job collector plan: sources, ingestion contract, pipeline, phases
 * `claude/DECISIONS.md` — Decision log
 * `prisma/schema.prisma` — Draft Prisma schema

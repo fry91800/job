@@ -39,9 +39,9 @@ enum RemoteType {
 }
 
 enum ContractType {
-  permanent      // CDI
-  fixed_term     // CDD
-  temporary      // intérim
+  permanent // CDI
+  fixed_term // CDD
+  temporary // intérim
   freelance
   internship
   apprenticeship // alternance
@@ -72,8 +72,8 @@ enum SavedOfferStatus {
 
 enum LocationType {
   city
-  county  // e.g. French département
-  region  // e.g. French région
+  county // e.g. French département
+  region // e.g. French région
   country
 
   @@map("location_type")
@@ -91,27 +91,27 @@ enum RelationshipType {
 // ───────────────────────────── Users & auth ─────────────────────────────
 
 model User {
-  id                 String    @id @default(uuid()) @db.Uuid
-  email              String?   @unique // stored trimmed + lowercased; NULL = guest
-  passwordHash       String?   @map("password_hash") // NULL = guest
-  emailVerifiedAt    DateTime? @map("email_verified_at") @db.Timestamptz
-  uiLanguage         String    @default("fr") @map("ui_language") @db.VarChar(10) // fr | en
-  lastActiveAt       DateTime  @default(now()) @map("last_active_at") @db.Timestamptz
-  searchLocationId   Int?      @map("search_location_id")
-  modifierEnabled    Boolean   @default(false) @map("modifier_enabled")
-  modifierStrength   ModifierStrength @default(soft) @map("modifier_strength") // rules live in code
-  modifierConfig     Json      @default("{\"summary\": true, \"skills\": true, \"workExperience\": false}") @map("modifier_config")
-  templateId         Int       @default(1) @map("template_id")
-  selectedResumeId   String?   @unique @map("selected_resume_id") @db.Uuid
-  selectedPhotoId    String?   @unique @map("selected_photo_id") @db.Uuid
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+  id               String           @id @default(uuid()) @db.Uuid
+  email            String?          @unique // stored trimmed + lowercased; NULL = guest
+  passwordHash     String?          @map("password_hash") // NULL = guest
+  emailVerifiedAt  DateTime?        @map("email_verified_at") @db.Timestamptz
+  uiLanguage       String           @default("fr") @map("ui_language") @db.VarChar(10) // fr | en
+  lastActiveAt     DateTime         @default(now()) @map("last_active_at") @db.Timestamptz
+  searchLocationId Int?             @map("search_location_id")
+  modifierEnabled  Boolean          @default(false) @map("modifier_enabled")
+  modifierStrength ModifierStrength @default(soft) @map("modifier_strength") // rules live in code
+  modifierConfig   Json             @default("{\"summary\": true, \"skills\": true, \"workExperience\": false}") @map("modifier_config")
+  templateId       Int              @default(1) @map("template_id")
+  selectedResumeId String?          @unique @map("selected_resume_id") @db.Uuid
+  selectedPhotoId  String?          @unique @map("selected_photo_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime?        @map("deleted_at") @db.Timestamptz
 
-  searchLocation   Location?        @relation(fields: [searchLocationId], references: [id], onDelete: SetNull)
-  template         Template         @relation(fields: [templateId], references: [id])
-  selectedResume   Resume?          @relation("UserSelectedResume", fields: [selectedResumeId], references: [id], onDelete: SetNull)
-  selectedPhoto    UserPhoto?       @relation("UserSelectedPhoto", fields: [selectedPhotoId], references: [id], onDelete: SetNull)
+  searchLocation Location?  @relation(fields: [searchLocationId], references: [id], onDelete: SetNull)
+  template       Template   @relation(fields: [templateId], references: [id])
+  selectedResume Resume?    @relation("UserSelectedResume", fields: [selectedResumeId], references: [id], onDelete: SetNull)
+  selectedPhoto  UserPhoto? @relation("UserSelectedPhoto", fields: [selectedPhotoId], references: [id], onDelete: SetNull)
 
   sessions         Session[]
   tokens           UserToken[]
@@ -198,16 +198,16 @@ model UserPhoto {
 }
 
 model Resume {
-  id                String    @id @default(uuid()) @db.Uuid
-  userId            String    @map("user_id") @db.Uuid
-  name              String
-  content           Json // ResumeContent v1, see DATABASE.md
-  language          String    @db.VarChar(10)
-  sourceFileKey     String?   @map("source_file_key") // uploaded PDF/DOCX, if any
-  translatedFromResumeId String? @map("translated_from_resume_id") @db.Uuid // set when created by translation (T1)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+  id                     String    @id @default(uuid()) @db.Uuid
+  userId                 String    @map("user_id") @db.Uuid
+  name                   String
+  content                Json // ResumeContent v1, see DATABASE.md
+  language               String    @db.VarChar(10)
+  sourceFileKey          String?   @map("source_file_key") // uploaded PDF/DOCX, if any
+  translatedFromResumeId String?   @map("translated_from_resume_id") @db.Uuid // set when created by translation (T1)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime? @map("deleted_at") @db.Timestamptz
 
   user             User               @relation("UserResumes", fields: [userId], references: [id], onDelete: Cascade)
   selectedBy       User?              @relation("UserSelectedResume")
@@ -223,30 +223,30 @@ model Resume {
 }
 
 model GeneratedResume {
-  id                 String    @id @default(uuid()) @db.Uuid
-  userId             String    @map("user_id") @db.Uuid
-  offerId            String    @map("offer_id") @db.Uuid
-  resumeId           String?   @map("resume_id") @db.Uuid
-  language           String    @db.VarChar(10)
-  originalContent    Json      @map("original_content")
-  generatedContent   Json      @map("generated_content") // original + all non-rejected changes applied
-  changes            Json      @default("[]") // AI change set to review, see DATABASE.md
-  modifierStrength   ModifierStrength? @map("modifier_strength") // NULL = modifier off (no AI call)
-  modifierConfig     Json?     @map("modifier_config") // NULL = modifier off
-  templateId         Int       @map("template_id")
-  photoId            String?   @map("photo_id") @db.Uuid
-  matchScore         Int?      @map("match_score") // 0-100 snapshot at generation time
-  aiModel            String?   @map("ai_model") // provider:model
-  promptVersion      String?   @map("prompt_version") // version of the generation prompt/rules in code
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  offerId          String            @map("offer_id") @db.Uuid
+  resumeId         String?           @map("resume_id") @db.Uuid
+  language         String            @db.VarChar(10)
+  originalContent  Json              @map("original_content")
+  generatedContent Json              @map("generated_content") // original + all non-rejected changes applied
+  changes          Json              @default("[]") // AI change set to review, see DATABASE.md
+  modifierStrength ModifierStrength? @map("modifier_strength") // NULL = modifier off (no AI call)
+  modifierConfig   Json?             @map("modifier_config") // NULL = modifier off
+  templateId       Int               @map("template_id")
+  photoId          String?           @map("photo_id") @db.Uuid
+  matchScore       Int?              @map("match_score") // 0-100 snapshot at generation time
+  aiModel          String?           @map("ai_model") // provider:model
+  promptVersion    String?           @map("prompt_version") // version of the generation prompt/rules in code
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz
 
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  offer            Offer             @relation(fields: [offerId], references: [id], onDelete: Restrict)
-  resume           Resume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  template         Template          @relation(fields: [templateId], references: [id])
-  photo            UserPhoto?        @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer    Offer      @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  resume   Resume?    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  template Template   @relation(fields: [templateId], references: [id])
+  photo    UserPhoto? @relation(fields: [photoId], references: [id], onDelete: SetNull)
 
   @@index([userId, offerId])
   @@index([userId, createdAt])
@@ -299,6 +299,9 @@ model Offer {
   externalId      String?       @map("external_id")
   rawData         Json?         @map("raw_data")
   createdByUserId String?       @map("created_by_user_id") @db.Uuid
+  companyId       String?       @map("company_id") @db.Uuid // collected offers (COLLECTOR.md)
+  qualityScore    Int?          @map("quality_score") // 0-100, collected offers
+  fingerprint     String? // company|title|département, for deduplication across sources
   publishedAt     DateTime?     @map("published_at") @db.Timestamptz
   collectedAt     DateTime      @default(now()) @map("collected_at") @db.Timestamptz
   lastVerifiedAt  DateTime?     @map("last_verified_at") @db.Timestamptz
@@ -308,6 +311,8 @@ model Offer {
 
   location         Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
   createdByUser    User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  company          Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  sources          OfferSource[]
   skills           OfferSkill[]
   occupations      OfferOccupation[]
   savedBy          SavedOffer[]
@@ -317,6 +322,8 @@ model Offer {
   @@index([isPublic, closedAt, publishedAt(sort: Desc)])
   @@index([locationId])
   @@index([createdByUserId])
+  @@index([companyId])
+  @@index([fingerprint])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([companyName(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("offers")
@@ -344,17 +351,17 @@ model SavedOffer {
 // ───────────────────────────── Skills & occupations catalogue ─────────────────────────────
 
 model Skill {
-  id         Int       @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   source     String // esco | manual
-  externalId String?   @map("external_id")
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  externalId String?  @map("external_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  names        SkillName[]
-  resumes      ResumeSkill[]
-  offers       OfferSkill[]
-  relations    SkillRelationship[] @relation("SkillRelFrom")
-  relatedFrom  SkillRelationship[] @relation("SkillRelTo")
+  names       SkillName[]
+  resumes     ResumeSkill[]
+  offers      OfferSkill[]
+  relations   SkillRelationship[] @relation("SkillRelFrom")
+  relatedFrom SkillRelationship[] @relation("SkillRelTo")
 
   @@unique([source, externalId])
   @@map("skills")
@@ -379,11 +386,14 @@ model SkillName {
 
 model Occupation {
   id         Int      @id @default(autoincrement())
-  source     String
-  externalId String?  @map("external_id")
+  source     String // rome | esco | manual
+  externalId String?  @map("external_id") // ROME code (M1805) or ESCO URI
+  parentId   Int?     @map("parent_id") // ROME 4.0 hierarchy (M1811 → M1802)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  parent      Occupation?              @relation("OccupationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Occupation[]             @relation("OccupationHierarchy")
   names       OccupationName[]
   resumes     ResumeOccupation[]
   offers      OfferOccupation[]
@@ -391,6 +401,7 @@ model Occupation {
   relatedFrom OccupationRelationship[] @relation("OccRelTo")
 
   @@unique([source, externalId])
+  @@index([parentId])
   @@map("occupations")
 }
 
@@ -490,4 +501,101 @@ model OccupationRelationship {
   @@id([occupationId, relatedOccupationId, relationshipType])
   @@index([relatedOccupationId])
   @@map("occupation_relationships")
+}
+
+// ───────────────────────────── Job collector (COLLECTOR.md) ─────────────────────────────
+
+model Company {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  normalizedName String   @map("normalized_name") // for deduplication (legal forms, case, accents removed)
+  siren          String?  @unique @db.VarChar(9)
+  website        String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  offers  Offer[]
+  sources CompanySource[]
+
+  @@index([normalizedName])
+  @@map("companies")
+}
+
+// Which ATS board or career page to collect for a company.
+model CompanySource {
+  id        String    @id @default(uuid()) @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  ats       String // greenhouse | lever | smartrecruiters | ashby | career-page…
+  slug      String // board id at the ATS, or career page URL
+  status    String    @default("active") // active | paused | invalid
+  lastRunAt DateTime? @map("last_run_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([ats, slug])
+  @@index([companyId])
+  @@map("company_sources")
+}
+
+// One offer, many sources (the same job on France Travail, the company ATS…).
+model OfferSource {
+  id          String    @id @default(uuid()) @db.Uuid
+  offerId     String    @map("offer_id") @db.Uuid
+  source      String // connector key
+  externalId  String    @map("external_id")
+  url         String?
+  applyUrl    String?   @map("apply_url")
+  firstSeenAt DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz // given by the source
+  closedAt    DateTime? @map("closed_at") @db.Timestamptz // the source dropped it
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([source, externalId])
+  @@index([offerId])
+  @@index([url])
+  @@map("offer_sources")
+}
+
+// Records as received from the sources, for reprocessing. A new row only when the
+// content changed (content_hash).
+model RawOffer {
+  id          BigInt   @id @default(autoincrement())
+  source      String
+  externalId  String   @map("external_id")
+  payload     Json
+  contentHash String   @map("content_hash")
+  receivedAt  DateTime @default(now()) @map("received_at") @db.Timestamptz
+
+  @@unique([source, externalId, contentHash])
+  @@index([source, externalId])
+  @@map("raw_offers")
+}
+
+model CollectorRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  connector  String
+  status     String // running | succeeded | failed
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz
+  cursor     String? // where the next incremental run starts
+  counts     Json      @default("{}") // received, created, updated, merged, unchanged, rejected, closed
+  error      String?
+
+  @@index([connector, startedAt])
+  @@map("collector_runs")
+}
+
+// Auth of POST /api/collector/ingest: one token per external source.
+model CollectorToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  source    String
+  name      String
+  tokenHash String    @unique @map("token_hash") // SHA-256
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+
+  @@map("collector_tokens")
 }

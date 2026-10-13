@@ -4,7 +4,7 @@ import { runAiJson, withoutProperties } from "../ai/run";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
 import { fetchPage } from "../lib/safe-fetch";
-import { matchLocation } from "../locations/location-match";
+import { matchLocation } from "@job/backend";
 import { pageContent } from "./page-text";
 
 // Offer extraction (FEATURE O5): a URL (page fetched server-side) or pasted text → AI →

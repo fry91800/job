@@ -207,14 +207,14 @@ A place used by offers (`offers.location_id`) and by the last search (`users.sea
 | Column | Type | M | Default | Notes |
 |---|---|---|---|---|
 | id | INTEGER | ✓ | auto | |
-| provider | TEXT | ✓ | | `geoapify`, `manual`… |
+| provider | TEXT | ✓ | | `geoapify`, `seed`, `manual`… |
 | external_id | TEXT | | NULL | Provider's place id |
 | type | `location_type` | ✓ | `city` | `city` \| `county` \| `region` \| `country`: the level of this place |
 | name | TEXT | ✓ | | Display name in its own language ("Brunoy", "Île-de-France") |
 | country_code | CHAR(2) | ✓ | | ISO 3166-1 alpha-2 (`FR`) |
 | region_code | TEXT | | NULL | ISO 3166-2 region code (`FR-IDF`). NULL only for `country` |
 | region_name | TEXT | | NULL | Display only |
-| county_code | TEXT | | NULL | County / département code (`91`). NULL for `region` and `country` |
+| county_code | TEXT | | NULL | County / département code (`91`). NULL for `region` and `country`. Geoapify doesn't return it: derived from the département name (static table), else the postcode |
 | county_name | TEXT | | NULL | Display only |
 | latitude / longitude | DOUBLE PRECISION | | NULL | Point for cities; centre for areas (not used for matching areas) |
 | created_at / updated_at | | | | |
@@ -290,9 +290,13 @@ A user's bookmarked offer, with a lightweight application status.
 
 `UNIQUE (user_id, offer_id)`, index `(user_id, status)`.
 
+### Job collector tables
+
+`companies`, `company_sources`, `offer_sources`, `raw_offers`, `collector_runs`, `collector_tokens`, and `offers.company_id` / `quality_score` / `fingerprint`: see COLLECTOR.md §8 and §13. Job queues live in the separate `pgboss` schema, managed by pg-boss, not by Prisma.
+
 ### skills, skill_names, occupations, occupation_names
 
-Multilingual catalogue (ESCO + manual entries). Each skill/occupation has one name row per language and synonym.
+Multilingual catalogue: ROME 4.0 occupations (`source = 'rome'`, `external_id` = ROME code, `parent_id` = ROME hierarchy, names = label + appellations with gender variants), ESCO occupations and skills (`source = 'esco'`, `external_id` = ESCO URI), manual entries (`source = 'manual'`). ROME ↔ ESCO links are rows of `occupation_relationships`. Imported by `npm run collector -- catalogue` (COLLECTOR.md §8.1). Each skill/occupation has one name row per language and synonym.
 * `UNIQUE (source, external_id)` on `skills` and `occupations`.
 * `UNIQUE (skill_id, language, normalized_name)` and index `(language, normalized_name)` on name tables (lookup path for extraction).
 * App rule: at most one `is_canonical = true` per `(skill_id, language)` (optional partial unique index via raw SQL).

@@ -1,3 +1,4 @@
+import { backendConfig } from "@job/backend";
 // Configuration values (FEATURE: limits are configuration, not code or database).
 // Defaults are the initial values from FEATURE.md; environment variables override some.
 
@@ -42,6 +43,9 @@ export const config = {
     timeoutMs: 60 * 1000,
     geminiApiKey: process.env.GEMINI_API_KEY,
   },
+
+  // Geoapify (shared object with @job/backend, see its config).
+  geoapify: backendConfig.geoapify,
 
   // Frontend address, for the links in emails.
   webBaseUrl: process.env.WEB_BASE_URL ?? "http://localhost:5173",

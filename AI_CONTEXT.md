@@ -40,7 +40,8 @@ apps/
 └── job_collector/
 
 packages/
-└── shared/        # pure TypeScript shared by web and api (schemas, match formula)
+├── shared/        # pure TypeScript shared by web and api (schemas, match formula, ingestion contract)
+└── backend/       # server code shared by api and job_collector (Prisma client, matcher, locations, queues)
 
 prisma/
 ├── schema.prisma
@@ -51,6 +52,7 @@ prisma/
 
 * `FEATURE.md` — feature specification (IDs such as O4, M1 are used in code and reviews)
 * `DATABASE.md` — database design and JSON formats
+* `COLLECTOR.md` — job collector plan (sources, ingestion contract, pipeline)
 * `claude/DECISIONS.md` — decision log
 * `ARCHITECTURE.md` — technical architecture
 

@@ -58,6 +58,7 @@ Conventions:
 * **Resume generation** (M1/M4): `generated-resumes/resume-modifier.ts` asks the AI for the allowed sections only (the output schema is built from the modifier settings) with the strength rules in the prompt; `generated-resumes/change-set.ts` (pure functions, unit-tested) turns the proposal into the change set, drops what the strength or permissions don't allow, applies changes (replace → remove → add → reorder) and applies accept/reject decisions to the current content so manual edits are kept.
 * **Translation** (T1, `resumes/resume-translator.ts`): the AI receives and returns only the translatable fields with their ids; the API checks it returned exactly the same items and copies them onto the source, so names, companies, technical skills, dates… cannot change.
 * **Emails** (`mail/`): `nodemailer` over SMTP (MailHog in development, `MAIL_TRANSPORT=memory` in tests), texts in the user's language (`mail/templates.ts`). Single-use tokens (`auth/user-tokens.ts`): only the SHA-256 is stored, a new token invalidates the previous one, consumption is conditional so a link works once. Password-reset requests always get the same answer and send the email in the background (no account enumeration).
+* **Locations** (`locations/`): autocomplete searches the `locations` table and, when it has fewer than 5 matches (query ≥ 3 characters), Geoapify (`geoapify.ts`, results cached in memory for 24 h). Only cities, départements, regions and countries are kept; each is stored in `locations` (`location-store.ts`), reusing an existing row for the same place, so frequent searches end up answered locally. Geoapify gives the region code (`iso3166_2`) but not the département code, which comes from a static table (`french-departements.ts`, postcode as fallback). Geoapify failures never break the autocomplete. Extracted offer places use the same lookup (`location-match.ts`).
 * Every AI call goes through one per-IP rate limit (`ai/rate-limit.ts`), on top of the per-feature quotas.
 * Offer skills/occupations of user-added offers are found by dictionary matching of catalogue names as whole words (`offers/offer-catalogue.ts`).
 
@@ -75,7 +76,11 @@ The `job_collector` application is responsible for collecting job offers.
 
 It runs independently from the web application and communicates directly with the database.
 
-Its implementation will evolve as the project develops. It is postponed until the API can search offers; until then the development seed (`prisma/seed/`) fills the database.
+Its design is in `COLLECTOR.md`: one connector per kind of source, a shared ingestion contract, and a pipeline (normalize, validate, deduplicate, enrich, upsert, close expired). Until it runs, the development seed (`prisma/seed/`) fills the database.
+
+## Backend package
+
+`packages/backend` (`@job/backend`) holds the server code used by both the API and the job collector: the Prisma client, the catalogue matcher and offer links, locations (Geoapify, département codes, storage), HTML → Markdown, and the job queues (pg-boss). Unlike `packages/shared`, it does I/O and never goes to the browser.
 
 ## Shared package
 

@@ -143,7 +143,7 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D44 | Rate limits (login failures per email 5/15 min and per IP, sign-ups and guest creation per IP) are in memory | One API process in the MVP; no extra table or service |
 | D45 | Saved offers are addressed by **offer id** (`PUT/PATCH/DELETE /api/saved-offers/:offerId`); `PUT` is idempotent; `GET` returns an empty list to anonymous visitors instead of creating a guest | One saved entry per user and offer, so the offer id is the natural key; reads never create guests (FEATURE G1) |
 | D46 | Login always replaces the current session; when it belonged to a guest, the guest is merged and deleted even if it has no data | One code path; an empty guest has nothing to lose |
-| D47 | Location autocomplete searches the `locations` table (prefix, accent-insensitive with the `unaccent` extension, then trigram). Geoapify results will be inserted into `locations` to get an id | Search needs a `locationId` now; the seeded locations are enough until Geoapify is set up |
+| D47 | Location autocomplete searches the `locations` table (prefix, accent-insensitive with the `unaccent` extension, then trigram). Geoapify results are inserted into `locations` to get an id (done: D95–D99) | Search needs a `locationId` now; the seeded locations are enough until Geoapify is set up |
 | D48 | Offer detail takes `?lang=` for skill/occupation names (default: the user's UI language, else `fr`) | Anonymous visitors have no stored language; the web app knows the UI language |
 | P25 | ~~Password reset (A4) and email verification (A6) are postponed~~ — superseded by P30 | They need an email provider, not chosen yet |
 
@@ -232,6 +232,44 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D92 | Emails: `nodemailer`, plain text + escaped HTML, in `users.ui_language`; tokens 1 h (reset) / 48 h (verification), SHA-256 stored, previous ones invalidated, single use; reset request answers 202 in every case and sends in the background; reset confirmation logs out every session and logs in (guest merged like A2); verification confirm works without a session | A4, A6, L1, DATABASE.md "user_tokens" |
 | D93 | Live checks with Gemini (paid tier): upload 7 s, URL extraction 3 s, generation 5–6 s, translation 3 s. Generation prompt tightened (`2026-10-13b`) after the model added unstated claims ("modern architecture", "code review"): reword and emphasise only, no new tasks/tools/qualifiers, keep punctuation; temperature 0.3 | Truthfulness is the core promise of the modifier |
 | D94 | Bug found live: a JSON Schema `required` listing a removed property makes Gemini answer 400; test added | The fake AI doesn't validate schemas like Gemini |
+
+## Update 19 — Geoapify (2026-10-13)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D95 | Autocomplete = `locations` table first; Geoapify only when the table has < 5 matches and the query has ≥ 3 characters; answers cached 24 h in memory; countries limited by `GEOAPIFY_COUNTRIES` (default `fr`) | Free tier credits; every Geoapify place is stored, so the table answers more and more searches |
+| D96 | Only `city`, `county`, `state` (→ region) and `country` results are kept; streets, districts, postcodes ignored | Search works on these four levels (FEATURE O1) |
+| D97 | Region code = Geoapify `iso3166_2` (`FR-IDF`); **département code from a static name → code table** (101 départements + aliases such as "Métropole de Lyon" → 69), postcode prefix as fallback | Geoapify doesn't return département codes, and area search matches on codes |
+| D98 | A Geoapify place identical to an existing row (type, name, country, codes) reuses that row; failures and timeouts (3 s) return the local results only | No duplicates (e.g. seeded cities); the autocomplete never breaks because of Geoapify |
+| D99 | Offer extraction (O5) looks up places missing from the table with Geoapify (exact name, right level) | Completes D78 |
+| D100 | Tests never call Geoapify (key cleared in the test helpers); Geoapify tests use a local fake server with real answers | No credits used, deterministic |
+
+## Update 20 — job collector plan (2026-10-13)
+
+Full plan in `COLLECTOR.md`.
+
+| ID | Decision | Why |
+|---|---|---|
+| P31 | Goal: the offers people look for, fresh, deduplicated, complete — measured (coverage on an evaluation slice, freshness, duplicates, completeness, dead links, cost) | "All offers" and "best quality" conflict; numbers decide which sources are worth it |
+| P32 | **IT first** (ROME family M18 + matching ESCO occupations), **all of France** for API sources; evaluation slice = IT in Île-de-France | API sources cost the same for one city or the country; geography is a measurement tool, not a collection limit |
+| P33 | **ROME + ESCO**: ROME and ESCO occupations linked by the official correspondence (`occupation_relationships`), ESCO for skills | ROME is native in France Travail data; ESCO gives multilingual skills |
+| P34 | One connector per **kind** of source (official API, ATS adapter, structured-data crawler, aggregator), not per site; order: France Travail → ATS (Greenhouse, Lever, SmartRecruiters, Ashby) → `JobPosting` crawler → aggregators → user-triggered browser extension | Coverage per unit of maintenance; legal sources |
+| P35 | **Placeholders, documented but not functional**: per-site crawlers, AI as a source (later only as lead suggestions verified by a real connector), automated logged-in bots | Kept in the design by request; not built because of maintenance, invented offers, and terms of use / EU database right / GDPR |
+| P36 | One **ingestion contract** (`CollectedOffer` v1, Zod in `packages/shared`) for every source; `POST /api/collector/ingest` with per-source tokens (or the user's session for the extension), asynchronous through pg-boss | Bots, extension and partners share one format; the API stays fast |
+| P37 | Collector in the monorepo (`apps/job_collector`), own process, pg-boss queues on PostgreSQL; raw data kept; one offer with many sources (`offer_sources`); companies table brought forward (C1) | Shares schema and normalization; reprocessing; deduplication across sources |
+
+## Update 21 — collector phase 1 (2026-10-13)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| D101 | `packages/backend` (`@job/backend`) for server code shared by the API and the collector (Prisma client, matcher, offer links, locations, HTML → Markdown, queues); `apps/api/src/lib/prisma.ts` re-exports its client | No imports from inside another app; `packages/shared` stays I/O-free |
+| D102 | Catalogue matching by **token groups** looked up in an in-memory index of all names (refreshed every 10 min or after an import), replacing one regular expression per name; ambiguous words (go, c, r, swift…) only from source labels | ROME + ESCO = tens of thousands of names; same behaviour on the existing tests |
+| D103 | ROME data from France Travail's open-data zip (no credentials); ROME ↔ ESCO from the official EURES mapping table (appellation level) aggregated per (ROME occupation, ESCO occupation): `equivalent` for any exact match, else `related`; ESCO occupations missing from the table are created from the mapping's label | Both official; the France Travail ROME API isn't needed for the catalogue |
+| D104 | ESCO is imported from the portal's CSV package placed in a local folder (`--esco`) | The portal sends the download link by email; it can't be scripted |
+| D105 | IT scope = ROME M18 minus M1808 (cartography) and M1809 (meteorology), with their sub-occupations | Those two belong to M18 in ROME but aren't IT |
+| D106 | Source priority for merged offers: ATS 5 > official API 4 > crawler 3 > aggregator 2 > ingest 1 > user-added/placeholder 0; lower-priority sources only fill empty fields; salary merged as one group | COLLECTOR.md §7 |
+| D107 | Ingestion endpoint: tokens per source (hashed), ≤ 100 offers / ≤ 5 MB per request, 120 requests/min per token, `source` must match the token; asynchronous through pg-boss (`sendOnly` in the API) | COLLECTOR.md §4 |
+| D108 | Deferred from phase 1: AI for missing fields / uncertain duplicates, recruiter-name removal, `isStillOpen` and full-sync closing, company discovery | Need real sources to be designed well |
 
 ## Assumptions made (change if wrong)
 
