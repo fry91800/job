@@ -19,13 +19,27 @@ export const resumeUpdateSchema = z.object({
 
 export const resumeUploadQuerySchema = z.object({ name: name.optional() });
 
+// Translation (FEATURE T1).
+export const translateResumeSchema = z.strictObject({
+  language: z.enum(RESUME_LANGUAGES),
+  // Create a new translation even if one already exists in that language.
+  force: z.boolean().optional(),
+});
+
+// "Re-translate" one field of a translated resume, e.g. "summary" or
+// "workExperience[id=w1].responsibilities[id=r2].text". The text is returned, not saved.
+export const translateFieldSchema = z.strictObject({ path: z.string().min(1).max(200) });
+export type TranslateFieldResponse = { path: string; text: string };
+
 export type ResumeListItem = {
   id: string;
   name: string;
   language: string;
   isSelected: boolean;
   hasSourceFile: boolean;
-  translatedFrom: { id: string; name: string } | null;
+  // The source of a translation (T1); `changedSinceTranslation` when the source was edited
+  // after the translation was created ("Translate again").
+  translatedFrom: { id: string; name: string; changedSinceTranslation: boolean } | null;
   updatedAt: string;
 };
 

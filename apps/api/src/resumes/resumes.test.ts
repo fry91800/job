@@ -221,3 +221,21 @@ describe("resume upload (R2)", () => {
     assert.equal(over.status, 429);
   });
 });
+
+describe("per-IP AI rate limit (G4)", () => {
+  test("uploads and offer extractions share one limit", async () => {
+    const limit = config.rateLimits.aiPerIp.max;
+    try {
+      // At least one AI request was counted for this IP by now; allow no more.
+      assert.equal((await upload(server.client(), PDF)).status, 201);
+      config.rateLimits.aiPerIp.max = 1;
+      const upload429 = await upload(server.client(), PDF);
+      assert.equal(upload429.status, 429);
+      assert.equal(upload429.body.error.code, "rate_limited");
+      const extract = await server.client().post("/api/user-offers/extract", { text: "[test] Développeur React\nUne offre avec assez de texte." });
+      assert.equal(extract.status, 429);
+    } finally {
+      config.rateLimits.aiPerIp.max = limit;
+    }
+  });
+});

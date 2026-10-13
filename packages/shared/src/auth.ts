@@ -28,6 +28,11 @@ export const changePasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+// Password reset (A4) and email verification (A6). Tokens come from the emailed links.
+export const passwordResetRequestSchema = z.object({ email: emailSchema });
+export const passwordResetConfirmSchema = z.object({ token: z.string().min(1).max(200), password: passwordSchema });
+export const emailVerificationConfirmSchema = z.object({ token: z.string().min(1).max(200) });
+
 export const deleteAccountSchema = z.object({
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 });

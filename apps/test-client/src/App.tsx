@@ -3,6 +3,7 @@ import type { MeResponse } from "@job/shared";
 import { api, onApiCall, type LogEntry } from "./api";
 import { AddOfferPage } from "./pages/AddOfferPage";
 import { AuthPage } from "./pages/AuthPage";
+import { ResetPasswordPage, VerifyEmailPage } from "./pages/EmailLinkPages";
 import { GeneratedPage, GeneratedResumePage } from "./pages/GeneratedPages";
 import { OfferPage } from "./pages/OfferPage";
 import { PhotosPage } from "./pages/PhotosPage";
@@ -17,6 +18,8 @@ export type Navigate = (page: Page) => void;
 
 // Minimal client for trying the API by hand (see ARCHITECTURE.md "Test client").
 export function App() {
+  // Links from emails open /verify-email or /reset-password (A4, A6).
+  const [emailLink, setEmailLink] = useState(window.location.pathname);
   const [page, setPage] = useState<Page>({ name: "search" });
   const [me, setMe] = useState<MeResponse["user"]>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -33,6 +36,13 @@ export function App() {
   }, [refreshMe]);
 
   const openOffer = (id: string) => setPage({ name: "offer", id });
+  const leaveEmailLink = () => {
+    window.history.replaceState(null, "", "/");
+    setEmailLink("/");
+    refreshMe();
+  };
+  if (emailLink === "/verify-email") return <main><VerifyEmailPage done={leaveEmailLink} /></main>;
+  if (emailLink === "/reset-password") return <main><ResetPasswordPage done={leaveEmailLink} /></main>;
   const tab = (name: Tab, label: string) => (
     <button aria-current={page.name === name ? "page" : undefined} onClick={() => setPage({ name })}>
       {label}

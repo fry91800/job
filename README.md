@@ -8,7 +8,7 @@ Early development / MVP.
 
 Current focus:
 
-* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload parsed by Gemini), photos, user-added offers (page fetched and read by Gemini), match %, settings and templates, resume generation with the AI modifier and change review, PDF download, cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
+* Backend API (Express). Done: offer search and detail, location autocomplete, guest sessions and accounts, saved offers, resumes (upload parsed by Gemini), photos, user-added offers (page fetched and read by Gemini), match %, settings and templates, resume generation with the AI modifier and change review, PDF download, resume translation, password reset and email verification (emails caught by MailHog in development), cleanup jobs (see *API* below). Next routes follow `FEATURE.md`
 * Development seed data used to write and test the API
 
 Done:
@@ -140,7 +140,7 @@ Requirements: Node.js 24.7 or later (built-in Argon2 password hashing), Docker. 
 ```bash
 nvm use
 npm install
-npm run db:up        # start PostgreSQL in Docker
+npm run db:up        # start PostgreSQL (port 5433) and MailHog in Docker
 npm run db:migrate   # apply the migrations and generate the Prisma client
 cp .env.example .env # then fill in GEMINI_API_KEY (see .env.example)
 npm run db:seed      # empty the database and insert the development data
@@ -197,6 +197,9 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `POST /api/auth/signup` | A1, G2 | Upgrades the current guest if there is one |
 | `POST /api/auth/login` | A2 | Merges the current guest's data into the account |
 | `POST /api/auth/logout`, `/logout-all` | A3 | Registered users only |
+| `POST /api/auth/password-reset/request` | A4 | `{ email }` → always 202 (no account enumeration); emails a 1 h single-use link |
+| `POST /api/auth/password-reset/confirm` | A4 | `{ token, password }` → new password, every session logged out, logged in here |
+| `POST /api/auth/email-verification/resend`, `/confirm` | A6 | Link sent at sign-up (48 h); `confirm { token }` works without a session |
 | `POST /api/auth/password` | A7 | Logs out the other devices |
 | `DELETE /api/auth/account` | A5 | Password confirmation |
 | `GET /api/saved-offers` | O3 | `?status=`, `?sort=saved\|status_changed` |
@@ -209,6 +212,8 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `PUT /api/resumes/:id` | R3 | Whole resume; re-extracts skills/occupations |
 | `POST /api/resumes/:id/select`, `DELETE /api/resumes/:id` | R4, R5 | |
 | `GET /api/resumes/:id/source` | R5 | Original uploaded file |
+| `POST /api/resumes/:id/translations` | T1 | `{ language, force? }` → new linked resume; `409 translation_exists` with its id unless `force` |
+| `POST /api/resumes/:id/translate-field` | T1 | `{ path }` → the field re-translated from the source (not saved) |
 | `GET /api/photos`, `POST /api/photos?name=` | R6 | Upload body = the image (JPEG/PNG/WEBP); stored as WebP ≤ 1000 px without metadata |
 | `PATCH /api/photos/:id`, `POST /api/photos/:id/select`, `DELETE /api/photos/:id` | R6 | Rename, select, soft delete |
 | `DELETE /api/photos/selection` | R6 | "No photo" |
@@ -222,7 +227,7 @@ All routes are under `/api`. Request and response types are in `packages/shared`
 | `DELETE /api/generated-resumes/:id` | M3 | Soft delete |
 | `GET /api/generated-resumes/:id/html`, `/pdf` | M3 | Rendered preview; PDF printed by headless Chromium |
 
-Not built yet: translation (T1). Password reset (A4) and email verification (A6) are postponed (they need an email provider).
+Every MVP feature of `FEATURE.md` is built in the API. Still to come: the job collector, the ESCO catalogue import, Geoapify, and production readiness.
 
 ## Test client
 

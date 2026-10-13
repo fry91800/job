@@ -1,9 +1,9 @@
 import { Prisma } from "@prisma/client";
 import type { OfferDetail, OfferDraft, OfferExtractResponse } from "@job/shared";
+import { consumeAiRateLimit } from "../ai/rate-limit";
 import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
-import { RateLimiter } from "../lib/rate-limit";
 import { saveOffer } from "../saved-offers/saved-offers";
 import { syncOfferLinks } from "./offer-catalogue";
 import { getOfferDetail } from "./offer-detail";
@@ -13,8 +13,6 @@ import { extractOfferDraft } from "./offer-extractor";
 // private offer, saved for its creator.
 
 type SessionUser = { id: string; isGuest: boolean };
-
-const aiLimiter = new RateLimiter(config.rateLimits.aiPerIp);
 
 // Counted from the created offers (FEATURE G4); offers are never deleted.
 async function checkQuota(user: SessionUser): Promise<void> {
@@ -31,8 +29,6 @@ function offerExists(id: string) {
 }
 
 export async function extractUserOffer(user: SessionUser, ip: string, input: { url: string } | { text: string }): Promise<OfferExtractResponse> {
-  if (aiLimiter.isLimited(ip)) throw new HttpError(429, "rate_limited", "Too many requests, try again later");
-
   // Known URL: reuse the existing offer, just save it for the user (no extraction).
   if ("url" in input) {
     const existing = await prisma.offer.findUnique({ where: { url: input.url }, select: { id: true } });
@@ -43,7 +39,7 @@ export async function extractUserOffer(user: SessionUser, ip: string, input: { u
   }
 
   await checkQuota(user);
-  aiLimiter.record(ip);
+  consumeAiRateLimit(ip);
   return { draft: await extractOfferDraft(input) };
 }
 

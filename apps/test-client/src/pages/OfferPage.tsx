@@ -44,6 +44,14 @@ export function OfferPage({ id, me, refreshMe, navigate }: { id: string; me: MeR
       if (details.alternativeResumeId && confirm(`The offer is in ${details.offerLanguage}. Use your ${details.offerLanguage} resume instead?`)) {
         return generate({ ...options, resumeId: details.alternativeResumeId });
       }
+      const sourceId = options.resumeId ?? me?.selectedResume?.id;
+      if (!details.alternativeResumeId && sourceId && confirm(`The offer is in ${details.offerLanguage}. Translate your resume to ${details.offerLanguage} first?`)) {
+        setError("Translating…");
+        const translated = await api<{ id: string }>("POST", `/api/resumes/${sourceId}/translations`, { language: details.offerLanguage, force: true });
+        if (!translated.ok) return setError(errorText(translated));
+        // The translation is the source of this generation, not the selected resume (T1).
+        return generate({ ...options, resumeId: translated.data.id });
+      }
       if (confirm(`The offer is in ${details.offerLanguage}, your resume in ${details.resumeLanguage}. Generate in ${details.resumeLanguage} anyway?`)) {
         return generate({ ...options, ignoreLanguageMismatch: true });
       }

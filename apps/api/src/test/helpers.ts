@@ -28,11 +28,14 @@ export async function startTestServer() {
   config.rateLimits.signupsPerIp.max = 1000;
   config.rateLimits.guestsPerIp.max = 1000;
   config.rateLimits.loginFailuresPerIp.max = 1000;
+  config.rateLimits.passwordResetsPerIp.max = 1000;
   // Never call a real AI provider from tests. Default answers per task; tests use
   // `ai.with(task, handler, run)` for other answers.
   const ai = useFakeAi();
   ai.handlers["parse-resume"] = () => sampleParsedResume;
   ai.handlers["extract-offer"] = () => sampleExtractedOffer;
+  // Emails are kept in memory (sentMails), never sent.
+  config.mail.transport = "memory";
   // Uploaded files go to a temporary folder, removed at the end.
   config.storage.localDir = await mkdtemp(join(tmpdir(), "job-api-test-"));
   const server = createApp().listen(0);

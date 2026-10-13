@@ -32,7 +32,10 @@ export function AuthPage({ me, refreshMe }: { me: MeResponse["user"]; refreshMe:
         <label>Email <input value={email.value} onChange={email.onChange} /></label>
         <label>Password <input type="password" value={password.value} onChange={password.onChange} /></label>
         <button onClick={() => run(api("POST", "/api/auth/signup", credentials()), "Signed up")}>Sign up</button>{" "}
-        <button onClick={() => run(api("POST", "/api/auth/login", credentials()), "Logged in")}>Log in</button>
+        <button onClick={() => run(api("POST", "/api/auth/login", credentials()), "Logged in")}>Log in</button>{" "}
+        <button onClick={() => run(api("POST", "/api/auth/password-reset/request", { email: email.value }), "If an account exists, an email was sent (see MailHog: http://localhost:8026)")}>
+          Forgot password
+        </button>
         <div>
           Seeded users:{" "}
           <button onClick={() => { email.set("demo@example.com"); password.set("demo-password"); }}>demo</button>{" "}
@@ -43,7 +46,10 @@ export function AuthPage({ me, refreshMe }: { me: MeResponse["user"]; refreshMe:
       <fieldset>
         <legend>Session</legend>
         <button onClick={() => run(api("POST", "/api/auth/logout"), "Logged out")}>Log out</button>{" "}
-        <button onClick={() => run(api("POST", "/api/auth/logout-all"), "Logged out everywhere")}>Log out everywhere</button>
+        <button onClick={() => run(api("POST", "/api/auth/logout-all"), "Logged out everywhere")}>Log out everywhere</button>{" "}
+        <button onClick={() => run(api("POST", "/api/auth/email-verification/resend"), "Confirmation email sent (see MailHog: http://localhost:8026)")}>
+          Resend confirmation email
+        </button>
       </fieldset>
 
       <fieldset>

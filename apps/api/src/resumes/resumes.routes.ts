@@ -1,8 +1,9 @@
 import express, { Router } from "express";
-import { resumeCreateSchema, resumeUpdateSchema, resumeUploadQuerySchema } from "@job/shared";
+import { resumeCreateSchema, resumeUpdateSchema, resumeUploadQuerySchema, translateFieldSchema, translateResumeSchema } from "@job/shared";
 import { requireSession, requireUser } from "../auth/session";
 import { config } from "../config";
 import { parseUuid } from "../lib/ids";
+import { createTranslation, retranslateField } from "./translations";
 import { createResume, deleteResume, getResume, getSourceFile, listResumes, resumeNotFound, selectResume, updateResume, uploadResume } from "./resumes";
 
 export const resumesRouter = Router();
@@ -29,7 +30,7 @@ resumesRouter.post(
   async (req, res) => {
     const { name } = resumeUploadQuerySchema.parse(req.query);
     const file = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    res.status(201).json(await uploadResume(req.user!, file, name));
+    res.status(201).json(await uploadResume(req.user!, req.ip ?? "unknown", file, name));
   },
 );
 
@@ -53,6 +54,18 @@ resumesRouter.post("/:id/select", requireSession, async (req, res) => {
 resumesRouter.delete("/:id", requireSession, async (req, res) => {
   await deleteResume(req.user!.id, resumeId(req.params.id));
   res.status(204).end();
+});
+
+// POST /api/resumes/:id/translations { language, force? } — translate into a new resume (T1).
+resumesRouter.post("/:id/translations", requireSession, async (req, res) => {
+  const input = translateResumeSchema.parse(req.body);
+  res.status(201).json(await createTranslation(req.user!, req.ip ?? "unknown", resumeId(req.params.id), input));
+});
+
+// POST /api/resumes/:id/translate-field { path } — re-translate one field of a translation.
+resumesRouter.post("/:id/translate-field", requireSession, async (req, res) => {
+  const { path } = translateFieldSchema.parse(req.body);
+  res.json(await retranslateField(req.user!.id, req.ip ?? "unknown", resumeId(req.params.id), path));
 });
 
 // GET /api/resumes/:id/source — the uploaded file (R5).

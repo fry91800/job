@@ -57,7 +57,8 @@ function listTarget(content: unknown, path: string): { list: Item[] | undefined;
   return { list: Array.isArray(list) ? (list as Item[]) : undefined, id: last.id };
 }
 
-function getText(content: unknown, path: string): unknown {
+// The value at a change path ("summary", "skills[id=s3].name"…), undefined if missing.
+export function getText(content: unknown, path: string): unknown {
   return resolve(content, parsePath(path));
 }
 

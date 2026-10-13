@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: job_dev_password
       POSTGRES_DB: job
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432" # 5433: a local PostgreSQL often already uses 5432
     volumes:
       - job_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +16,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Development mail server: catches every email the API sends (nothing leaves the machine).
+  # Web UI: http://localhost:8026. Host ports 1026/8026 avoid clashing with other MailHogs.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: job-mailhog
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1026:1025"
+      - "127.0.0.1:8026:8025"
 
 volumes:
   job_pgdata:

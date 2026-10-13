@@ -1,22 +1,57 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { Prisma } from "@prisma/client";
-import { changePasswordSchema, deleteAccountSchema, loginSchema, signupSchema } from "@job/shared";
+import {
+  changePasswordSchema,
+  deleteAccountSchema,
+  emailVerificationConfirmSchema,
+  loginSchema,
+  passwordResetConfirmSchema,
+  passwordResetRequestSchema,
+  signupSchema,
+} from "@job/shared";
 import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
+import { sendMailInBackground } from "../mail/mailer";
+import { emailVerificationEmail, passwordResetEmail } from "../mail/templates";
 import { RateLimiter } from "../lib/rate-limit";
 import { mergeGuestInto } from "./guest-merge";
 import { getMe } from "./me";
 import { hashPassword, verifyDummyPassword, verifyPassword } from "./password";
 import { clearSessionCookie, languageFromRequest, requireRegistered, startSession } from "./session";
+import { consumeToken, issueToken } from "./user-tokens";
 
 export const authRouter = Router();
 
 const loginEmailLimiter = new RateLimiter(config.rateLimits.loginFailuresPerEmail);
 const loginIpLimiter = new RateLimiter(config.rateLimits.loginFailuresPerIp);
 const signupLimiter = new RateLimiter(config.rateLimits.signupsPerIp);
+const resetEmailLimiter = new RateLimiter(config.rateLimits.passwordResetsPerEmail);
+const resetIpLimiter = new RateLimiter(config.rateLimits.passwordResetsPerIp);
+const verificationLimiter = new RateLimiter(config.rateLimits.verificationEmailsPerUser);
 
 const tooManyAttempts = () => new HttpError(429, "rate_limited", "Too many attempts, try again later");
+
+// Logs the request in as `accountId` with a new session (login, password reset). The
+// current session is replaced; a guest's data is merged into the account (A2).
+async function switchToAccount(req: Request, res: Response, accountId: string): Promise<void> {
+  if (req.user && req.user.id !== accountId && req.user.isGuest) {
+    const guestId = req.user.id;
+    await prisma.$transaction((tx) => mergeGuestInto(tx, guestId, accountId));
+  } else if (req.sessionId) {
+    await prisma.session.deleteMany({ where: { id: req.sessionId } });
+  }
+  await startSession(req, res, { id: accountId, isGuest: false });
+}
+
+// Sends a new verification link (A6), in the user's language.
+async function sendVerificationEmail(userId: string): Promise<void> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true, uiLanguage: true } });
+  if (!user.email) return;
+  const token = await issueToken(userId, "email_verification", config.tokens.emailVerificationMs);
+  const url = `${config.webBaseUrl}/verify-email?token=${token}`;
+  sendMailInBackground({ to: user.email, ...emailVerificationEmail(user.uiLanguage === "fr" ? "fr" : "en", url) });
+}
 
 // GET /api/auth/me — the current user, or { user: null } for anonymous visitors.
 authRouter.get("/me", async (req, res) => {
@@ -54,7 +89,8 @@ authRouter.post("/signup", async (req, res) => {
     }
     throw error;
   }
-  // A6: the verification email is sent here once an email provider is chosen.
+  // A6: the account is usable right away; the link only confirms the address.
+  await sendVerificationEmail(req.user!.id);
 
   res.status(201).json(await getMe(req.user!.id));
 });
@@ -84,20 +120,62 @@ authRouter.post("/login", async (req, res) => {
   }
   loginEmailLimiter.reset(input.email);
 
-  if (req.user && req.user.id !== account.id) {
-    const previous = req.user;
-    if (previous.isGuest) {
-      await prisma.$transaction((tx) => mergeGuestInto(tx, previous.id, account.id));
-    } else {
-      await prisma.session.delete({ where: { id: req.sessionId } });
-    }
-  } else if (req.sessionId) {
-    // Logging in again as the same user: start a fresh session.
-    await prisma.session.delete({ where: { id: req.sessionId } });
-  }
-
-  await startSession(req, res, { id: account.id, isGuest: false });
+  await switchToAccount(req, res, account.id);
   res.json(await getMe(account.id));
+});
+
+// POST /api/auth/password-reset/request { email } (A4). Always the same answer, whether
+// or not the account exists (no account enumeration); the email is sent in the background.
+authRouter.post("/password-reset/request", async (req, res) => {
+  const { email } = passwordResetRequestSchema.parse(req.body);
+  const ip = req.ip ?? "unknown";
+  if (resetEmailLimiter.isLimited(email) || resetIpLimiter.isLimited(ip)) throw tooManyAttempts();
+  resetEmailLimiter.record(email);
+  resetIpLimiter.record(ip);
+
+  const account = await prisma.user.findFirst({ where: { email, deletedAt: null }, select: { id: true, uiLanguage: true } });
+  if (account) {
+    const token = await issueToken(account.id, "password_reset", config.tokens.passwordResetMs);
+    const url = `${config.webBaseUrl}/reset-password?token=${token}`;
+    sendMailInBackground({ to: email, ...passwordResetEmail(account.uiLanguage === "fr" ? "fr" : "en", url) });
+  }
+  res.status(202).json({ message: "If an account exists for this address, an email has been sent" });
+});
+
+// POST /api/auth/password-reset/confirm { token, password } (A4): new password, every
+// session of the account logged out, then logged in here with a new session.
+authRouter.post("/password-reset/confirm", async (req, res) => {
+  const input = passwordResetConfirmSchema.parse(req.body);
+  const userId = await consumeToken(input.token, "password_reset");
+  const account = await prisma.user.findFirst({ where: { id: userId, deletedAt: null, email: { not: null } }, select: { id: true, email: true } });
+  if (!account) throw new HttpError(400, "invalid_token", "This link is invalid, expired or already used. Ask for a new one.");
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: account.id }, data: { passwordHash: await hashPassword(input.password) } }),
+    prisma.session.deleteMany({ where: { userId: account.id } }),
+  ]);
+  loginEmailLimiter.reset(account.email!);
+  await switchToAccount(req, res, account.id);
+  res.json(await getMe(account.id));
+});
+
+// POST /api/auth/email-verification/resend (A6)
+authRouter.post("/email-verification/resend", requireRegistered, async (req, res) => {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { emailVerifiedAt: true } });
+  if (user.emailVerifiedAt) throw new HttpError(409, "already_verified", "This address is already confirmed");
+  if (verificationLimiter.isLimited(req.user!.id)) throw tooManyAttempts();
+  verificationLimiter.record(req.user!.id);
+  await sendVerificationEmail(req.user!.id);
+  res.status(202).json({ message: "A new confirmation email has been sent" });
+});
+
+// POST /api/auth/email-verification/confirm { token } (A6). Works without being logged
+// in (the link may be opened on another device).
+authRouter.post("/email-verification/confirm", async (req, res) => {
+  const { token } = emailVerificationConfirmSchema.parse(req.body);
+  const userId = await consumeToken(token, "email_verification");
+  await prisma.user.updateMany({ where: { id: userId, deletedAt: null, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
+  res.status(204).end();
 });
 
 // POST /api/auth/logout (FEATURE A3)

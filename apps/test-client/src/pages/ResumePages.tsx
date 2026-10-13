@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { emptyResumeContent, RESUME_LANGUAGES, type ResumeDetail, type ResumeListResponse } from "@job/shared";
+import { emptyResumeContent, RESUME_LANGUAGES, type ResumeDetail, type ResumeListResponse, type TranslateFieldResponse } from "@job/shared";
 import { api, errorText } from "../api";
 import type { Navigate } from "../App";
 import { JsonEditor } from "../JsonEditor";
@@ -22,6 +22,20 @@ export function ResumesPage({ navigate, refreshMe }: { navigate: Navigate; refre
     setMessage(errorText(result));
     refreshMe(); // the selection or a new guest changes the current user
     load();
+  }
+
+  // Translation (T1): proposes the existing translation when there is one.
+  async function translate(id: string, language: string, force = false): Promise<void> {
+    setMessage("Translating…");
+    const result = await api<ResumeDetail>("POST", `/api/resumes/${id}/translations`, { language, force });
+    if (result.ok) return navigate({ name: "resume", id: result.data.id });
+    const existing = (result.error.details as { existingResumeId?: string } | undefined)?.existingResumeId;
+    if (existing) {
+      return confirm("A translation already exists. OK = open it, Cancel = create a new one")
+        ? navigate({ name: "resume", id: existing })
+        : translate(id, language, true);
+    }
+    await after(result);
   }
 
   async function createEmpty() {
@@ -58,10 +72,14 @@ export function ResumesPage({ navigate, refreshMe }: { navigate: Navigate; refre
                 <div className="muted">
                   {resume.language} · updated {new Date(resume.updatedAt).toLocaleString()}
                   {resume.translatedFrom && ` · translated from ${resume.translatedFrom.name}`}
+                  {resume.translatedFrom?.changedSinceTranslation && <span className="error"> (original changed since)</span>}
                   {resume.hasSourceFile && <> · <a href={`/api/resumes/${resume.id}/source`}>original file</a></>}
                 </div>
               </td>
               <td>
+                {RESUME_LANGUAGES.filter((language) => language !== resume.language).map((language) => (
+                  <button key={language} onClick={() => translate(resume.id, language)}>Translate to {language}</button>
+                ))}{" "}
                 {!resume.isSelected && <button onClick={async () => after(await api("POST", `/api/resumes/${resume.id}/select`))}>Select</button>}{" "}
                 <button onClick={async () => confirm("Delete this resume?") && after(await api("DELETE", `/api/resumes/${resume.id}`))}>Delete</button>
               </td>
@@ -119,7 +137,49 @@ export function ResumePage({ id, refreshMe }: { id: string; refreshMe: () => voi
         Catalogue links (M2): skills [{resume.skillIds.join(", ")}] · occupations [{resume.occupationIds.join(", ")}]. Items without an id get one on save.
       </p>
       {message && <p className={message === "Saved" ? undefined : "error"}>{message}</p>}
+      {resume.translatedFrom && <TranslationTools resume={resume} />}
       <JsonEditor key={resume.updatedAt} value={resume.content} onSave={save} />
     </div>
+  );
+}
+
+// Translated resume (T1): source changed banner, re-translate a field, source side by side.
+function TranslationTools({ resume }: { resume: ResumeDetail }) {
+  const source = resume.translatedFrom!;
+  const [path, setPath] = useState("summary");
+  const [result, setResult] = useState("");
+  const [sourceContent, setSourceContent] = useState<unknown>(null);
+
+  useEffect(() => {
+    api<ResumeDetail>("GET", `/api/resumes/${source.id}`).then((response) => response.ok && setSourceContent(response.data.content));
+  }, [source.id]);
+
+  async function retranslate() {
+    const response = await api<TranslateFieldResponse>("POST", `/api/resumes/${resume.id}/translate-field`, { path });
+    setResult(response.ok ? response.data.text : errorText(response));
+  }
+
+  return (
+    <fieldset>
+      <legend>Translation of "{source.name}" — check the translation</legend>
+      {source.changedSinceTranslation && (
+        <p className="error">
+          The original resume changed since this translation.{" "}
+          <button onClick={async () => {
+            const response = await api<ResumeDetail>("POST", `/api/resumes/${source.id}/translations`, { language: resume.language, force: true });
+            setResult(response.ok ? `New translation created: ${response.data.name} (see the resume list)` : errorText(response));
+          }}>Translate again</button>
+        </p>
+      )}
+      <p>
+        Re-translate field (path, e.g. summary, workExperience[id=…].responsibilities[id=…].text):{" "}
+        <input size={50} value={path} onChange={(event) => setPath(event.target.value)} /> <button onClick={retranslate}>Re-translate</button>
+      </p>
+      {result && <pre>{result}</pre>}
+      <details>
+        <summary>Source resume (side by side reference)</summary>
+        <pre>{JSON.stringify(sourceContent, null, 2)}</pre>
+      </details>
+    </fieldset>
   );
 }

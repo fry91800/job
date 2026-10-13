@@ -145,7 +145,7 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D46 | Login always replaces the current session; when it belonged to a guest, the guest is merged and deleted even if it has no data | One code path; an empty guest has nothing to lose |
 | D47 | Location autocomplete searches the `locations` table (prefix, accent-insensitive with the `unaccent` extension, then trigram). Geoapify results will be inserted into `locations` to get an id | Search needs a `locationId` now; the seeded locations are enough until Geoapify is set up |
 | D48 | Offer detail takes `?lang=` for skill/occupation names (default: the user's UI language, else `fr`) | Anonymous visitors have no stored language; the web app knows the UI language |
-| P25 | Password reset (A4) and email verification (A6) are **postponed** | They need an email provider, not chosen yet |
+| P25 | ~~Password reset (A4) and email verification (A6) are postponed~~ — superseded by P30 | They need an email provider, not chosen yet |
 
 ## Update 12 — resumes, templates, generation without AI (2026-10-12)
 
@@ -219,6 +219,19 @@ No database has been created yet, so `DATABASE.md` now describes the target desi
 | D85 | Generation options default to the settings and can be overridden per request (`modifierEnabled`, `modifierStrength`, `modifierConfig`); `remember: true` saves them; no section selected → `400 no_section_selected` | M1 / S1 |
 | D86 | AI generations count towards the quota (guest 3 total, registered 30/day, deleted included); modifier off is free; failed AI calls save nothing and use no quota | G4, P16, G5 |
 | D87 | Generation uses low thinking effort and temperature 0.4 | Keeps within the 60 s timeout (a parse took 42 s with default effort); some rewording freedom |
+
+## Update 18 — translation, emails, live checks (2026-10-13)
+
+| ID | Decision / change | Why |
+|---|---|---|
+| P30 | **Email in development: MailHog** (docker-compose, SMTP 1026, UI 8026); production SMTP is configuration only (`SMTP_*`). A4 and A6 are built (supersedes P25) | Catches every email locally, nothing leaves the machine |
+| D88 | PostgreSQL published on host port **5433** | A system PostgreSQL in WSL took 5432 and Docker silently failed to publish the container's port |
+| D89 | One shared per-IP AI rate limit for upload, extraction, generation and translation (`ai/rate-limit.ts`); it was missing on upload | G4; separate counters per feature multiplied the real limit |
+| D90 | Translation: the AI only sees translatable fields (with ids); same items required (else invalid → one retry); merged onto a copy of the source. Never selected automatically; `translation_exists` (409) unless `force`; quota guest 2 / registered 20 per day (translated resumes, deleted included); the resume limit is checked before the AI call | T1, D31, D32; nothing outside the translatable fields can change |
+| D91 | "Re-translate a field" returns the text (not saved); allowed paths are a fixed list (technical skills excluded); covered by the per-IP limit only | T1 "small call" |
+| D92 | Emails: `nodemailer`, plain text + escaped HTML, in `users.ui_language`; tokens 1 h (reset) / 48 h (verification), SHA-256 stored, previous ones invalidated, single use; reset request answers 202 in every case and sends in the background; reset confirmation logs out every session and logs in (guest merged like A2); verification confirm works without a session | A4, A6, L1, DATABASE.md "user_tokens" |
+| D93 | Live checks with Gemini (paid tier): upload 7 s, URL extraction 3 s, generation 5–6 s, translation 3 s. Generation prompt tightened (`2026-10-13b`) after the model added unstated claims ("modern architecture", "code review"): reword and emphasise only, no new tasks/tools/qualifiers, keep punctuation; temperature 0.3 | Truthfulness is the core promise of the modifier |
+| D94 | Bug found live: a JSON Schema `required` listing a removed property makes Gemini answer 400; test added | The fake AI doesn't validate schemas like Gemini |
 
 ## Assumptions made (change if wrong)
 

@@ -9,7 +9,7 @@ import type { Proposal, Sections, Strength } from "./change-set";
 
 // Stored on each generated resume (generated_resumes.prompt_version). Change it whenever
 // the prompt or the strength rules change.
-export const GENERATE_RESUME_PROMPT_VERSION = "2026-10-13";
+export const GENERATE_RESUME_PROMPT_VERSION = "2026-10-13b";
 
 const MAX_OFFER_TEXT = 20000;
 
@@ -52,7 +52,9 @@ Absolute rules:
 - Write in the resume's language (${language === "fr" ? "French" : "English"}), whatever the offer's language.
 - Never invent or change employers, job titles, dates, degrees, certifications, contact details or technologies.
 - Never add a work experience, an education entry or a responsibility.
-- Stay truthful: rephrase what the resume says, do not claim experience the person doesn't have${strength === "hard" ? " (except skills added with the HARD strength)" : ""}.
+- Stay strictly truthful: every rewritten text must say what the original says, nothing more. You may reword, use the offer's vocabulary, change the emphasis and shorten. You must NOT add tasks, responsibilities, tools, methods, results, figures, scopes or qualifiers ("advanced", "modern", "complete", "expert"…) that the original text doesn't state${strength === "hard" ? " (the only exception: skills added with the HARD strength)" : ""}.
+- Keep the punctuation style of the original (e.g. a final period).
+- If a text is already good for this offer, return it unchanged.
 - Keep the "id" values exactly as given.
 
 ${STRENGTH_RULES[strength]}
@@ -88,7 +90,7 @@ export async function proposeModifications(input: {
     system: systemPrompt(sections, input.strength, input.language),
     parts: [{ text: `<offer>\n${offerText}\n</offer>\n<resume>\n${JSON.stringify(input.resume)}\n</resume>` }],
     schema,
-    temperature: 0.4,
+    temperature: 0.3,
     effort: "low",
   });
   return { proposal: data as Proposal, model };

@@ -1,5 +1,6 @@
 import type { Prisma, Resume } from "@prisma/client";
 import { withItemIds, type ResumeContent, type ResumeContentInput, type ResumeDetail, type ResumeListItem, type ResumeListResponse } from "@job/shared";
+import { consumeAiRateLimit } from "../ai/rate-limit";
 import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { newItemId } from "../lib/ids";
@@ -15,7 +16,7 @@ type SessionUser = { id: string; isGuest: boolean };
 export const resumeNotFound = () => new HttpError(404, "resume_not_found", "Resume not found");
 
 const listInclude = {
-  translatedFrom: { select: { id: true, name: true, deletedAt: true } },
+  translatedFrom: { select: { id: true, name: true, deletedAt: true, updatedAt: true } },
   selectedBy: { select: { id: true } },
 } satisfies Prisma.ResumeInclude;
 
@@ -29,7 +30,10 @@ function toListItem(resume: ResumeWithList): ResumeListItem {
     language: resume.language,
     isSelected: resume.selectedBy !== null,
     hasSourceFile: resume.sourceFileKey !== null,
-    translatedFrom: source && !source.deletedAt ? { id: source.id, name: source.name } : null,
+    translatedFrom:
+      source && !source.deletedAt
+        ? { id: source.id, name: source.name, changedSinceTranslation: source.updatedAt > resume.createdAt }
+        : null,
     updatedAt: resume.updatedAt.toISOString(),
   };
 }
@@ -65,10 +69,16 @@ export async function getResume(userId: string, resumeId: string): Promise<Resum
   };
 }
 
-type NewResume = { name?: string; language: string; content: ResumeContentInput; sourceFileKey?: string };
+type NewResume = {
+  name?: string;
+  language: string;
+  content: ResumeContentInput;
+  sourceFileKey?: string;
+  translatedFromResumeId?: string;
+};
 
 // Creates a resume (from scratch, upload or translation). Becomes the selected resume if
-// the user has none (R2).
+// the user has none (R2), except translations, which are never selected automatically (T1).
 export async function createResume(user: SessionUser, input: NewResume): Promise<ResumeDetail> {
   const limit = user.isGuest ? config.limits.resumes.guest : config.limits.resumes.registered;
   const count = await prisma.resume.count({ where: { userId: user.id, deletedAt: null } });
@@ -83,10 +93,13 @@ export async function createResume(user: SessionUser, input: NewResume): Promise
         language: input.language,
         content,
         sourceFileKey: input.sourceFileKey ?? null,
+        translatedFromResumeId: input.translatedFromResumeId ?? null,
       },
     });
     await syncResumeLinks(tx, created.id, content, input.language);
-    await tx.user.updateMany({ where: { id: user.id, selectedResumeId: null }, data: { selectedResumeId: created.id } });
+    if (!input.translatedFromResumeId) {
+      await tx.user.updateMany({ where: { id: user.id, selectedResumeId: null }, data: { selectedResumeId: created.id } });
+    }
     return created;
   });
   return getResume(user.id, resume.id);
@@ -148,11 +161,12 @@ async function checkUploadQuota(user: SessionUser): Promise<void> {
 
 // Upload a PDF/DOCX (R2): the file is stored, parsed into ResumeContent and the resume
 // is saved immediately.
-export async function uploadResume(user: SessionUser, file: Buffer, name: string | undefined): Promise<ResumeDetail> {
+export async function uploadResume(user: SessionUser, ip: string, file: Buffer, name: string | undefined): Promise<ResumeDetail> {
   if (file.length === 0) throw new HttpError(400, "empty_file", "The file is empty");
   const type = detectFileType(file);
   if (!type) throw new HttpError(415, "unsupported_file_type", "Only PDF and DOCX files are accepted");
   await checkUploadQuota(user);
+  consumeAiRateLimit(ip);
 
   const key = newStorageKey("resume-sources", user.id, fileTypes[type].extension);
   await putFile(key, file);

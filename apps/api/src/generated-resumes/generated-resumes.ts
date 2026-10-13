@@ -12,11 +12,11 @@ import {
   type ResumeContent,
   type ResumeContentInput,
 } from "@job/shared";
+import { consumeAiRateLimit } from "../ai/rate-limit";
 import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { newItemId } from "../lib/ids";
 import { prisma } from "../lib/prisma";
-import { RateLimiter } from "../lib/rate-limit";
 import { visibleOfferWhere } from "../offers/offer-access";
 import { photoDataUrl } from "../photos/photos";
 import { saveOffer } from "../saved-offers/saved-offers";
@@ -29,8 +29,6 @@ import { enabledSections, GENERATE_RESUME_PROMPT_VERSION, proposeModifications }
 // Generated resumes (FEATURE M1, M3, M4). Modifier off: the source resume is copied and
 // rendered with a template. Modifier on: the AI proposes modifications, the API turns them
 // into a change set the user reviews (accept / reject each change).
-
-const aiLimiter = new RateLimiter(config.rateLimits.aiPerIp);
 
 type SessionUser = { id: string; isGuest: boolean };
 
@@ -151,9 +149,8 @@ export async function generateResume(user: SessionUser, input: GenerateInput, ip
   let aiModel: string | null = null;
 
   if (modifierEnabled) {
-    if (aiLimiter.isLimited(ip)) throw new HttpError(429, "rate_limited", "Too many requests, try again later");
     await checkGenerationQuota(user);
-    aiLimiter.record(ip);
+    consumeAiRateLimit(ip);
 
     const offerSkills = await prisma.skillName.findMany({
       where: { skillId: { in: offer.skills.map((link) => link.skillId) }, isCanonical: true, language: resume.language },

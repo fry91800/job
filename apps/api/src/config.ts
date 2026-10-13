@@ -30,6 +30,8 @@ export const config = {
     userOffers: { guestTotal: 3, registeredPerDay: 30 },
     // Generations with the modifier on (AI); modifier off is free (FEATURE G4, P16).
     aiGenerations: { guestTotal: 3, registeredPerDay: 30 },
+    // Resume translations (T1), counted from translated resumes, deleted ones included.
+    translations: { guestTotal: 2, registeredPerDay: 20 },
     photoMaxPixels: 1000, // longest side after resizing (R6)
   },
 
@@ -39,6 +41,26 @@ export const config = {
     model: process.env.AI_MODEL ?? "gemini-3.8-flash",
     timeoutMs: 60 * 1000,
     geminiApiKey: process.env.GEMINI_API_KEY,
+  },
+
+  // Frontend address, for the links in emails.
+  webBaseUrl: process.env.WEB_BASE_URL ?? "http://localhost:5173",
+
+  // Emails (FEATURE A4, A6). Development: MailHog from docker-compose (web UI on
+  // http://localhost:8026). `transport: "memory"` keeps messages in memory (tests).
+  mail: {
+    transport: (process.env.MAIL_TRANSPORT ?? "smtp") as "smtp" | "memory",
+    from: process.env.MAIL_FROM ?? "Job Platform <no-reply@job.local>",
+    smtpHost: process.env.SMTP_HOST ?? "localhost",
+    smtpPort: Number(process.env.SMTP_PORT ?? 1026),
+    smtpSecure: process.env.SMTP_SECURE === "true",
+    smtpUser: process.env.SMTP_USER,
+    smtpPassword: process.env.SMTP_PASSWORD,
+  },
+
+  tokens: {
+    passwordResetMs: 3600 * 1000, // 1 h (A4)
+    emailVerificationMs: 48 * 3600 * 1000, // 48 h (A6)
   },
 
   // Fetching offer pages from user-supplied URLs (O5). Private and internal network
@@ -74,5 +96,8 @@ export const config = {
     guestsPerIp: { max: 30, windowMs: 3600 * 1000 },
     // Every endpoint that will call the AI (FEATURE G4).
     aiPerIp: { max: 60, windowMs: 3600 * 1000 },
+    passwordResetsPerEmail: { max: 3, windowMs: 3600 * 1000 }, // A4
+    passwordResetsPerIp: { max: 20, windowMs: 3600 * 1000 },
+    verificationEmailsPerUser: { max: 3, windowMs: 3600 * 1000 }, // A6 resend
   },
 };

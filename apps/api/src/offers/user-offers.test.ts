@@ -82,6 +82,8 @@ describe("user-added offers (O5)", () => {
     assert.equal(request.task, "extract-offer");
     assert.ok("text" in request.parts[0] && request.parts[0].text.includes("<offer>"));
     assert.ok(!("description" in (request.jsonSchema as any).properties), "no description asked for pasted text");
+    // Gemini rejects a schema that requires a property it doesn't define.
+    assert.ok(!(request.jsonSchema as any).required.includes("description"));
   });
 
   test("URL: the page is fetched and reduced to its content for the AI", async () => {
