@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p apps/test-client",
     "api:dev": "tsx watch apps/api/src/server.ts",
     "api:start": "tsx apps/api/src/server.ts",
-    "api:test": "node --import tsx --test --test-concurrency=1 \"packages/shared/src/**/*.test.ts\" \"apps/api/src/**/*.test.ts\" \"apps/job_collector/src/**/*.test.ts\"",
+    "test": "tsx scripts/test.ts",
     "client:dev": "vite apps/test-client",
     "api:install-browser": "playwright-core install chromium-headless-shell",
     "jobs:cleanup": "tsx apps/api/src/jobs/run-cleanup.ts",

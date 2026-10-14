@@ -8,7 +8,7 @@ import { runConnector } from "../runs/run-connector";
 import { closeSource, runMaintenance } from "./close";
 import { processRecord } from "./process";
 
-// Runs against the development database with the seed data (`npm run db:seed`).
+// Runs against the seeded test database (`npm test`).
 
 const SOURCES = ["test-ats", "test-api", "test-aggregator"] as const;
 const DESCRIPTION =

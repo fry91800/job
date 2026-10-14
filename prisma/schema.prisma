@@ -521,20 +521,27 @@ model Company {
   @@map("companies")
 }
 
-// Which ATS board or career page to collect for a company.
+// A job board of a company at a recruiting tool (ATS), found by discovery or added by
+// hand (COLLECTOR.md §5.2). Candidates are checked before being collected.
 model CompanySource {
-  id        String    @id @default(uuid()) @db.Uuid
-  companyId String    @map("company_id") @db.Uuid
-  ats       String // greenhouse | lever | smartrecruiters | ashby | career-page…
-  slug      String // board id at the ATS, or career page URL
-  status    String    @default("active") // active | paused | invalid
-  lastRunAt DateTime? @map("last_run_at") @db.Timestamptz
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  companyId      String?   @map("company_id") @db.Uuid // set when the board is checked
+  ats            String // greenhouse | ashby | lever | lever-eu | smartrecruiters
+  slug           String // board id at the ATS
+  status         String    @default("candidate") // candidate | active | no-france | empty | invalid | duplicate | paused
+  discoveredFrom String?   @map("discovered_from") // e.g. commoncrawl:CC-MAIN-2026-39, manual
+  jobCount       Int?      @map("job_count") // at the last check or run
+  franceJobCount Int?      @map("france_job_count")
+  checkedAt      DateTime? @map("checked_at") @db.Timestamptz
+  lastRunAt      DateTime? @map("last_run_at") @db.Timestamptz
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@unique([ats, slug])
   @@index([companyId])
+  @@index([ats, status])
   @@map("company_sources")
 }
 

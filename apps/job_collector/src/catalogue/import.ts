@@ -219,15 +219,25 @@ async function importEsco(dir: string, log: Log) {
   log(`ESCO: ${occupations.length} occupations (${occupationResult.names} names), ${skills.length} skills (${skillResult.names} names)`);
 }
 
-// ── Hand-written technical skills (React, Node.js… often missing from ESCO) ─────
+// ── Hand-written technical skills (React, Node.js… missing from ESCO) ─────────
+// Only the skills ESCO doesn't have: a manual skill is skipped when one of its names is
+// already an ESCO name in the same language (no duplicate skills).
 
 async function importManualSkills(log: Log) {
-  const entries: Entry[] = manualSkills.map((skill) => ({
-    externalId: skill.key,
-    names: [...skill.fr.map((name) => ({ language: "fr", name })), ...skill.en.map((name) => ({ language: "en", name }))],
-  }));
+  const escoNames = new Set(
+    (await prisma.skillName.findMany({ where: { skill: { source: "esco" } }, select: { language: true, normalizedName: true } })).map(
+      (row) => `${row.language}|${row.normalizedName}`,
+    ),
+  );
+  const entries: Entry[] = [];
+  const covered: string[] = [];
+  for (const skill of manualSkills) {
+    const names = [...skill.fr.map((name) => ({ language: "fr", name })), ...skill.en.map((name) => ({ language: "en", name }))];
+    if (names.some(({ language, name }) => escoNames.has(`${language}|${normalizeCatalogueName(name)}`))) covered.push(skill.key);
+    else entries.push({ externalId: skill.key, names });
+  }
   const { names } = await writeEntries("skill", "manual", entries, { replaceNames: true });
-  log(`manual skills: ${entries.length} (${names} names)`);
+  log(`manual skills: ${entries.length} added or updated (${names} names), ${covered.length} already in ESCO`);
 }
 
 export async function importCatalogue(options: { cacheDir?: string; escoDir?: string; refresh?: boolean; log?: Log } = {}) {

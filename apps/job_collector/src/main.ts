@@ -1,6 +1,9 @@
 // The collector worker: schedules the connectors, runs them, and processes the offers
 // sent by the API's ingestion endpoint. `npm run collector:start`.
-import { prisma, QUEUES, startQueue, type IngestJob, type RunJob } from "@job/backend";
+import { prisma, QUEUES, startQueue, type BoardsJob, type IngestJob, type RunJob } from "@job/backend";
+import { atsAdapters } from "./ats/registry";
+import { checkBoards } from "./discovery/check-boards";
+import { discoverBoards } from "./discovery/common-crawl";
 import { collectorConfig } from "./config";
 import { connectors, findConnector } from "./connectors/registry";
 import { runMaintenance } from "./pipeline/close";
@@ -27,6 +30,15 @@ async function main() {
     }
   });
 
+  // Company discovery and board checks (COLLECTOR.md §5.2).
+  await boss.work<BoardsJob>(QUEUES.boards, async ([job]) => {
+    if (job.data.action === "discover") {
+      for (const adapter of atsAdapters) await discoverBoards(adapter);
+    } else {
+      await checkBoards({ limit: collectorConfig.discovery.checkBatch });
+    }
+  });
+
   await boss.work(QUEUES.maintenance, async () => {
     console.log("[maintenance]", JSON.stringify(await runMaintenance()));
   });
@@ -36,6 +48,8 @@ async function main() {
     else await boss.unschedule(QUEUES.run, connector.key);
   }
   await boss.schedule(QUEUES.maintenance, collectorConfig.maintenanceCron, {}, { key: "daily" });
+  await boss.schedule(QUEUES.boards, collectorConfig.discovery.checkCron, { action: "check" }, { key: "check" });
+  await boss.schedule(QUEUES.boards, collectorConfig.discovery.discoverCron, { action: "discover" }, { key: "discover" });
 
   console.log(`collector started: ${connectors.filter((connector) => connector.schedule).length} scheduled connector(s)`);
 

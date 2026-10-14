@@ -18,7 +18,7 @@ Done:
 
 Postponed:
 
-* Job collector (`apps/job_collector`, plan in `COLLECTOR.md`): phase 1 done (pipeline, deduplication, ingestion endpoint, ROME + ESCO catalogue); phase 2 is France Travail. The development seed still provides the test offers.
+* Job collector (`apps/job_collector`, plan in `COLLECTOR.md`): phase 1 (pipeline, deduplication, ingestion endpoint, ROME + ESCO catalogue) and phase 2 (Greenhouse, Ashby, Lever, SmartRecruiters adapters with company discovery from Common Crawl) done. France Travail's offer API is closed to new users. The development seed still provides the test offers.
 * Full frontend (`apps/web`): built after the API. Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
 
 ## Planned features
@@ -151,10 +151,10 @@ Other scripts:
 
 * `npm run api:dev` — start the API on http://localhost:3000 (restarts on change)
 * `npm run client:dev` — start the test client on http://localhost:5173 (needs the API running); it proxies `/api` to the API
-* `npm run api:test` — API integration tests (they expect the seed data: run `npm run db:seed` first)
+* `npm test` — all tests (shared, API, collector), against their own database `job_test` (created on first run, migrated and reseeded on every run) and storage folder `storage-test`, with the fake AI provider: development data is never touched. `npm test -- path/to/file.test.ts` runs only some files. Running a test file directly against the development database is refused
 * `npm run ai:check` — one tiny request to the configured AI provider/model (checks the key, the model and the latency; uses one request of the quota)
 * `npm run collector -- catalogue [--esco data/esco]` — import the ROME + ESCO catalogue (run again after `db:seed`, which empties it; see COLLECTOR.md §8.1)
-* `npm run collector:start` — job collector worker; `npm run collector -- run <connector> | metrics | token <source> <name> | contract`
+* `npm run collector:start` — job collector worker; `npm run collector -- discover | boards check|add|list | run <connector> | metrics | token <source> <name> | contract` (see COLLECTOR.md §13–14)
 * `npm run jobs:cleanup` — run the cleanup job once (the API also runs it every 24 h)
 * `npm run db:reset` — drop everything, re-apply the migrations and reseed
 * `npm run db:studio` — browse the data in Prisma Studio

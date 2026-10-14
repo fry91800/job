@@ -1,10 +1,12 @@
+import { atsConnector } from "../ats/connector";
+import { atsAdapters } from "../ats/registry";
 import { aiSourcePlaceholder } from "./placeholders/ai-source";
 import { loggedInBotPlaceholder } from "./placeholders/logged-in-bot";
 import { siteCrawlerPlaceholder } from "./placeholders/site-crawler";
 import { KIND_PRIORITY, type Connector, type ConnectorKind } from "./types";
 
-// Every connector of the collector. Phase 2 adds France Travail, phase 3 the ATS adapters.
-export const connectors: Connector[] = [siteCrawlerPlaceholder, aiSourcePlaceholder, loggedInBotPlaceholder];
+// Every connector of the collector: one per recruiting tool (phase 2), the placeholders.
+export const connectors: Connector[] = [...atsAdapters.map((adapter) => atsConnector(adapter)), siteCrawlerPlaceholder, aiSourcePlaceholder, loggedInBotPlaceholder];
 
 const extra: Connector[] = [];
 

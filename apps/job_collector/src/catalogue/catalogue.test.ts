@@ -99,6 +99,13 @@ describe("catalogue import (ROME + ESCO)", () => {
     assert.ok(found.includes(z9901.id));
   });
 
+  test("acronyms only match in capitals", async () => {
+    const skill = await prisma.skill.findFirstOrThrow({ where: { source: "esco", externalId: ESCO_SKILL } });
+    assert.ok((await matchInText("skill", "Nous développons en KMP.", "fr")).includes(skill.id));
+    assert.ok(!(await matchInText("skill", "Nous développons en kmp.", "fr")).includes(skill.id));
+    assert.ok((await matchInText("skill", "Expérience en Kotlin Multiplateforme", "fr")).includes(skill.id), "full names in any case");
+  });
+
   test("running it again changes nothing", async () => {
     const before = await prisma.occupationName.count();
     await importCatalogue({ cacheDir: dir, escoDir: join(dir, "esco"), log: () => {} });

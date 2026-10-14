@@ -1,5 +1,5 @@
-// Integration tests for GET /api/offers. They run against the development database
-// and expect the seed data: run `npm run db:seed` first.
+// Integration tests for GET /api/offers. They run against the seeded test database
+// (`npm test`).
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import type { OfferDetail, OfferSearchResponse, OfferSearchResult } from "@job/shared";
@@ -28,7 +28,7 @@ async function searchAll(query: Record<string, string | number>): Promise<OfferS
 
 const location = (key: string) => {
   const id = locationIds.get(key);
-  assert.ok(id, `seed location ${key} missing — run npm run db:seed`);
+  assert.ok(id, `seed location ${key} missing — run the tests with npm test`);
   return id;
 };
 

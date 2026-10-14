@@ -114,7 +114,7 @@ prisma/schema.prisma
 
 Database changes are managed using Prisma migrations.
 
-Development data comes from `prisma/seed/` (`npm run db:seed`). The seed empties the database first, so it is for development and tests only.
+Development data comes from `prisma/seed/` (`npm run db:seed`). The seed empties the database first, so it is for development and tests only. Tests run against their own database (`job_test`, see `scripts/test.ts`), which `npm test` reseeds on every run.
 
 ## Main domains
 

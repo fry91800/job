@@ -270,6 +270,35 @@ Full plan in `COLLECTOR.md`.
 | D106 | Source priority for merged offers: ATS 5 > official API 4 > crawler 3 > aggregator 2 > ingest 1 > user-added/placeholder 0; lower-priority sources only fill empty fields; salary merged as one group | COLLECTOR.md §7 |
 | D107 | Ingestion endpoint: tokens per source (hashed), ≤ 100 offers / ≤ 5 MB per request, 120 requests/min per token, `source` must match the token; asynchronous through pg-boss (`sendOnly` in the API) | COLLECTOR.md §4 |
 | D108 | Deferred from phase 1: AI for missing fields / uncertain duplicates, recruiter-name removal, `isStillOpen` and full-sync closing, company discovery | Need real sources to be designed well |
+| D109 | ESCO 1.2.1 imported (fr + en). Manual skills are added only when ESCO lacks them; hyphens split tokens; short all-capital names match only in capitals | ESCO has no React/Node.js/Docker…; ROME writes "full-stack"; ESCO acronyms like "AVEC" matched the word "avec" |
+
+## Update 22 — France Travail closed, sources reordered (2026-10-13)
+
+| ID | Decision | Why |
+|---|---|---|
+| P38 | France Travail's offer API is **blocked** (closed to new users since early 2026 after abuse by AI services; access on request). The collector no longer starts with it | Our credentials are refused; access requires a request whose outcome is unknown |
+| P39 | New order: **ATS adapters + company discovery** (phase 2) → structured-data crawler → public-sector open data (Choisir le service public) and apprenticeship offers (La bonne alternance, if its non-profit terms allow) → aggregators (Adzuna…) and France Travail if access is granted → extension | ATS endpoints were checked to answer with full descriptions and many Paris offers; no single source should be critical |
+| P40 | Company discovery from Common Crawl's URL index (columnar files, the query API being overloaded) and Web Data Commons' `JobPosting` extractions | Finds which companies use which ATS / publish structured offers, at scale and from public data |
+
+## Update 23 — collector phase 2 (2026-10-13)
+
+| ID | Decision | Why |
+|---|---|---|
+| D110 | Adapters for Greenhouse, Ashby, Lever, Lever EU, SmartRecruiters; only offers located in France are collected (tool's country field, else location text) | Product scope is France; boards are worldwide |
+| D111 | Contract / remote types only from explicit signals; "full time" alone leaves the contract empty | Avoid inventing CDI for every full-time job |
+| D112 | Full sync per board: offers that disappeared from a successfully read board are closed; a failing board closes nothing; 404 → `invalid` | Freshness without false closures |
+| D113 | Discovery from Common Crawl's URL index (paged, pauses, retries, saved per prefix); board checks with statuses and re-check delays (7/30/30/90 days); letter-case variants of a board id are `duplicate` | Find French boards from public data while keeping requests polite and the registry clean |
+| D114 | Every French offer of a followed company is collected (not only IT); IT share measured by occupation | Long-term goal is all offers; filtering by title at collection would lose offers |
+| D115 | A new run closes the connector's older unfinished runs as interrupted | A stopped process must not leave runs "running" forever |
+| D116 | An offer missing at its detail request (404 after being listed) is skipped; only the board's list can mark a board `invalid` | Offers are removed between the two requests; one vanished offer must not disable a whole board |
+
+## Update 24 — test database (2026-10-14)
+
+| ID | Decision | Why |
+|---|---|---|
+| D117 | Tests run against their own database (`job_test` in the same PostgreSQL, or `TEST_DATABASE_URL`) and storage folder, created, migrated and reseeded by `npm test` (`scripts/test.ts`); `api:test` is replaced by `npm test` | The seed empties every table: running tests used to wipe collected offers, discovered boards and the imported catalogue |
+| D118 | The Prisma client refuses to start under `node --test` unless the database name ends in `_test` | A test file run by hand cannot reach development data |
+| D119 | Tests always use the fake AI provider (`AI_PROVIDER=fake` set by the runner) | No paid model calls from tests |
 
 ## Assumptions made (change if wrong)
 

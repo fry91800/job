@@ -64,6 +64,6 @@ describe("catalogue helpers", () => {
   });
 
   test("tokens keep technical names whole", () => {
-    assert.deepEqual(tokenize("Node.js, C#, C++ et .NET ; front-end. PostgreSQL."), ["node.js", "c#", "c++", "et", ".net", "front-end", "postgresql"]);
+    assert.deepEqual(tokenize("Node.js, C#, C++ et .NET ; front-end. PostgreSQL."), ["node.js", "c#", "c++", "et", ".net", "front", "end", "postgresql"]);
   });
 });

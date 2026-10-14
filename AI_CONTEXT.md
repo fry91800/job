@@ -12,7 +12,7 @@ The current priority is the backend API (Express), starting with offer search (F
 
 The database is filled by the development seed (`prisma/seed/`, `npm run db:seed`). The job collector is postponed: do not work on it unless explicitly requested.
 
-Each API route gets integration tests next to it (`*.test.ts`, run with `npm run api:test`).
+Each API route gets integration tests next to it (`*.test.ts`, run with `npm test`, which uses the separate `job_test` database).
 
 When a feature needs test data the seed does not have, add it to the seed (as a hand-written edge case if it tests a specific rule) instead of inserting rows by hand.
 

@@ -1,5 +1,5 @@
-// Helpers for the API integration tests. Tests run against the seeded development
-// database (`npm run db:seed`) and remove the users they create.
+// Helpers for the API integration tests. Tests run against the seeded test database
+// (`npm test`) and remove the users they create.
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
@@ -50,7 +50,7 @@ export async function startTestServer() {
     ai,
     client: (session?: string) => new TestClient(baseUrl, session),
     // Deletes the users created since the server started (registered test users,
-    // guests and deleted accounts). Test files run one at a time (see api:test).
+    // guests and deleted accounts). Test files run one at a time (see scripts/test.ts).
     async close() {
       server.close();
       await closeBrowser();

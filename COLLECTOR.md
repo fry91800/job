@@ -2,7 +2,7 @@
 
 Plan and reference for `apps/job_collector`: the process that finds job offers and stores them in the shared database. Decisions are logged in `claude/DECISIONS.md` (Updates 20–21).
 
-**Status: phase 1 (foundations) done** — see §13. Phase 2 (France Travail) is next.
+**Status: phases 1 (foundations, §13) and 2 (ATS adapters + discovery, §14) done.** France Travail's offer API is closed to new users (§5.1); phase 3 (structured-data crawler) is next.
 
 ## 1. Goal
 
@@ -47,7 +47,7 @@ apps/job_collector/src/
 │   ├── ats/                   # phase 3: greenhouse.ts, lever.ts, smartrecruiters.ts, ashby.ts…
 │   ├── jsonld-crawler/        # phase 4
 │   ├── aggregators/           # phase 5
-│   └── placeholders/          # site-crawler.ts, ai-source.ts, logged-in-bot.ts (5.7)
+│   └── placeholders/          # site-crawler.ts, ai-source.ts, logged-in-bot.ts (5.8)
 ├── pipeline/                  # normalize, validate, dedupe, enrich, upsert, close
 ├── catalogue/                 # ROME + ESCO import (phase 1)
 ├── companies/                 # company registry and ATS discovery
@@ -149,51 +149,66 @@ Example:
 
 | Phase | Connector | Kind | Status |
 |---|---|---|---|
-| 2 | France Travail — Offres d'emploi API | Official API | Planned |
-| 3 | Greenhouse, Lever, SmartRecruiters, Ashby, then others | Recruiting software (ATS) | Planned |
-| 4 | Structured-data crawler (`JobPosting`) | Crawler | Planned |
-| 5 | Aggregators and partner feeds (Adzuna…) | API / feed | To evaluate |
+| 2 | Greenhouse, Ashby, SmartRecruiters, Lever, then others + company discovery | Recruiting software (ATS) | Next |
+| 3 | Structured-data crawler (`JobPosting`) | Crawler | Planned |
+| 4 | Choisir le service public (weekly open data) | Open data file | Planned |
+| 4 | La bonne alternance (apprenticeship offers) | Public API | To evaluate (terms: non-profit use only) |
+| 5 | Aggregators and partner feeds (Adzuna, Jooble, Careerjet…) | API / feed | To evaluate (terms, descriptions often truncated) |
+| — | France Travail — Offres d'emploi API | Official API | **Blocked**: access closed since early 2026, request needed (§5.1) |
 | 6 | User-triggered browser extension | Ingestion endpoint | Planned |
-| — | Per-site crawlers, AI as a source, automated logged-in bots | Placeholders | Documented only (5.7) |
+| — | Per-site crawlers, AI as a source, automated logged-in bots | Placeholders | Documented only (5.8) |
 
-### 5.1 France Travail (phase 2)
+**Why several sources**: no single source covers the market, and any can close. In early 2026 France Travail withdrew its open offer API after massive reuse by AI services; it was meant to be our main source.
+
+### 5.1 France Travail (blocked)
+
+* **Status (2026-10-13)**: around January 2026 France Travail stopped exposing the Offres d'emploi API on its old domain while reviewing its reuse terms, after massive automated use by AI services that ignored the licence; organizations must now ask for access through the contact form on francetravail.io. Our credentials answer `invalid_client`. Next step: an access request explaining the use (job search service, offers displayed with attribution and a link to the original). The connector is built only once access is granted.
 
 * The official job-offer API (developer account on francetravail.io, OAuth2 "client credentials"; credentials in `FRANCE_TRAVAIL_CLIENT_ID` / `FRANCE_TRAVAIL_CLIENT_SECRET`). Free; covers all of France and includes offers from partner job boards; offers carry ROME codes, structured contract, salary and location data.
 * Collection: search by ROME code (IT first) and creation date, incremental (`minCreationDate` from the last cursor). Result windows per query are capped, so queries are split (by département, ROME code, date window) until each slice fits under the cap. **To verify at implementation**: exact paging limits, rate limits, and the terms of reuse (attribution, display, storage).
 * `isStillOpen`: offers missing from the source are re-checked by id before being closed.
 
-### 5.2 Recruiting software / ATS (phase 3)
+### 5.2 Recruiting software / ATS (phase 2)
 
 Many companies publish their openings through their ATS, with public endpoints intended for job boards: structured, clean, legal, and one adapter covers every company using the tool.
 
-* First adapters: **Greenhouse** (`boards-api.greenhouse.io/v1/boards/{company}/jobs`), **Lever** (`api.lever.co/v0/postings/{company}`), **SmartRecruiters** (`api.smartrecruiters.com/v1/companies/{id}/postings`), **Ashby** (`api.ashbyhq.com/posting-api/job-board/{org}`). Then Workable, Teamtailor, Recruitee, Welcome to the Jungle's ATS and others: **endpoints and terms to verify one by one**.
-* **Company registry** (`companies` + `company_sources`: company, ATS, slug, last run): which companies use which tool. Built from employer names seen in France Travail offers, lists of tech companies and large employers, the Sirene register (SIREN, address), and the career pages found by the crawler (which often reveal the ATS). This is a sub-project of its own; IT companies first.
+* First adapters: **Greenhouse** (`boards-api.greenhouse.io/v1/boards/{company}/jobs?content=true`), **Ashby** (`api.ashbyhq.com/posting-api/job-board/{org}?includeCompensation=true`), **SmartRecruiters** (`api.smartrecruiters.com/v1/companies/{id}/postings`, description in a second call per offer), **Lever** (`api.lever.co/v0/postings/{company}?mode=json`). Checked on 2026-10-13: Greenhouse (Datadog: 435 offers, 48 in Paris, full HTML descriptions), Ashby (Alan: 118 offers, 53 in Paris, full descriptions), SmartRecruiters (Ubisoft: 100+ offers, 34 in Paris) answer without authentication; Lever answers but the tested company had moved away — boards must be re-checked regularly. Then Workable, Teamtailor, Recruitee, Welcome to the Jungle's ATS and others: **endpoints and terms to verify one by one**.
+* **Company registry** (`companies` + `company_sources`: company, ATS, slug, last run): which companies use which tool. A sub-project of its own; IT companies first. Discovery sources:
+  * **Common Crawl's URL index** (public archive of the web): every crawled URL of `boards.greenhouse.io/*`, `jobs.ashbyhq.com/*`, `jobs.lever.co/*`, `jobs.smartrecruiters.com/*`, `*.recruitee.com`, `*.teamtailor.com`… gives company slugs. The public query API is often overloaded (it answered 504 on 2026-10-13); use the columnar index (Parquet files, queryable in bulk) instead.
+  * **Web Data Commons** (University of Mannheim): schema.org `JobPosting` data extracted from Common Crawl every year (about 50 000 websites in 2022), giving career pages that publish structured offers, and often the ATS behind them.
+  * Lists of tech companies and large employers; the Sirene register (SIREN, address) to identify companies.
+  * Each discovered board is checked (does it answer, does it have offers in France?) before being followed; boards with no French offer are re-checked monthly only.
 
-### 5.3 Structured-data crawler (phase 4)
+### 5.3 Structured-data crawler (phase 3)
 
 * Reads schema.org `JobPosting` (JSON-LD) from company career pages, the same data published for Google for Jobs. Generic: no per-site code.
 * Starts from the career-page URLs of the company registry and their sitemaps; follows only offer pages.
 * Respects `robots.txt`, crawl delays and a per-domain rate limit; uses the SSRF-safe fetcher of the API (`lib/safe-fetch.ts`, to be moved to a shared package).
 
-### 5.4 Aggregators and partner feeds (phase 5)
+### 5.4 Public-sector and apprenticeship sources (phase 4)
 
-* Aggregator APIs (e.g. Adzuna) and XML feeds that job boards provide to aggregators. Each one only if its terms allow storing and displaying the offers, with the required attribution and links back.
+* **Choisir le service public**: the public-sector job platform (about 350 000 offers a year, all three branches of the civil service) publishes its offers as open data on data.gouv.fr, refreshed weekly (CSV). Users report that the file has much less detail than the website; to measure before relying on it.
+* **La bonne alternance** (apprenticeship offers, searchable by ROME code and location, API on api.apprentissage.beta.gouv.fr): its terms reserve the API for non-profit use and cap results per source; to clarify before use.
 
-### 5.5 User-added offers (already built, O5)
+### 5.5 Aggregators and partner feeds (phase 5)
+
+* Aggregator APIs (Adzuna has a self-service key and covers France; Jooble, Careerjet, Talent.com need publisher approval) and XML feeds that job boards provide to aggregators. Each one only if its terms allow storing and displaying the offers, with the required attribution and links back. Known limits: descriptions are often excerpts, links go through the aggregator, salaries may be estimated (Adzuna flags them).
+
+### 5.6 User-added offers (already built, O5)
 
 * Private offers added by users. Later they go through the same contract and pipeline (deduplication with collected offers); when a connector collects the same URL, the offer becomes public (O5 rule).
 
-### 5.6 User-triggered browser extension (phase 6)
+### 5.7 User-triggered browser extension (phase 6)
 
 * A browser extension the user clicks on an offer page they are viewing ("save this offer"), including sites that require being logged in. One page, by the user, in their own session, like pasting the text in O5. It sends a `CollectedOffer` to the ingestion endpoint with the user's session; the offer is private to that user (O5).
 
-### 5.7 Placeholders (documented, not functional)
+### 5.8 Placeholders (documented, not functional)
 
 These connectors exist in `connectors/placeholders/` with the interface implemented and `schedule: null`: they collect nothing. They are kept so the design has a place for them; each needs a decision before being built.
 
 * **Per-site crawlers** (`site-crawler.ts`): code specific to one website, for high-value sites with no API, ATS or structured data. Conditions before building one: the site's terms allow it, `robots.txt` allows it, and the value justifies the maintenance (per-site code breaks when the site changes).
 * **AI as a source** (`ai-source.ts`): asking an AI model for offers ("IT jobs in Paris"). Not built because models don't have live offers and invent plausible ones (companies, URLs). If it is built later, the AI only **suggests leads** (companies, career pages, offer URLs), and every lead is verified by fetching the real page and extracting it with a real connector (5.2, 5.3) before anything is stored. Never stored directly.
-* **Automated logged-in bots** (`logged-in-bot.ts`): bots browsing sites that require an account (e.g. LinkedIn) and posting to the ingestion endpoint. Not built because these sites' terms forbid automated access, accounts get banned, and the EU database right and GDPR apply. The ingestion contract is ready for it; the user-triggered extension (5.6) covers the legitimate part of the idea.
+* **Automated logged-in bots** (`logged-in-bot.ts`): bots browsing sites that require an account (e.g. LinkedIn) and posting to the ingestion endpoint. Not built because these sites' terms forbid automated access, accounts get banned, and the EU database right and GDPR apply. The ingestion contract is ready for it; the user-triggered extension (5.7) covers the legitimate part of the idea.
 
 ## 6. Pipeline
 
@@ -245,8 +260,9 @@ To add with migrations when the collector starts (details settled in each phase)
   * **ROME 4.0**: France Travail's open data, all files in one zip (`https://api.francetravail.fr/api-nomenclatureemploi/v1/open-data/json`, Licence Ouverte 2.0; version 61 of June 2026 when imported). Files are **Windows-1252**; a few values are double-encoded and repaired. Each ROME occupation (1 911) gets its label and all its appellations (14 301) as French names, with masculine / feminine variants ("Développeur / Développeuse informatique" → "Développeur informatique", "Développeuse informatique") so that offer titles match; `parent_id` holds the hierarchy.
   * **ROME ↔ ESCO**: the official table published by Pôle emploi / France Travail on the ESCO portal (EURES mapping tables, `EURESmapping_occs_FR_v1.1.csv`, mapping v1.4 of July 2022, ESCO 1.1 ↔ ROME v3). It maps ROME **appellations** to ESCO occupations (exact / broad / narrow / close match); 99.9 % of its appellations still exist in ROME 4.0 (unknown ones are counted and skipped). Stored per (ROME occupation, ESCO occupation): `equivalent` if any appellation is an exact match, else `related` (2 626 links, 1 025 equivalent).
   * **ESCO** occupations and skills (French and English, preferred and alternative labels): the CSV package from the ESCO portal's download page (version 1.2.1, content "classification", languages fr and en, file type CSV; the link is sent by email, so this step is manual). Unzip the files into one folder (`data/esco/`, ignored by git) and pass `--esco data/esco`; the importer reads every `occupations_xx.csv` and `skills_xx.csv`.
-  * **Manual technical skills**: the hand-written list of the development seed (React, Node.js… which ESCO may lack), source `manual`.
-  * Downloads are cached in `data/catalogue/` (`--refresh` downloads again). `npm run db:seed` empties every table, catalogue included: run the import again after it.
+  * **Manual technical skills**: the hand-written list of the development seed, source `manual`, **only for skills ESCO doesn't have** (a manual skill is skipped when one of its names is an ESCO name). ESCO 1.2.1 lacks most current technology names: React, Node.js, Docker, Kubernetes, Vue.js, GraphQL, AWS, Terraform, Power BI… (it has JavaScript, TypeScript, PostgreSQL, Python, SQL, Git, Angular, Java, PHP, Scrum, DevOps). On 2026-10-13: 37 manual skills added, 28 already in ESCO. **The IT technology list must keep growing** (phase 2: from the skill labels France Travail gives and the unmatched terms the pipeline logs).
+  * Imported on 2026-10-13: ESCO 1.2.1 — 3 039 occupations (50 079 names) and 13 939 skills (120 903 names) in French and English; 3 ESCO occupations of the 2022 correspondence no longer exist in 1.2.1 (kept with their French name).
+  * Downloads are cached in `data/catalogue/` (`--refresh` downloads again). `npm run db:seed` empties every table, catalogue included: run the import again after it. Tests (`npm test`) use their own database, so they leave the catalogue and collected data alone.
 * Resume matching (M2) also links resumes to ROME occupations through the correspondence.
 
 ## 9. Measuring coverage and quality
@@ -278,17 +294,17 @@ The coverage sample tells us which sources to add next.
 
 | Phase | Content | Done when |
 |---|---|---|
-| **1. Foundations** | `apps/job_collector` skeleton, pg-boss, connector interface, ingestion contract (shared), pipeline stages, `offer_sources` / `raw_offers` / `collector_runs` / `companies`, **ROME + ESCO import**, placeholders (5.7), metrics views | A fake connector's offers go through the whole pipeline with deduplication and enrichment; catalogue imported |
-| **2. France Travail** | Connector, IT ROME codes, all of France, incremental sync, closing expired offers | IT offers of all France collected daily; first metrics on the evaluation slice |
-| **3. ATS** | Greenhouse, Lever, SmartRecruiters, Ashby adapters; company registry and discovery (IT companies first) | Coverage and duplicates measured against phase 2 |
-| **4. Structured-data crawler** | `JobPosting` crawler on registry career pages | Same |
-| **5. Aggregators / feeds** | Sources whose terms fit | Same |
+| **1. Foundations** | `apps/job_collector` skeleton, pg-boss, connector interface, ingestion contract (shared), pipeline stages, `offer_sources` / `raw_offers` / `collector_runs` / `companies`, **ROME + ESCO import**, placeholders (5.8), metrics views | A fake connector's offers go through the whole pipeline with deduplication and enrichment; catalogue imported |
+| **2. ATS + discovery** | Greenhouse, Ashby, SmartRecruiters, Lever adapters (full sync per board, closing offers that disappear); company registry fed by Common Crawl / Web Data Commons discovery; IT companies with offers in France first | IT offers of the discovered companies collected daily; first metrics on the evaluation slice |
+| **3. Structured-data crawler** | `JobPosting` crawler on registry career pages | Coverage and duplicates measured against phase 2 |
+| **4. Public sector / apprenticeship** | Choisir le service public (weekly file); La bonne alternance if its terms allow | Same |
+| **5. Aggregators / feeds** | Sources whose terms fit; France Travail if access is granted | Same |
 | **6. Browser extension** | Ingestion endpoint + extension (separate project) | Offers saved from any page by users |
 | Later | Other occupations than IT; placeholders if a decision is taken | |
 
 ## 12. Open questions
 
-1. France Travail credentials: the token request answers `invalid_client` (2026-10-13) — check the application on francetravail.io (credentials copied correctly, application activated, API "Offres d'emploi v2" subscribed).
+1. France Travail: the offer API is closed to new users since early 2026; send an access request through francetravail.io (use: job search service with attribution and links to the original offers).
 2. France Travail terms of reuse: attribution and display rules to confirm before showing their offers.
 3. Which ATS tools are most used by IT companies in France: to measure on the company registry before choosing adapters after the first four.
 4. Hosting: the collector runs continuously (worker) — where and how it is deployed is part of production readiness.
@@ -301,8 +317,23 @@ The coverage sample tells us which sources to add next.
 * **Ingestion endpoint**: `POST /api/collector/ingest`, Bearer token per source (`npm run collector -- token <source> <name>`, shown once, stored hashed), ≤ 100 offers per request (body ≤ 5 MB), 120 requests/minute per token, an offer's `source` must be its token's source, answers `202` with a result per offer; accepted offers go to the `collector-ingest` queue.
 * **Queues and schedules**: pg-boss 12 in the `pgboss` schema (not managed by Prisma, no drift). Queues `collector-run`, `collector-ingest`, `collector-maintenance` (daily 03:30). The API's connection only sends jobs.
 * **Pipeline** (`pipeline/process.ts`), every stage tested: raw stored (unchanged content = only "seen"), contract validated, HTML → Markdown, emails and phone numbers removed, company (SIREN, else normalized name, legal forms removed), location (city via the table then Geoapify, else département from the code or the postcode, else country), fingerprint, deduplication (same source → same URL or apply URL → fingerprint + publication within 14 days + description similarity ≥ 0.5), occupations (ROME codes or ESCO URIs from the source, else the title; completed with their ROME ↔ ESCO links), skills (source labels and dictionary matching), language (source, else stop-word detection), quality score, upsert with per-source priority (ATS 5 > API 4 > crawler 3 > aggregator 2 > ingest 1 > user-added/placeholder 0; the salary is taken as one group), closing when all sources dropped an offer and reopening when one publishes it again, daily expiry.
-* **Catalogue matcher** (`@job/backend`, `catalogue/matcher.ts`): offers' skills and occupations are found by looking up token groups ("node.js", "c#" and ".net" stay whole) in an index of every name; 42 000 names load in under a second, a title is matched in a few milliseconds. Very ambiguous words (go, c, r, swift…) are only matched when a source gives them as a skill label. Also used for user-added offers (O5).
-* **Placeholders**: `site-crawler`, `ai-source`, `logged-in-bot` (§5.7), registered, collecting nothing.
+* **Catalogue matcher** (`@job/backend`, `catalogue/matcher.ts`): offers' skills and occupations are found by looking up token groups ("node.js", "c#" and ".net" stay whole; hyphens separate words, so ROME's "full-stack" matches "Full Stack") in an index of every name; the full catalogue (~210 000 names) loads in under 2 s, a text is matched in a few milliseconds. Very ambiguous words (go, c, r, swift…) are only matched when a source gives them as a skill label; short all-capital names (ESCO acronyms such as "AVEC", "PAP", "MDM") only match when written in capitals ("avec" is a French word). Known noise: a few single-word ESCO skills are ordinary words ("politique"); to handle in phase 2 (frequency check or AI). Also used for user-added offers (O5).
+* **Placeholders**: `site-crawler`, `ai-source`, `logged-in-bot` (§5.8), registered, collecting nothing.
 * **Commands**: `npm run collector:start` (worker), `npm run collector -- catalogue | run <connector> | maintenance | metrics | token <source> <name> | contract`.
 
 Not in phase 1 (planned with the first real sources): AI for missing fields and uncertain duplicates, removing recruiter names (needs AI), `isStillOpen` checks and full-sync closing (connector-specific), the company registry's discovery.
+
+## 14. Phase 2 — what was built
+
+* **Adapters** (`apps/job_collector/src/ats/adapters/`): Greenhouse, Ashby, Lever and Lever EU (`api.eu.lever.co`, a separate instance), SmartRecruiters. Each one `check`s a board (exists? offers? offers in France?) and `collect`s **its offers located in France only** (country field when the tool gives one, else the location text: France, Île-de-France, French cities), mapped to the ingestion contract. Contract and remote types only from explicit signals (CDI/CDD/stage/alternance/freelance words, the tool's own fields); "full time" alone leaves the contract empty. Salaries when published (Ashby, Lever). Greenhouse descriptions are entity-encoded HTML and are decoded; SmartRecruiters needs one detail request per offer.
+* **One connector per tool** (`ats/connector.ts`), every 6 hours, collects the `active` boards. Each board is a **full sync**: after a successful read, the board's offers that disappeared are closed; a failing board closes nothing (error kept in `company_sources.last_error`); a board that answers 404 becomes `invalid`.
+* **Discovery** (`discovery/common-crawl.ts`, `npm run collector -- discover [--ats …] [--pages N]`, monthly in the worker): Common Crawl's URL index, read page by page with pauses and retries; candidates saved after each URL prefix (a busy index answering 502 doesn't lose what was found). Board ids that only differ by letter case ("AbbVie" / "abbvie") are one board.
+* **Board checks** (`discovery/check-boards.ts`, `npm run collector -- boards check [--ats X] [--limit N]`, nightly batch of 500): statuses `candidate` → `active` (offers in France; its company is created) / `no-france` / `empty` / `invalid` / `duplicate`; re-checked after 7 days (active), 30 (no-france, empty), 90 (invalid). `boards add <ats> <slug>` adds a board by hand, `boards list` counts them.
+* **Runs** interrupted by a stopped process are closed as failed by the next run of the connector.
+
+**First real run (2026-10-13)**, discovery limited to 2 index pages per tool: 2 620 candidate boards (Greenhouse 1 060, SmartRecruiters 857, Ashby 612, Lever EU 64, Lever 27). On a sample of 187 checked boards, 33 had offers in France — SmartRecruiters 16/40, Lever EU 7/40, Lever 6/27, Greenhouse 2/40, Ashby 2/40 (Common Crawl is worldwide; Greenhouse also has many boards that moved away). Those 33 boards announced 2 343 offers in France, mostly two SmartRecruiters boards (Accor 935, ALTEN 711). Collection: about 0.5 s per offer with SmartRecruiters (detail request + pipeline).
+
+**Observations for the next steps**
+* Most offers of followed companies are not IT (e.g. hotel jobs at Accor): collecting every French offer is consistent with the long-term goal, but the IT evaluation slice needs a filter by occupation (ROME M18) in the metrics, and discovery could favour IT companies first.
+* Full discovery (all index pages) should give thousands of boards per tool; at ~10–40 % with offers in France, a few hundred French boards per tool.
+* Tests must never touch real boards: the ATS tests are scoped to their own `test-` boards and run records (an earlier version marked 402 real boards invalid — repaired). A separate test database remains the real fix (production readiness).

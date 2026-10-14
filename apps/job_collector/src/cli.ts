@@ -3,13 +3,20 @@
 //   run <connector>                           run one connector now
 //   maintenance                               close expired offers
 //   metrics                                   coverage and quality numbers
+//   discover [--ats greenhouse,ashby] [--pages N] [--crawl CC-MAIN-…]   find boards in Common Crawl
+//   boards check [--ats X] [--limit N]        check candidate / due boards
+//   boards add <ats> <slug>                   add a board by hand (checked right away)
+//   boards list [--status S]                  boards by tool and status
 //   token <source> <name>                     create a token for POST /api/collector/ingest
 //   contract                                  the ingestion contract as JSON Schema
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@job/backend";
 import { collectedOfferJsonSchema } from "@job/shared";
+import { atsAdapters, findAdapter } from "./ats/registry";
 import { importCatalogue } from "./catalogue/import";
 import { connectors, findConnector } from "./connectors/registry";
+import { checkBoard, checkBoards } from "./discovery/check-boards";
+import { discoverBoards } from "./discovery/common-crawl";
 import { collectorMetrics } from "./metrics";
 import { runMaintenance } from "./pipeline/close";
 import { runConnector } from "./runs/run-connector";
@@ -31,6 +38,39 @@ async function main() {
       await runConnector(connector);
       break;
     }
+    case "discover": {
+      const names = option(args, "--ats")?.split(",") ?? atsAdapters.map((adapter) => adapter.ats);
+      const pages = option(args, "--pages");
+      for (const name of names) {
+        const adapter = findAdapter(name);
+        if (!adapter) throw new Error(`Unknown ATS "${name}". Known: ${atsAdapters.map((item) => item.ats).join(", ")}`);
+        await discoverBoards(adapter, { crawl: option(args, "--crawl"), maxPages: pages ? Number(pages) : undefined });
+      }
+      break;
+    }
+    case "boards": {
+      const [action, ...rest] = args;
+      if (action === "check") {
+        const limit = option(rest, "--limit");
+        await checkBoards({ ats: option(rest, "--ats"), limit: limit ? Number(limit) : undefined });
+      } else if (action === "add") {
+        const [ats, slug] = rest;
+        if (!ats || !slug || !findAdapter(ats)) throw new Error(`Usage: boards add <${atsAdapters.map((item) => item.ats).join("|")}> <slug>`);
+        const board = await prisma.companySource.upsert({
+          where: { ats_slug: { ats, slug } },
+          create: { ats, slug, status: "candidate", discoveredFrom: "manual" },
+          update: {},
+        });
+        console.log(`${ats}/${slug}:`, await checkBoard(board));
+      } else if (action === "list") {
+        const status = option(rest, "--status");
+        const rows = await prisma.companySource.groupBy({ by: ["ats", "status"], _count: true, where: status ? { status } : {}, orderBy: [{ ats: "asc" }, { status: "asc" }] });
+        for (const row of rows) console.log(`${row.ats.padEnd(16)} ${row.status.padEnd(10)} ${row._count}`);
+      } else {
+        throw new Error("Usage: boards check|add|list");
+      }
+      break;
+    }
     case "maintenance":
       console.log(await runMaintenance());
       break;
@@ -49,7 +89,7 @@ async function main() {
       console.log(JSON.stringify(collectedOfferJsonSchema(), null, 2));
       break;
     default:
-      console.log("Commands: catalogue [--esco <folder>] [--refresh] | run <connector> | maintenance | metrics | token <source> <name> | contract");
+      console.log("Commands: catalogue [--esco <folder>] [--refresh] | discover [--ats …] [--pages N] | boards check|add|list | run <connector> | maintenance | metrics | token <source> <name> | contract");
       process.exitCode = command ? 1 : 0;
   }
 }

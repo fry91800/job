@@ -474,7 +474,7 @@ All three are applied (migration `check_constraints`).
 
 ## Development seed (`prisma/seed/`)
 
-Run with `npm run db:seed`. It **truncates every table** (except `_prisma_migrations`), **empties the local file storage** (`STORAGE_LOCAL_DIR`) and inserts a fixed data set; it refuses to run with `NODE_ENV=production`. Contents are listed in `README.md` (*Development data*).
+Run with `npm run db:seed`. It **truncates every table** (except `_prisma_migrations`), **empties the local file storage** (`STORAGE_LOCAL_DIR`) and inserts a fixed data set; it refuses to run with `NODE_ENV=production`. Contents are listed in `README.md` (*Development data*). `npm test` runs it on the separate test database (`job_test`), never on the development one.
 
 | File | Contents |
 |---|---|

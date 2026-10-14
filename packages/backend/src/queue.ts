@@ -8,10 +8,12 @@ export const QUEUES = {
   run: "collector-run", // { connector }
   ingest: "collector-ingest", // { offers }
   maintenance: "collector-maintenance",
+  boards: "collector-boards", // { action: "discover" | "check" }
 } as const;
 
 export type RunJob = { connector: string };
 export type IngestJob = { offers: CollectedOffer[] };
+export type BoardsJob = { action: "discover" | "check" };
 
 // `sendOnly`: for processes that only send jobs (the API): no maintenance or scheduling,
 // which the collector's worker does.

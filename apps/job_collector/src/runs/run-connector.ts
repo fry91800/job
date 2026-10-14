@@ -10,6 +10,12 @@ export type RunCounts = Record<"received" | "created" | "updated" | "merged" | "
 
 export async function runConnector(connector: Connector, options: { signal?: AbortSignal; log?: (message: string) => void } = {}) {
   const log = options.log ?? ((message: string) => console.log(`[${connector.key}] ${message}`));
+  // A run whose process was stopped (deploy, crash, timeout) stays "running": the next
+  // run of the same connector closes it as interrupted.
+  await prisma.collectorRun.updateMany({
+    where: { connector: connector.key, status: "running" },
+    data: { status: "failed", finishedAt: new Date(), error: "interrupted (the process stopped before the end)" },
+  });
   const previous = await prisma.collectorRun.findFirst({
     where: { connector: connector.key, status: "succeeded" },
     orderBy: { startedAt: "desc" },
