@@ -1,6 +1,6 @@
 # Frontend (`apps/web`) — plan, version 1
 
-The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **steps 1–2 done** (§9), step 3 next.
+The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **steps 1–3 done** (§9), step 4 next.
 
 ## 1. Goals
 
@@ -150,4 +150,15 @@ Smoothness is a requirement, checked like a feature:
 * Speed, measured on the production build (`npm run web:build`, `npx vite preview apps/web` on port 5175) with the real database: results visible about 0.75 s after a cold page load; opening an offer 60–95 ms (first of the session 130–180 ms); 208 KB of compressed JavaScript at first load. The offer tab is part of the first load (a lazy view waits one round on first display); other views' code is fetched when the page is idle.
 * Web unit tests run with Vitest (`npm test` runs them after the server tests): tabs, search address, Markdown parsing.
 * Seen with real data, outside the frontend: on English offers the skill matching adds noise (e.g. "Recruitment", "rhetoric", "Scratch (computer programming)", a skill shown twice) — to fix in the collector's matcher; it also weighs on the match %.
+
+**Step 3 — accounts (2026-10-16)**:
+* One dialog for log in, sign up, forgotten password and new password (`src/auth/`): fields checked with the API's shared rules (email, 10-character password) before sending; API errors translated under the form (wrong password, address taken, too many attempts, invalid link…). Signing up as a guest keeps the guest's data; logging in merges it (FEATURE A2, done by the API).
+* After a login, sign-up or logout, every user-dependent answer is fetched again (saved stars, match %…).
+* Account menu: log in / sign up for visitors and guests; the address, a dot and "Resend the confirmation email" while it is unconfirmed, log out, log out everywhere, for accounts; theme and language for everyone.
+* Guest reminder (FEATURE G1): guests (who exist once they saved something) see a small banner at the bottom of the sidebar; dismissed for a week.
+* Email links: `/reset-password?token=…` opens the new password dialog, `/verify-email?token=…` confirms the address (each token used once); the address then goes back to the workspace. The API builds these links from `WEB_BASE_URL`: set it to `http://localhost:5174` to use the web app (default: the test client, 5173).
+* Language: an account's language is adopted on login and on a new device; choosing a language saves it to the account.
+* Short confirmations as toasts (bottom right, read by screen readers).
+* Change password and delete the account come with the Settings tab (step 6).
+* Checked end to end in a headless browser against an API on the test database (emails read from MailHog): wrong password, login, logout, guest reminder, sign-up keeping a saved offer, email confirmation link, forgotten password link, account language. Lesson: browser checks must use their own ports (5176 here) — a check that reuses a running 5174 talks to the developer's own API and database.
 

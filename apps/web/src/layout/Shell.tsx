@@ -5,6 +5,9 @@ import { useLocation, useNavigate } from "react-router";
 import { useTabsStore } from "../tabs/store";
 import { useAddressSync, useWorkspace } from "../tabs/workspace";
 import { preloadViews, VIEWS } from "../views/registry";
+import { AuthDialog } from "../auth/AuthDialog";
+import { useAccountLanguage } from "../auth/session";
+import { Toaster } from "../lib/toast";
 import { ConfirmCloseDialog } from "./close-tabs";
 import { IconButton } from "./IconButton";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "./menu";
@@ -85,10 +88,13 @@ export function Shell() {
   const phone = usePhone();
   useAddressSync(phone);
   useEffect(preloadViews, []);
+  useAccountLanguage();
   return (
     <>
       {phone ? <Phone /> : <Desktop />}
       <ConfirmCloseDialog />
+      <AuthDialog />
+      <Toaster />
     </>
   );
 }

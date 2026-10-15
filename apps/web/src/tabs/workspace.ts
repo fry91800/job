@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { handleEmailLink } from "../auth/email-links";
 import { tabFromPath, tabPath, type Tab, type TabRef } from "./model";
 import { useTabsStore } from "./store";
 
@@ -15,6 +16,11 @@ export function useAddressSync(isPhone: boolean): void {
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
+    // Links from the account emails: handled, then back to the workspace.
+    if (handleEmailLink(location.pathname, location.search)) {
+      navigate({ pathname: "/" }, { replace: true });
+      return;
+    }
     const ref = tabFromPath(location.pathname);
     if (ref) {
       useTabsStore.getState().ensure(ref);

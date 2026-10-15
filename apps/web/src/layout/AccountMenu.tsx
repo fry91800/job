@@ -1,38 +1,69 @@
-import { ChevronDown, CircleUser } from "lucide-react";
+import { ChevronDown, CircleUser, MailWarning } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { LANGUAGES, setLanguage, type Language } from "../i18n";
+import { useMe } from "../api/queries";
+import { chooseLanguage, useAuthDialog, useLogout, useResendVerification } from "../auth/session";
+import { LANGUAGES, type Language } from "../i18n";
+import { errorMessage } from "../lib/errors";
+import { toast } from "../lib/toast";
 import { THEMES, useTheme } from "../theme/theme";
 import { MenuChoice, MenuContent, MenuItem, MenuLabel, MenuRoot, MenuSeparator, MenuTrigger } from "./menu";
 
-// Account menu (FRONTEND.md §2.1). Logging in and signing up come with step 3; until then
-// everyone is a guest.
+// Account menu (FRONTEND.md §2.1): log in / sign up for visitors and guests; the address,
+// its confirmation and logging out for accounts; theme and language for everyone.
 export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
+  const user = useMe().data?.user ?? null;
+  const openAuth = useAuthDialog((state) => state.open);
+  const logout = useLogout();
+  const resend = useResendVerification();
+  const registered = user !== null && !user.isGuest;
+  const unverified = registered && !user.emailVerified;
+
   return (
     <MenuRoot>
       <MenuTrigger asChild>
         <button
           type="button"
           aria-label={t("account.menu")}
-          className="flex h-8 items-center gap-1.5 rounded-control px-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg data-[state=open]:bg-hover"
+          className="relative flex h-8 min-w-0 items-center gap-1.5 rounded-control px-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg data-[state=open]:bg-hover"
         >
-          <CircleUser size={18} strokeWidth={1.75} />
+          <CircleUser size={18} strokeWidth={1.75} className={registered ? "text-accent" : ""} />
+          {unverified && <span className="absolute left-5 top-1 size-2 rounded-full border-2 border-sidebar bg-warning" />}
           {!compact && (
             <>
-              <span>{t("account.guest")}</span>
-              <ChevronDown size={14} />
+              <span className="max-w-28 truncate">{registered ? user.email : t("account.guest")}</span>
+              <ChevronDown size={14} className="shrink-0" />
             </>
           )}
         </button>
       </MenuTrigger>
       <MenuContent align="end">
-        <MenuItem disabled>
-          {t("account.logIn")} <span className="ml-auto text-xs">{t("account.soon")}</span>
-        </MenuItem>
-        <MenuItem disabled>
-          {t("account.signUp")} <span className="ml-auto text-xs">{t("account.soon")}</span>
-        </MenuItem>
+        {registered ? (
+          <>
+            <MenuLabel>{t("account.signedInAs")}</MenuLabel>
+            <div className="truncate px-2 pb-1.5 text-sm">{user.email}</div>
+            {unverified && (
+              <MenuItem
+                onSelect={() =>
+                  resend.mutate(undefined, {
+                    onSuccess: () => toast(t("auth.verificationSent")),
+                    onError: (error) => toast(errorMessage(t, error), "error"),
+                  })
+                }
+              >
+                <MailWarning size={14} className="text-warning" /> {t("auth.resendVerification")}
+              </MenuItem>
+            )}
+            <MenuItem onSelect={() => logout.mutate(false, { onSuccess: () => toast(t("auth.done.logout"), "info") })}>{t("account.logOut")}</MenuItem>
+            <MenuItem onSelect={() => logout.mutate(true, { onSuccess: () => toast(t("auth.done.logoutAll"), "info") })}>{t("account.logOutAll")}</MenuItem>
+          </>
+        ) : (
+          <>
+            <MenuItem onSelect={() => openAuth("login")}>{t("account.logIn")}</MenuItem>
+            <MenuItem onSelect={() => openAuth("signup")}>{t("account.signUp")}</MenuItem>
+          </>
+        )}
         <MenuSeparator />
         <MenuLabel>{t("account.theme")}</MenuLabel>
         <MenuChoice value={theme} options={THEMES.map((value) => ({ value, label: t(`account.themes.${value}`) }))} onChange={setTheme} />
@@ -41,7 +72,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
         <MenuChoice
           value={i18n.language as Language}
           options={LANGUAGES.map((value) => ({ value, label: value === "fr" ? "Français" : "English" }))}
-          onChange={setLanguage}
+          onChange={chooseLanguage}
         />
       </MenuContent>
     </MenuRoot>

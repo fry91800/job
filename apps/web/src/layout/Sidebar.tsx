@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { TabKind } from "../tabs/model";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
+import { GuestReminder } from "../auth/GuestReminder";
 import { ResultList } from "../search/ResultList";
 import { SearchBlock } from "../search/SearchBlock";
 import { AccountMenu } from "./AccountMenu";
@@ -96,6 +97,7 @@ export function Sidebar({ phone = false }: { phone?: boolean }) {
       </div>
       <SearchBlock />
       <ResultList />
+      <GuestReminder />
       {!phone && <ResizeHandle />}
     </aside>
   );
