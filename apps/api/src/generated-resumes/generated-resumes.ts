@@ -20,7 +20,7 @@ import { prisma } from "../lib/prisma";
 import { visibleOfferWhere } from "../offers/offer-access";
 import { photoDataUrl } from "../photos/photos";
 import { saveOffer } from "../saved-offers/saved-offers";
-import { availableTemplate } from "../settings/settings";
+import { availableTemplate, modifierSections } from "../settings/settings";
 import { renderPdf } from "../templates/pdf";
 import { renderResumeHtml } from "../templates/render";
 import { applyChanges, ChangeSetError, computeChanges, markEditedChanges, setChangeStatus } from "./change-set";
@@ -96,12 +96,21 @@ export async function generateResume(user: SessionUser, input: GenerateInput, ip
   // The settings are the defaults; the request may override them once (M1).
   const modifierEnabled = input.modifierEnabled ?? settings.modifierEnabled;
   const strength = input.modifierStrength ?? (settings.modifierStrength as ModifierStrength);
-  const sections = input.modifierConfig ?? (settings.modifierConfig as ModifierConfig);
+  // The sections come from the strength, or from the user's choice when users choose them.
+  const userChoice = input.modifierConfig ?? (settings.modifierConfig as ModifierConfig);
+  const sections = modifierSections(strength, userChoice);
   if (input.remember) {
-    await prisma.user.update({ where: { id: user.id }, data: { modifierEnabled, modifierStrength: strength, modifierConfig: sections } });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { modifierEnabled, modifierStrength: strength, ...(config.modifier.userChoosesSections && { modifierConfig: userChoice }) },
+    });
   }
   if (modifierEnabled && enabledSections(sections).length === 0) {
-    throw new HttpError(400, "no_section_selected", "Choose at least one section the AI may modify");
+    throw new HttpError(
+      400,
+      "no_section_selected",
+      config.modifier.userChoosesSections ? "Choose at least one section the AI may modify" : "No section can be modified at this strength",
+    );
   }
 
   const resumeId = input.resumeId ?? settings.selectedResumeId;

@@ -10,6 +10,7 @@ import {
   type ResumeDetail,
   type SavedOfferListResponse,
   type Settings,
+  type SettingsResponse,
   type TemplateListResponse,
 } from "@job/shared";
 import type { AiJsonRequest } from "../ai/provider";
@@ -18,8 +19,13 @@ import { prisma, seedOfferId, startTestServer, TestClient, TEST_PASSWORD, unique
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
+// The tests' own strength → sections mapping (the real one is a configuration).
+const TEST_SECTIONS = { soft: { summary: true }, medium: { summary: true, title: true }, hard: { summary: true, skills: true } };
+
 before(async () => {
   server = await startTestServer();
+  config.modifier.userChoosesSections = false;
+  config.modifier.sectionsByStrength = structuredClone(TEST_SECTIONS);
 });
 after(() => server.close());
 
@@ -172,7 +178,7 @@ describe("settings and templates (S1, S2)", () => {
 
   test("update settings; unknown templates and config keys are rejected", async () => {
     const client = server.client();
-    const updated = await client.patch<Settings>("/api/settings", {
+    const updated = await client.patch<SettingsResponse>("/api/settings", {
       modifierEnabled: true,
       modifierStrength: "hard",
       modifierConfig: { summary: true, projects: true },
@@ -180,7 +186,9 @@ describe("settings and templates (S1, S2)", () => {
     });
     assert.equal(updated.status, 200, "creates a guest");
     assert.equal(updated.body.modifierStrength, "hard");
-    assert.deepEqual(updated.body.modifierConfig, { summary: true, projects: true });
+    assert.deepEqual(updated.body.modifierConfig, TEST_SECTIONS.hard, "the strength decides the sections");
+    assert.equal(updated.body.modifierSectionChoice, false);
+    assert.deepEqual(updated.body.modifierSectionsByStrength, TEST_SECTIONS);
     assert.equal((await client.get<Settings>("/api/settings")).body.templateId, 2);
 
     assert.equal((await client.patch("/api/settings", { templateId: 999 })).status, 400);
@@ -299,14 +307,47 @@ describe("generation with the modifier (M1) and change review (M4)", () => {
     assert.deepEqual(body.changes, []);
   });
 
-  test("needs at least one section; `remember` saves the overrides as defaults", async () => {
+  test("the strength decides the sections; a strength with none is refused", async () => {
     const { client } = await userWithResume("fr", "Développeuse web.");
-    const none = await generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierConfig: {} });
-    assert.equal(none.body.error.code, "no_section_selected");
+    // The user's own choice is ignored while the strength decides.
+    const { body } = await server.ai.with("generate-resume", () => ({ summary: "Résumé réécrit." }), () =>
+      generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierStrength: "soft", modifierConfig: { projects: true } }),
+    );
+    assert.deepEqual(body.modifierConfig, TEST_SECTIONS.soft);
+    assert.deepEqual(Object.keys((server.ai.requests.at(-1)!.jsonSchema as any).properties), ["summary"]);
 
+    config.modifier.sectionsByStrength.medium = {};
+    try {
+      const none = await generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierStrength: "medium" });
+      assert.equal(none.body.error.code, "no_section_selected");
+    } finally {
+      config.modifier.sectionsByStrength.medium = TEST_SECTIONS.medium;
+    }
+  });
+
+  test("users choose the sections when the configuration allows it; `remember` saves them", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
+    config.modifier.userChoosesSections = true;
+    try {
+      const none = await generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierConfig: {} });
+      assert.equal(none.body.error.code, "no_section_selected");
+
+      const { body } = await server.ai.with("generate-resume", () => ({ summary: "Résumé réécrit." }), () =>
+        generate(client, { offerId: frenchOffer, modifierEnabled: true, modifierStrength: "hard", modifierConfig: { summary: true }, remember: true }),
+      );
+      assert.deepEqual(body.modifierConfig, { summary: true });
+      const settings = (await client.get<SettingsResponse>("/api/settings")).body;
+      assert.deepEqual([settings.modifierEnabled, settings.modifierStrength, settings.modifierConfig, settings.modifierSectionChoice], [true, "hard", { summary: true }, true]);
+    } finally {
+      config.modifier.userChoosesSections = false;
+    }
+  });
+
+  test("`remember` saves the strength as the default", async () => {
+    const { client } = await userWithResume("fr", "Développeuse web.");
     await server.ai.with("generate-resume", proposal, () => generate(client, { offerId: frenchOffer, ...modifier, remember: true }));
-    const settings = (await client.get<Settings>("/api/settings")).body;
-    assert.deepEqual([settings.modifierEnabled, settings.modifierStrength, settings.modifierConfig], [true, "hard", { summary: true, skills: true }]);
+    const settings = (await client.get<SettingsResponse>("/api/settings")).body;
+    assert.deepEqual([settings.modifierEnabled, settings.modifierStrength, settings.modifierConfig], [true, "hard", TEST_SECTIONS.hard]);
   });
 
   test("AI failures save nothing and use no quota", async () => {

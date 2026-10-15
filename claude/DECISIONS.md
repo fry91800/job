@@ -329,6 +329,12 @@ Full plan in `COLLECTOR.md`.
 | D132 | Keyword search: each word is a union of offer ids from indexed lookups (title ILIKE / word similarity, company ILIKE, offers linked to occupations whose name matches); trigram index on `occupation_names.name`; French/English stop words and H/F markers ignored | With 35 000 offers the OR form was evaluated offer by offer: 2–3 s per word, 26 s for "chef de projet"; now 50–450 ms with the same results |
 | D133 | Offer search is sorted by relevance by default (keyword and skill matches first, then most recent); "recent" stays available | Keyword matches through linked occupations are broad; with date order, loosely related offers came first |
 
+## Update 28 — modifier sections follow the strength (2026-10-16)
+
+| ID | Decision | Why |
+|---|---|---|
+| D134 | The strength decides which resume sections the AI may rewrite (`config.modifier.sectionsByStrength`: soft = summary, skills; medium = + title, work experience; hard = + projects). `config.modifier.userChoosesSections: true` restores the per-user choice (still stored); generated resumes keep recording the sections actually used; GET /api/settings returns the mapping and whether users choose | One choice (the strength) instead of two keeps generation simple for users; the mapping stays easy to tune and the old behaviour one switch away |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

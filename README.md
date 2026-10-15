@@ -19,7 +19,7 @@ Done:
 Postponed:
 
 * Job collector (`apps/job_collector`, plan in `COLLECTOR.md`): phase 1 (pipeline, deduplication, ingestion endpoint, ROME + ESCO catalogue) and phase 2 (Greenhouse, Ashby, Lever, SmartRecruiters adapters with company discovery from Common Crawl) done. France Travail's offer API is closed to new users. The development seed still provides the test offers.
-* Full frontend (`apps/web`): built after the API. Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
+* Full frontend (`apps/web`): planned in `FRONTEND.md` (workspace with a search sidebar and tabs, light and dark themes); step 1 (layout, tabs, themes, languages) done. Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
 
 ## Planned features
 
@@ -151,6 +151,7 @@ Other scripts:
 
 * `npm run api:dev` — start the API on http://localhost:3000 (restarts on change)
 * `npm run client:dev` — start the test client on http://localhost:5173 (needs the API running); it proxies `/api` to the API
+* `npm run web:dev` — start the real frontend (`apps/web`, in progress, see FRONTEND.md) on http://localhost:5174; it proxies `/api` to the API's port (`PORT` in `.env`). `npm run web:build` builds it
 * `npm test` — all tests (shared, API, collector), against their own database `job_test` (created on first run, migrated and reseeded on every run) and storage folder `storage-test`, with the fake AI provider: development data is never touched. `npm test -- path/to/file.test.ts` runs only some files. Running a test file directly against the development database is refused
 * `npm run ai:check` — one tiny request to the configured AI provider/model (checks the key, the model and the latency; uses one request of the quota)
 * `npm run collector -- catalogue [--esco data/esco]` — import the ROME + ESCO catalogue (run again after `db:seed`, which empties it; see COLLECTOR.md §8.1)
@@ -323,5 +324,6 @@ The project aims to remain simple and modular.
 * `FEATURE.md` — MVP feature specification
 * `DATABASE.md` — Database design, JSON formats, search rules
 * `COLLECTOR.md` — Job collector plan: sources, ingestion contract, pipeline, phases
+* `FRONTEND.md` — Plan of the real frontend: layout, tabs, style, smoothness, technical choices
 * `claude/DECISIONS.md` — Decision log
 * `prisma/schema.prisma` — Draft Prisma schema

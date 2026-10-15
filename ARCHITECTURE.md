@@ -20,7 +20,7 @@ Layout: `src/api.ts` (fetch wrapper that feeds the request log panel), `src/App.
 
 ### Web *(later)*
 
-The `web` application is the complete React SPA, built after the API. The responsibilities below, i18n (FEATURE L1) and the UI details in `FEATURE.md` apply to it, not to the test client.
+The `web` application is the complete React SPA, built after the API; its plan (workspace layout, tabs, style, technical choices) is in `FRONTEND.md`. The responsibilities below, i18n (FEATURE L1) and the UI details in `FEATURE.md` apply to it, not to the test client.
 
 Responsibilities:
 

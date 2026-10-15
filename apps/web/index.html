@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Job</title>
+    <script>
+      // Theme applied before the first paint (no flash of the wrong theme). Same rule as
+      // src/theme/theme.ts: the saved choice, else the system's.
+      (function () {
+        var choice = "system";
+        try { choice = localStorage.getItem("job.theme") || "system"; } catch (e) {}
+        var dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

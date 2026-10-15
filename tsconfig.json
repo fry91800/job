@@ -10,5 +10,5 @@
     "types": ["node"]
   },
   "include": ["apps", "packages", "prisma", "scripts", "prisma7.config.ts"],
-  "exclude": ["apps/test-client"]
+  "exclude": ["apps/test-client", "apps/web"]
 }

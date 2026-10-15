@@ -8,7 +8,7 @@ import "dotenv/config";
 import { spawnSync } from "node:child_process";
 import pg from "pg";
 
-const DEFAULT_TESTS = ["packages/shared/src/**/*.test.ts", "apps/api/src/**/*.test.ts", "apps/job_collector/src/**/*.test.ts"];
+const DEFAULT_TESTS = ["packages/shared/src/**/*.test.ts", "apps/api/src/**/*.test.ts", "apps/job_collector/src/**/*.test.ts", "apps/web/src/**/*.test.ts"];
 
 const devUrl = process.env.DATABASE_URL;
 if (!devUrl) throw new Error("DATABASE_URL is not defined");

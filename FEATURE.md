@@ -90,7 +90,9 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 ## S — Settings (user section)
 
 ### S1. Resume modifier settings
-* `modifier_enabled` (on/off), `strength` (soft / medium / hard), `modifier_config` (which sections the AI may rewrite: summary, title, skills, work experience, projects; exact permissions in DATABASE.md *modifier_config*).
+* `modifier_enabled` (on/off), `strength` (soft / medium / hard).
+* **The strength decides which sections the AI may rewrite** (summary, title, skills, work experience, projects): the stronger, the more sections. The mapping is an API configuration (`config.modifier.sectionsByStrength`), initially: soft = summary, skills; medium = + title, work experience; hard = + projects. Users don't choose the sections; the settings and the generation screen show which sections the chosen strength modifies.
+* Reversible: `config.modifier.userChoosesSections: true` brings back the per-user choice of sections (`modifier_config`, still stored; exact permissions in DATABASE.md *modifier_config*).
 * These are **defaults** for the next generation; the generation screen shows them and allows a one-off override (M1). Overrides are not saved back unless the user ticks "remember".
 * Rules applying to all strengths (enforced in prompts and by post-generation validation):
   * never invent employers, job titles, dates, degrees, certifications or contact details;
@@ -213,7 +215,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
   * otherwise the screen offers "Translate my resume to {language}" (T1), which creates the translated resume and then returns to generation with it as the source;
   * the user can still choose "Generate in {resume language} anyway".
   * If the offer's language is unknown, no check is made.
-* Options shown, pre-filled from settings: source resume, modifier on/off, strength, modifiable sections, template, photo (hidden if the template doesn't support photos).
+* Options shown, pre-filled from settings: source resume, modifier on/off, strength (with the sections it modifies), template, photo (hidden if the template doesn't support photos).
 * Process: snapshot source content → if modifier on, AI rewrites allowed sections per S1 rules → server validates the output against ResumeContent v1 → modifications not allowed by the permission table (DATABASE.md *modifier_config*) are dropped (see M4) → the API builds the change set → save the `generated_resumes` row (with the match score computed by the API with the shared formula, and the model id) → open the **review screen** (M4).
 * If every proposed change was forbidden or nothing changed, the row is still saved with an empty change set, and the user sees "No modifications were proposed".
 * Output language is **always** the source resume language. Generating in another language would make the changes impossible to review; to apply in another language, the user translates the resume first (language check above, T1).

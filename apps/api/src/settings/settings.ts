@@ -1,4 +1,5 @@
-import type { ModifierConfig, ModifierStrength, Settings, TemplateListResponse } from "@job/shared";
+import type { ModifierConfig, ModifierStrength, Settings, SettingsResponse, TemplateListResponse } from "@job/shared";
+import { config } from "../config";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
 
@@ -23,18 +24,29 @@ export async function availableTemplate(templateId: number) {
   return fallback;
 }
 
-export async function getSettings(userId: string): Promise<Settings> {
+// The sections the AI may rewrite: the strength's (config.modifier), or the user's own
+// choice when users choose them (config.modifier.userChoosesSections).
+export function modifierSections(strength: ModifierStrength, userChoice: ModifierConfig): ModifierConfig {
+  return config.modifier.userChoosesSections ? userChoice : config.modifier.sectionsByStrength[strength];
+}
+
+export async function getSettings(userId: string): Promise<SettingsResponse> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const strength = user.modifierStrength as ModifierStrength;
   return {
     modifierEnabled: user.modifierEnabled,
-    modifierStrength: user.modifierStrength as ModifierStrength,
-    modifierConfig: user.modifierConfig as ModifierConfig,
+    modifierStrength: strength,
+    modifierConfig: modifierSections(strength, user.modifierConfig as ModifierConfig),
+    modifierSectionChoice: config.modifier.userChoosesSections,
+    modifierSectionsByStrength: config.modifier.sectionsByStrength,
     templateId: (await availableTemplate(user.templateId)).id,
     uiLanguage: user.uiLanguage,
   };
 }
 
-export async function updateSettings(userId: string, input: Partial<Settings>): Promise<Settings> {
+// A `modifierConfig` sent while the strength decides is still stored (it applies again if
+// users get to choose), but has no effect.
+export async function updateSettings(userId: string, input: Partial<Settings>): Promise<SettingsResponse> {
   if (input.templateId !== undefined) {
     const template = await prisma.template.findFirst({ where: { id: input.templateId, deletedAt: null } });
     if (!template) throw new HttpError(400, "unknown_template", "This template does not exist");

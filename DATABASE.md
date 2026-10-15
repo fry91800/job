@@ -64,7 +64,7 @@ A person using the app, **registered or guest**. A guest is a row with `email IS
 | search_location_id | INTEGER | | NULL | FK → locations. Last searched location |
 | modifier_enabled | BOOLEAN | ✓ | false | |
 | modifier_strength | `modifier_strength` | ✓ | `soft` | `soft` \| `medium` \| `hard`. The rules for each strength live in code (see *Modifier strengths*) |
-| modifier_config | JSONB | ✓ | `{"summary":true,"skills":true,"workExperience":false}` | See *modifier_config format* |
+| modifier_config | JSONB | ✓ | `{"summary":true,"skills":true,"workExperience":false}` | See *modifier_config format*. Used only when users choose the sections (`config.modifier.userChoosesSections`); otherwise the strength decides them (FEATURE S1) |
 | template_id | INTEGER | ✓ | 1 | FK → templates (seed id 1 = default template) |
 | selected_resume_id | UUID | | NULL | FK → resumes, ON DELETE SET NULL |
 | selected_photo_id | UUID | | NULL | FK → user_photos. NULL = no photo on generated resumes |
@@ -188,7 +188,7 @@ One resume generated for an offer (with or without AI). Rows are only written wh
 | generated_content | JSONB | ✓ | | ResumeContent v1. Equals original + every non-rejected change; also directly **editable** by the user |
 | changes | JSONB | ✓ | `[]` | Change set for review (see *Change set* below) |
 | modifier_strength | `modifier_strength` | | NULL | Strength used. NULL = modifier off (no AI call) |
-| modifier_config | JSONB | | NULL | Snapshot of the settings used. NULL = modifier off |
+| modifier_config | JSONB | | NULL | Snapshot of the sections actually used (the strength's, or the user's choice). NULL = modifier off |
 | template_id | INTEGER | ✓ | | Template last used to render. Changeable without regenerating |
 | photo_id | UUID | | NULL | Photo last used to render |
 | match_score | INTEGER | | NULL | 0–100 snapshot at generation time |

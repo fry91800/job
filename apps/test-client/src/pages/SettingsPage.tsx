@@ -1,22 +1,23 @@
 import { useEffect, useState } from "react";
-import { MODIFIER_SECTIONS, MODIFIER_STRENGTHS, UI_LANGUAGES, type Settings, type TemplateListResponse } from "@job/shared";
+import { MODIFIER_STRENGTHS, UI_LANGUAGES, type Settings, type SettingsResponse, type TemplateListResponse } from "@job/shared";
 import { api, errorText } from "../api";
+import { ModifierSections } from "../ModifierSections";
 
 export function SettingsPage({ refreshMe }: { refreshMe: () => void }) {
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [templates, setTemplates] = useState<TemplateListResponse["results"]>([]);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     api<TemplateListResponse>("GET", "/api/templates").then((result) => result.ok && setTemplates(result.data.results));
-    api<Settings>("GET", "/api/settings").then((result) => {
+    api<SettingsResponse>("GET", "/api/settings").then((result) => {
       if (result.ok) setSettings(result.data);
       else setMessage("No user yet: changing a setting creates a guest.");
     });
   }, []);
 
   async function update(change: Partial<Settings>) {
-    const result = await api<Settings>("PATCH", "/api/settings", change);
+    const result = await api<SettingsResponse>("PATCH", "/api/settings", change);
     setMessage(errorText(result));
     if (result.ok) setSettings(result.data);
     refreshMe();
@@ -37,7 +38,7 @@ export function SettingsPage({ refreshMe }: { refreshMe: () => void }) {
         ))}
       </fieldset>
       <fieldset>
-        <legend>Resume modifier (S1) — AI not available yet, generation needs it off</legend>
+        <legend>Resume modifier (S1)</legend>
         <label><input type="checkbox" checked={current.modifierEnabled} onChange={(event) => update({ modifierEnabled: event.target.checked })} /> Enabled</label>
         <label>Strength{" "}
           <select value={current.modifierStrength} onChange={(event) => update({ modifierStrength: event.target.value as Settings["modifierStrength"] })}>
@@ -46,16 +47,7 @@ export function SettingsPage({ refreshMe }: { refreshMe: () => void }) {
         </label>
         <div>
           Sections:{" "}
-          {MODIFIER_SECTIONS.map((section) => (
-            <label key={section}>
-              <input
-                type="checkbox"
-                checked={current.modifierConfig[section] ?? false}
-                onChange={(event) => update({ modifierConfig: { ...current.modifierConfig, [section]: event.target.checked } })}
-              />
-              {section}
-            </label>
-          ))}
+          <ModifierSections settings={settings} strength={current.modifierStrength} config={current.modifierConfig} onChange={(modifierConfig) => update({ modifierConfig })} />
         </div>
       </fieldset>
       <fieldset>

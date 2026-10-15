@@ -27,9 +27,17 @@ export const settingsUpdateSchema = z
 export type Settings = {
   modifierEnabled: boolean;
   modifierStrength: ModifierStrength;
+  // The sections the AI may rewrite: those of the strength, or the user's own choice when
+  // `modifierSectionChoice` is true (an API configuration).
   modifierConfig: ModifierConfig;
   templateId: number; // falls back to the first available template if the saved one was retired
   uiLanguage: string;
+};
+
+// GET /api/settings: the settings and how the sections are decided.
+export type SettingsResponse = Settings & {
+  modifierSectionChoice: boolean; // false: the strength decides the sections
+  modifierSectionsByStrength: Record<ModifierStrength, ModifierConfig>;
 };
 
 export type TemplateSummary = { id: number; name: string; rendererKey: string; supportsPhoto: boolean };

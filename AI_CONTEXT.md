@@ -53,6 +53,7 @@ prisma/
 * `FEATURE.md` — feature specification (IDs such as O4, M1 are used in code and reviews)
 * `DATABASE.md` — database design and JSON formats
 * `COLLECTOR.md` — job collector plan (sources, ingestion contract, pipeline)
+* `FRONTEND.md` — plan of the real frontend (`apps/web`): workspace layout with tabs, style, smoothness requirements
 * `claude/DECISIONS.md` — decision log
 * `ARCHITECTURE.md` — technical architecture
 
@@ -95,7 +96,7 @@ Business logic should not be unnecessarily placed directly inside route handlers
 There are two frontends (see ARCHITECTURE.md):
 
 * `apps/test-client` (now): keep it **as simple as possible**. Its only purpose is to call the API and show the results. No styling beyond the bare minimum, no i18n, no extra libraries, no abstractions. Do not spend effort on UX.
-* `apps/web` (later): the real frontend. Do not start it unless explicitly requested. The rules below are for it.
+* `apps/web` (later): the real frontend, planned in `FRONTEND.md`. Do not start it unless explicitly requested. The rules below are for it.
 
 React is responsible for the user interface.
 

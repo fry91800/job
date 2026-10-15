@@ -1,4 +1,5 @@
 import { backendConfig } from "@job/backend";
+import type { ModifierConfig, ModifierStrength } from "@job/shared";
 // Configuration values (FEATURE: limits are configuration, not code or database).
 // Defaults are the initial values from FEATURE.md; environment variables override some.
 
@@ -18,7 +19,7 @@ export const config = {
 
   // Origins allowed to send state-changing requests (CSRF check). Requests without an
   // Origin header (curl, tests) are allowed.
-  webOrigins: (process.env.WEB_ORIGINS ?? "http://localhost:5173").split(",").map((origin) => origin.trim()),
+  webOrigins: (process.env.WEB_ORIGINS ?? "http://localhost:5173,http://localhost:5174").split(",").map((origin) => origin.trim()),
 
   limits: {
     savedOffers: { guest: 50, registered: 1000 },
@@ -34,6 +35,18 @@ export const config = {
     // Resume translations (T1), counted from translated resumes, deleted ones included.
     translations: { guestTotal: 2, registeredPerDay: 20 },
     photoMaxPixels: 1000, // longest side after resizing (R6)
+  },
+
+  // Resume modifier (FEATURE S1): the sections the AI may rewrite at each strength (more
+  // strength, more sections). The strength decides; `userChoosesSections: true` lets users
+  // pick the sections themselves again (their choice is still stored in their settings).
+  modifier: {
+    userChoosesSections: false,
+    sectionsByStrength: {
+      soft: { summary: true, skills: true },
+      medium: { summary: true, title: true, skills: true, workExperience: true },
+      hard: { summary: true, title: true, skills: true, workExperience: true, projects: true },
+    } as Record<ModifierStrength, ModifierConfig>,
   },
 
   // AI (FEATURE G5). The provider is chosen here; features never depend on a provider.
