@@ -7,6 +7,7 @@ import { useAddressSync, useWorkspace } from "../tabs/workspace";
 import { preloadViews, VIEWS } from "../views/registry";
 import { AuthDialog } from "../auth/AuthDialog";
 import { useAccountLanguage } from "../auth/session";
+import { ConfirmDialog } from "../lib/confirm";
 import { Toaster } from "../lib/toast";
 import { ConfirmCloseDialog } from "./close-tabs";
 import { IconButton } from "./IconButton";
@@ -94,6 +95,7 @@ export function Shell() {
       {phone ? <Phone /> : <Desktop />}
       <ConfirmCloseDialog />
       <AuthDialog />
+      <ConfirmDialog />
       <Toaster />
     </>
   );

@@ -14,8 +14,12 @@ type ViewEntry = { icon: LucideIcon; view: ComponentType<TabViewProps>; step: nu
 // its first display, even preloaded); the others load on first use.
 const loaders = {
   placeholder: () => import("./Placeholder"),
+  resumes: () => import("../resumes/ResumesView"),
+  photos: () => import("../photos/PhotosView"),
 };
 const placeholder = lazy(loaders.placeholder);
+const resumes = lazy(loaders.resumes);
+const photos = lazy(loaders.photos);
 
 // Once the page is idle, every view's code is fetched in the background, so the first
 // tab of each kind opens without waiting for its code (FRONTEND.md §5).
@@ -28,8 +32,8 @@ export function preloadViews(): void {
 export const VIEWS: Record<TabKind, ViewEntry> = {
   offer: { icon: Briefcase, view: OfferView, step: 2 },
   generated: { icon: Sparkles, view: placeholder, step: 5 },
-  resumes: { icon: FileText, view: placeholder, step: 4 },
-  photos: { icon: Image, view: placeholder, step: 4 },
+  resumes: { icon: FileText, view: resumes, step: 4 },
+  photos: { icon: Image, view: photos, step: 4 },
   saved: { icon: Star, view: placeholder, step: 6 },
   history: { icon: History, view: placeholder, step: 5 },
   settings: { icon: Settings, view: placeholder, step: 6 },

@@ -19,7 +19,7 @@ Done:
 Postponed:
 
 * Job collector (`apps/job_collector`, plan in `COLLECTOR.md`): phase 1 (pipeline, deduplication, ingestion endpoint, ROME + ESCO catalogue) and phase 2 (Greenhouse, Ashby, Lever, SmartRecruiters adapters with company discovery from Common Crawl) done. France Travail's offer API is closed to new users. The development seed still provides the test offers.
-* Full frontend (`apps/web`): planned in `FRONTEND.md` (workspace with a search sidebar and tabs, light and dark themes); steps 1–3 done (layout, tabs, themes, languages; search, results, offer tab; accounts). Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
+* Full frontend (`apps/web`): planned in `FRONTEND.md` (workspace with a search sidebar and tabs, light and dark themes); steps 1–4 done (layout, tabs, themes, languages; search, results, offer tab; accounts; resumes and photos). Until then a deliberately simple **test client** (`apps/test-client`) is used to try the API in a browser.
 
 ## Planned features
 

@@ -11,14 +11,15 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(method: string, path: string, options: { body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+// `file`: sent as the request body itself (resume and photo uploads, no multipart).
+export async function api<T>(method: string, path: string, options: { body?: unknown; file?: File; signal?: AbortSignal } = {}): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, {
       method,
       signal: options.signal,
-      headers: options.body === undefined ? {} : { "Content-Type": "application/json" },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      headers: options.file ? { "Content-Type": options.file.type || "application/octet-stream" } : options.body === undefined ? {} : { "Content-Type": "application/json" },
+      body: options.file ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
     });
   } catch (error) {
     if ((error as Error).name === "AbortError") throw error;

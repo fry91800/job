@@ -1,6 +1,6 @@
 # Frontend (`apps/web`) — plan, version 1
 
-The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **steps 1–3 done** (§9), step 4 next.
+The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **steps 1–4 done** (§9), step 5 next.
 
 ## 1. Goals
 
@@ -161,4 +161,13 @@ Smoothness is a requirement, checked like a feature:
 * Short confirmations as toasts (bottom right, read by screen readers).
 * Change password and delete the account come with the Settings tab (step 6).
 * Checked end to end in a headless browser against an API on the test database (emails read from MailHog): wrong password, login, logout, guest reminder, sign-up keeping a saved offer, email confirmation link, forgotten password link, account language. Lesson: browser checks must use their own ports (5176 here) — a check that reuses a running 5174 talks to the developer's own API and database.
+
+**Step 4 — Resumes and Photos tabs (2026-10-16)**:
+* Resumes tab (`src/resumes/`): the list (selected resume, language, "translation of…", age) with an upload zone (drop or pick a PDF/DOCX; "Reading your resume…" while the AI reads it, about 5 s; then the resume opens with a "check the imported data" banner) and "Create an empty resume"; per resume: select (shown at once), translate into the other language, download the original file, delete (confirmed). The selected resume drives the match % everywhere.
+* Editor (`ResumeEditor.tsx`): a structured form over every section of ResumeContent v1 (identity and links, summary, skills with their type, experience with responsibilities and technologies, projects, education, languages, certifications, interests); items added, moved and removed; dates as YYYY or YYYY-MM, "current job"; checked with the API's schema before saving, errors next to the fields; Save or Ctrl+S; unsaved changes mark the tab and closing asks.
+* Translation review (FEATURE T1): a translated resume shows each translated field's original below it with "Re-translate" (that field only; the API accepts the T1 fields only), a "check the translation" banner until "Mark as reviewed" (kept in the browser), and "The original resume changed… Translate again" when the source was edited; translating again when a translation exists asks first.
+* Photos tab (`src/photos/`): a grid with upload (drop or pick), the selected photo, "No photo", rename in place, delete (confirmed); images from the owner-only API route.
+* Generic confirmation dialog (`lib/confirm.tsx`) and translated limits ("Limit reached: 2 at most", plus the account hint for guests).
+* Checked in a headless browser against an API on the test database with the real AI (3 small Gemini calls per run): upload of a sample PDF (name, title, 2 jobs, 6 skills read), automatic selection, match % in the results, unsaved-changes dot and close confirmation, required-field error, save, translation into English with 14 originals shown and a re-translated field, delete, photo upload, rename, "No photo". First load 188 KB compressed; the Resumes (7.5 KB) and Photos (2.3 KB) views load on first use or when the page is idle.
+* Not done: the optional square crop before a photo upload (FEATURE R6, optional).
 
