@@ -1,7 +1,7 @@
 import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CONTRACT_TYPES, PUBLISHED_WITHIN, REMOTE_TYPES, SEARCH_RADIUS_CHOICES } from "@job/shared";
+import { CONTRACT_TYPES, PUBLISHED_WITHIN, REMOTE_TYPES, SEARCH_RADIUS_CHOICES } from "@job/shared/src/constants";
 import { useOfferSearch } from "../api/queries";
 import { useWorkspace } from "../tabs/workspace";
 import { LocationInput } from "./LocationInput";

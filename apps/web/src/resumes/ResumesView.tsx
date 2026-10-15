@@ -1,10 +1,13 @@
-import { CheckCircle2, Circle, Download, FilePlus2, Languages, Loader2, MoreHorizontal, Trash2, UploadCloud } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Download, FilePlus2, Languages, Loader2, MoreHorizontal, Trash2, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { emptyResumeContent, RESUME_LANGUAGES, type ResumeLanguage, type ResumeListItem } from "@job/shared";
+import type { ResumeListItem } from "@job/shared";
+import { RESUME_LANGUAGES, type ResumeLanguage } from "@job/shared/src/constants";
+import { emptyResumeContent } from "@job/shared/src/resumes/empty";
 import { ApiError } from "../api/client";
 import { useMe } from "../api/queries";
 import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "../layout/menu";
+import { usePhone } from "../layout/use-media-query";
 import { confirm } from "../lib/confirm";
 import { errorMessage } from "../lib/errors";
 import { formatAge } from "../lib/format";
@@ -14,7 +17,8 @@ import { useCreateResume, useDeleteResume, useResume, useResumes, useSelectResum
 import { ResumeEditor } from "./ResumeEditor";
 
 // Resumes tab (FRONTEND.md §2.3; FEATURE R1–R5, T1): the list with upload on the left, the
-// open resume's editor on the right.
+// open resume's editor on the right. On phones, the list, then the editor with a back
+// button (FRONTEND.md §2.5).
 
 const ACCEPT = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -147,6 +151,13 @@ export default function ResumesView({ tab }: TabViewProps) {
   const me = useMe().data?.user ?? null;
   const [openId, setOpenId] = useState<string | null>(null);
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const phone = usePhone();
+  const [phoneEditor, setPhoneEditor] = useState(false);
+  // Opening a resume (click, upload, creation, translation) shows its editor.
+  const openResume = (id: string) => {
+    setOpenId(id);
+    setPhoneEditor(true);
+  };
   const list = resumes.data?.results ?? [];
   const opened = useResume(openId);
 
@@ -159,11 +170,12 @@ export default function ResumesView({ tab }: TabViewProps) {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto border-r border-border p-3">
+      <h1 className="sr-only">{t("tools.resumes")}</h1>
+      <div className={`flex shrink-0 flex-col gap-3 overflow-y-auto border-border p-3 ${phone ? (phoneEditor ? "hidden" : "w-full") : "w-72 border-r"}`}>
         <UploadZone
           onUploaded={(id) => {
             setImported((current) => new Set(current).add(id));
-            setOpenId(id);
+            openResume(id);
           }}
         />
         <button
@@ -172,7 +184,7 @@ export default function ResumesView({ tab }: TabViewProps) {
           onClick={() =>
             create.mutate(
               { language: "fr", content: emptyResumeContent(me?.email?.split("@")[0] ?? t("resume.newName")) },
-              { onSuccess: (resume) => setOpenId(resume.id), onError: (error) => toast(errorMessage(t, error), "error") },
+              { onSuccess: (resume) => openResume(resume.id), onError: (error) => toast(errorMessage(t, error), "error") },
             )
           }
           className="flex h-8 items-center justify-center gap-1.5 rounded-control text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg"
@@ -182,14 +194,19 @@ export default function ResumesView({ tab }: TabViewProps) {
         <div className="flex flex-col gap-0.5">
           {resumes.isPending && Array.from({ length: 2 }, (_, index) => <div key={index} className="h-12 animate-pulse rounded-control bg-hover" />)}
           {list.map((item) => (
-            <ResumeRow key={item.id} item={item} open={item.id === openId} onOpen={setOpenId} />
+            <ResumeRow key={item.id} item={item} open={item.id === openId} onOpen={openResume} />
           ))}
         </div>
         {list.length > 0 && !list.some((item) => item.isSelected) && <p className="text-xs text-warning">{t("resume.noneSelected")}</p>}
       </div>
-      <div className="min-w-0 flex-1 overflow-y-auto px-8 pb-10">
+      <div className={`min-w-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-8 ${phone && !phoneEditor ? "hidden" : ""}`}>
+        {phone && (
+          <button type="button" onClick={() => setPhoneEditor(false)} className="mt-3 flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg">
+            <ArrowLeft size={15} /> {t("resume.allResumes")}
+          </button>
+        )}
         {openId && opened.data ? (
-          <ResumeEditor key={opened.data.id} resume={opened.data} tabKey={tab.key} justImported={imported.has(opened.data.id)} onOpen={setOpenId} />
+          <ResumeEditor key={opened.data.id} resume={opened.data} tabKey={tab.key} justImported={imported.has(opened.data.id)} onOpen={openResume} />
         ) : openId && opened.isPending ? (
           <div className="flex flex-col gap-3 py-8">
             <div className="h-7 w-1/3 animate-pulse rounded-control bg-hover" />

@@ -1,12 +1,10 @@
 import { z } from "zod";
 import type { OfferSearchResult } from "./search";
+import { SAVED_OFFER_NOTES_MAX_LENGTH, SAVED_OFFER_STATUSES, type SavedOfferStatus } from "../constants";
 
 // Saved offers with application tracking (FEATURE O3).
 
-export const SAVED_OFFER_STATUSES = ["saved", "applied", "interviewing", "offer_received", "rejected", "withdrawn"] as const;
-export type SavedOfferStatus = (typeof SAVED_OFFER_STATUSES)[number];
-
-export const SAVED_OFFER_NOTES_MAX_LENGTH = 5000;
+export { SAVED_OFFER_NOTES_MAX_LENGTH, SAVED_OFFER_STATUSES, type SavedOfferStatus } from "../constants";
 
 export const savedOfferListSchema = z.object({
   status: z.preprocess((value) => (value === "" ? undefined : value), z.enum(SAVED_OFFER_STATUSES).optional()),

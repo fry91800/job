@@ -1,23 +1,36 @@
 import { z } from "zod";
 import type { LocationSummary } from "../locations";
+import {
+  CONTRACT_TYPES,
+  DEFAULT_SEARCH_RADIUS_KM,
+  MAX_SEARCH_SKILLS,
+  PUBLISHED_WITHIN,
+  REMOTE_TYPES,
+  SALARY_PERIODS,
+  SEARCH_RADIUS_CHOICES,
+  SEARCH_SORTS,
+  type ContractType,
+  type RemoteType,
+  type SalaryPeriod,
+} from "../constants";
 
 // Offer search (FEATURE O1). The web app builds the URL query string from these
 // parameters; the API validates the query string with the same schema.
 
-export const SEARCH_PAGE_SIZE = 20;
-export const SEARCH_RADIUS_CHOICES = [0, 10, 25, 50, 100] as const;
-export const DEFAULT_SEARCH_RADIUS_KM = 25;
-export const MAX_SEARCH_SKILLS = 20;
-
-export const REMOTE_TYPES = ["onsite", "hybrid", "remote"] as const;
-export const CONTRACT_TYPES = ["permanent", "fixed_term", "temporary", "freelance", "internship", "apprenticeship", "other"] as const;
-export const SALARY_PERIODS = ["hour", "day", "month", "year"] as const;
-export const PUBLISHED_WITHIN = ["24h", "7d", "30d"] as const;
-export const SEARCH_SORTS = ["recent", "relevance"] as const;
-
-export type RemoteType = (typeof REMOTE_TYPES)[number];
-export type ContractType = (typeof CONTRACT_TYPES)[number];
-export type SalaryPeriod = (typeof SALARY_PERIODS)[number];
+export {
+  CONTRACT_TYPES,
+  DEFAULT_SEARCH_RADIUS_KM,
+  MAX_SEARCH_SKILLS,
+  PUBLISHED_WITHIN,
+  REMOTE_TYPES,
+  SALARY_PERIODS,
+  SEARCH_PAGE_SIZE,
+  SEARCH_RADIUS_CHOICES,
+  SEARCH_SORTS,
+  type ContractType,
+  type RemoteType,
+  type SalaryPeriod,
+} from "../constants";
 
 // Query string values arrive as strings; an empty value means "not set".
 const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);

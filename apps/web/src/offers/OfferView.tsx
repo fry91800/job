@@ -1,21 +1,19 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Briefcase, Building2, ChevronDown, Clock, ExternalLink, Lock, MapPin, Pencil, Sparkles, Star, Wallet } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { computeMatch, SAVED_OFFER_STATUSES, type OfferDetail, type SavedOfferStatus } from "@job/shared";
-import { api, ApiError } from "../api/client";
+import type { OfferDetail, SavedOfferStatus } from "@job/shared";
+import { SAVED_OFFER_STATUSES } from "@job/shared/src/constants";
+import { computeMatch } from "@job/shared/src/match";
+import { ApiError } from "../api/client";
 import { useMe, useOffer, useSavedOfferMutation } from "../api/queries";
 import { useGenerateDialog } from "../generated/GenerateDialog";
 import { MenuChoice, MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "../layout/menu";
-import { errorMessage } from "../lib/errors";
 import { formatAge, formatDate, formatSalary } from "../lib/format";
-import { toast } from "../lib/toast";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
 import type { TabViewProps } from "../views/registry";
 import { Markdown } from "./Markdown";
 import { MatchBadge } from "./MatchBadge";
-import { OfferForm } from "./OfferForm";
 
 // Offer tab (FRONTEND.md §2.3, FEATURE O2): the offer, its match with the selected resume
 // (O4), saving and tracking (O3). Saving or tracking keeps a preview tab open.
@@ -116,7 +114,7 @@ function MatchPanel({ offer }: { offer: OfferDetail }) {
 
 function OfferSkeleton() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-8 py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 sm:px-8 sm:py-8">
       <div className="h-7 w-2/3 animate-pulse rounded-control bg-hover" />
       <div className="h-4 w-1/3 animate-pulse rounded-control bg-hover" />
       <div className="mt-4 h-4 w-full animate-pulse rounded-control bg-hover" />
@@ -126,45 +124,8 @@ function OfferSkeleton() {
   );
 }
 
-// The creator of a private offer may edit it (FEATURE O5).
-function EditOffer({ offer, onDone }: { offer: OfferDetail; onDone: () => void }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const save = useMutation({
-    mutationFn: (draft: object) => api<OfferDetail>("PUT", `/api/user-offers/${offer.id}`, { body: draft }),
-    onSuccess: (updated) => {
-      client.setQueriesData<OfferDetail>({ queryKey: ["offer", offer.id] }, () => updated);
-      void client.invalidateQueries({ queryKey: ["offer", offer.id] });
-      void client.invalidateQueries({ queryKey: ["saved-offers"] });
-      toast(t("addOffer.updated"));
-      onDone();
-    },
-  });
-  return (
-    <OfferForm
-      initial={{
-        title: offer.title,
-        companyName: offer.companyName,
-        description: offer.description,
-        language: (offer.language as "fr" | "en" | null) ?? null,
-        url: offer.url,
-        locationId: offer.location?.id ?? null,
-        location: offer.location ? { id: offer.location.id, name: offer.location.name } : null,
-        remoteType: offer.remoteType,
-        contractType: offer.contractType,
-        salaryMin: offer.salary?.min ?? null,
-        salaryMax: offer.salary?.max ?? null,
-        salaryCurrency: offer.salary?.currency ?? null,
-        salaryPeriod: offer.salary?.period ?? null,
-      }}
-      submitLabel={t("resume.save")}
-      pending={save.isPending}
-      error={save.error ? errorMessage(t, save.error) : null}
-      onSubmit={(draft) => save.mutate(draft)}
-      onCancel={onDone}
-    />
-  );
-}
+// The edit form (with its validation) loads only when a private offer is edited.
+const EditOffer = lazy(() => import("./EditOffer"));
 
 export default function OfferView({ tab }: TabViewProps) {
   const { t, i18n } = useTranslation();
@@ -181,14 +142,16 @@ export default function OfferView({ tab }: TabViewProps) {
   if (offer.isPending) return <OfferSkeleton />;
   if (offer.isError) {
     const missing = offer.error instanceof ApiError && offer.error.status === 404;
-    return <p className="mx-auto max-w-3xl px-8 py-10 text-fg-muted">{missing ? t("offer.notFound") : t("offer.error")}</p>;
+    return <p className="mx-auto max-w-3xl px-4 py-10 sm:px-8 text-fg-muted">{missing ? t("offer.notFound") : t("offer.error")}</p>;
   }
 
   const data = offer.data;
   if (editing) {
     return (
-      <div className="mx-auto max-w-3xl px-8 py-8">
-        <EditOffer offer={data} onDone={() => setEditing(false)} />
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8">
+        <Suspense fallback={<OfferSkeleton />}>
+          <EditOffer offer={data} onDone={() => setEditing(false)} />
+        </Suspense>
       </div>
     );
   }
@@ -197,7 +160,7 @@ export default function OfferView({ tab }: TabViewProps) {
   const card = "rounded-box border border-border bg-surface p-4";
 
   return (
-    <article className="mx-auto flex max-w-3xl flex-col gap-6 px-8 py-8">
+    <article className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
       {data.closedAt && (
         <p className="flex items-center gap-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
           <AlertTriangle size={16} className="text-warning" /> {t("offer.closed")}

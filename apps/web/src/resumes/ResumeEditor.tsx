@@ -108,12 +108,12 @@ export function ResumeEditor({ resume, tabKey, justImported, onOpen }: { resume:
   return (
     <EditorContext.Provider value={{ errors, resumeId: resume.id, isTranslation: !!resume.translatedFrom }}>
       <div className="flex flex-col gap-6">
-        <div className="sticky top-0 z-10 -mx-8 flex flex-wrap items-center gap-2 border-b border-border bg-bg/90 px-8 py-3 backdrop-blur">
+        <div className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-b border-border bg-bg/90 px-4 py-3 sm:-mx-8 sm:px-8 backdrop-blur">
           <input
             aria-label={t("resume.name")}
             value={draft.name}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            className="min-w-0 flex-1 rounded-control bg-transparent px-1 text-lg font-semibold outline-none hover:bg-hover focus:bg-hover"
+            className="min-w-0 flex-1 basis-full rounded-control bg-transparent px-1 text-lg font-semibold outline-none hover:bg-hover focus:bg-hover sm:basis-auto"
           />
           <select
             aria-label={t("resume.language")}
@@ -303,7 +303,8 @@ export function ResumeEditor({ resume, tabKey, justImported, onOpen }: { resume:
                   >
                     {(item, itemIndex, updateItem) => (
                       <TextField
-                        label=""
+                        label={t("resume.fields.responsibility", { number: itemIndex + 1 })}
+                        hideLabel
                         multiline
                         value={item.text}
                         onChange={(value) => updateItem({ text: value ?? "" })}
@@ -346,7 +347,8 @@ export function ResumeEditor({ resume, tabKey, justImported, onOpen }: { resume:
                   <ItemList compact items={project.highlights} onChange={(highlights) => update({ highlights })} newItem={() => ({ id: newId(), text: "" })} addLabel={t("resume.add.highlight")} title={(item) => item.text}>
                     {(item, itemIndex, updateItem) => (
                       <TextField
-                        label=""
+                        label={t("resume.fields.highlight", { number: itemIndex + 1 })}
+                        hideLabel
                         multiline
                         value={item.text}
                         onChange={(value) => updateItem({ text: value ?? "" })}

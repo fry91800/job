@@ -25,7 +25,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
       <MenuTrigger asChild>
         <button
           type="button"
-          aria-label={t("account.menu")}
+          aria-label={compact ? t("account.menu") : `${t("account.menu")} : ${registered ? user.email : t("account.guest")}`}
           className="relative flex h-8 min-w-0 items-center gap-1.5 rounded-control px-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg data-[state=open]:bg-hover"
         >
           <CircleUser size={18} strokeWidth={1.75} className={registered ? "text-accent" : ""} />

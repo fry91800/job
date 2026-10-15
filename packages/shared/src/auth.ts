@@ -1,12 +1,9 @@
 import { z } from "zod";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, UI_LANGUAGES, type UiLanguage } from "./constants";
 
 // Account rules (FEATURE A1). The web app uses the same schemas for its forms.
 
-export const PASSWORD_MIN_LENGTH = 10;
-export const PASSWORD_MAX_LENGTH = 128;
-export const UI_LANGUAGES = ["fr", "en"] as const;
-
-export type UiLanguage = (typeof UI_LANGUAGES)[number];
+export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, UI_LANGUAGES, type UiLanguage } from "./constants";
 
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
 export const passwordSchema = z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH);

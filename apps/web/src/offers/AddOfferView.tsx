@@ -83,7 +83,7 @@ export default function AddOfferView() {
   };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-8 py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8">
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <Plus size={20} className="text-accent" /> {t("search.addOffer")}

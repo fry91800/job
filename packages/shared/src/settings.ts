@@ -1,13 +1,11 @@
 import { z } from "zod";
-import { UI_LANGUAGES } from "./auth";
+import { MODIFIER_SECTIONS, MODIFIER_STRENGTHS, UI_LANGUAGES, type ModifierStrength } from "./constants";
 
 // User settings (FEATURE S1, S2, L1).
 
-export const MODIFIER_STRENGTHS = ["soft", "medium", "hard"] as const;
-export type ModifierStrength = (typeof MODIFIER_STRENGTHS)[number];
+export { MODIFIER_SECTIONS, MODIFIER_STRENGTHS, type ModifierStrength } from "./constants";
 
 // Which sections the AI may rewrite (DATABASE.md "modifier_config"). Missing keys = false.
-export const MODIFIER_SECTIONS = ["summary", "title", "skills", "workExperience", "projects"] as const;
 export const modifierConfigSchema = z.strictObject(
   Object.fromEntries(MODIFIER_SECTIONS.map((key) => [key, z.boolean().optional()])) as Record<(typeof MODIFIER_SECTIONS)[number], z.ZodOptional<z.ZodBoolean>>,
 );

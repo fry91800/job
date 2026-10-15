@@ -172,7 +172,7 @@ export default function SettingsView() {
   const registered = user && !user.isGuest;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-5 px-8 py-8">
+    <div className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
         <SettingsIcon size={20} className="text-accent" /> {t("tools.settings")}
       </h1>

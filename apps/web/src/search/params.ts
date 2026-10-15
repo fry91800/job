@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { CONTRACT_TYPES, DEFAULT_SEARCH_RADIUS_KM, PUBLISHED_WITHIN, REMOTE_TYPES, SEARCH_RADIUS_CHOICES, type ContractType, type RemoteType } from "@job/shared";
+import { CONTRACT_TYPES, DEFAULT_SEARCH_RADIUS_KM, PUBLISHED_WITHIN, REMOTE_TYPES, SEARCH_RADIUS_CHOICES, type ContractType, type RemoteType } from "@job/shared/src/constants";
 
 // The search lives in the address (FRONTEND.md §2.4): ?q=react&locationId=12&location=Lyon…
 // `location` (the place's name) is for display only and isn't sent to the API.

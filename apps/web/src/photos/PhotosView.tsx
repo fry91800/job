@@ -115,7 +115,7 @@ export default function PhotosView() {
   };
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-8 py-8" onDragOver={(event) => { event.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8" onDragOver={(event) => { event.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">{t("photos.title")}</h1>
         <p className="text-sm text-fg-muted">{t("photos.intro")}</p>

@@ -1,9 +1,9 @@
 import { z } from "zod";
+import type { ChangeStatus } from "../constants";
 
 // Change set of a generated resume (DATABASE.md "Change set", FEATURE M4).
 
-export const CHANGE_STATUSES = ["pending", "accepted", "rejected", "edited"] as const;
-export type ChangeStatus = (typeof CHANGE_STATUSES)[number];
+export { CHANGE_STATUSES, type ChangeStatus } from "../constants";
 
 export type ResumeChange = {
   id: string; // c1, c2… unique within the list

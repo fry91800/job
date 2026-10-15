@@ -1,7 +1,7 @@
 import { z } from "zod";
+import type { LocationType } from "./constants";
 
-export const LOCATION_TYPES = ["city", "county", "region", "country"] as const;
-export type LocationType = (typeof LOCATION_TYPES)[number];
+export { LOCATION_TYPES, type LocationType } from "./constants";
 
 export type LocationSummary = {
   id: number;

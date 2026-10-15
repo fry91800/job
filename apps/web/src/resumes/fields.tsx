@@ -64,6 +64,7 @@ export function TextField(props: {
   placeholder?: string;
   translation?: Translation;
   className?: string;
+  hideLabel?: boolean; // the label is read by screen readers only (items of a list)
 }) {
   const id = useId();
   const { errors, isTranslation } = useContext(EditorContext);
@@ -77,7 +78,7 @@ export function TextField(props: {
   };
   return (
     <div className={`flex flex-col gap-1 ${props.className ?? ""}`}>
-      <label htmlFor={id} className="text-xs font-medium text-fg-muted">
+      <label htmlFor={id} className={props.hideLabel ? "sr-only" : "text-xs font-medium text-fg-muted"}>
         {props.label}
       </label>
       {props.multiline ? <textarea {...common} rows={3} className={`${inputClass} field-sizing-content min-h-16 resize-y`} /> : <input {...common} className={`${inputClass} h-8`} />}

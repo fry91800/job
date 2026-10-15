@@ -19,6 +19,9 @@ const loaders = {
   saved: () => import("../saved/SavedView"),
   settings: () => import("../settings/SettingsView"),
   addOffer: () => import("../offers/AddOfferView"),
+  // Not tabs, but loaded the same way: the account dialog and the offer edit form.
+  authDialog: () => import("../auth/AuthDialog"),
+  editOffer: () => import("../offers/EditOffer"),
 };
 const resumes = lazy(loaders.resumes);
 const photos = lazy(loaders.photos);

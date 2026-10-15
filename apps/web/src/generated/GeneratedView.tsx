@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { GeneratedResumeDetail, PhotoListResponse, ResumeChange } from "@job/shared";
 import { ApiError, api } from "../api/client";
 import { useCloseTabs } from "../layout/close-tabs";
+import { usePhone } from "../layout/use-media-query";
 import { confirm } from "../lib/confirm";
 import { diffWords } from "../lib/diff";
 import { errorMessage } from "../lib/errors";
@@ -30,11 +31,11 @@ function Diff({ before, after }: { before: string; after: string }) {
         part.type === "same" ? (
           <span key={index}>{part.text}</span>
         ) : part.type === "removed" ? (
-          <del key={index} className="rounded-sm bg-danger/15 text-danger decoration-danger/60">
+          <del key={index} className="rounded-sm bg-diff-del-bg text-diff-del-fg">
             {part.text}
           </del>
         ) : (
-          <ins key={index} className="rounded-sm bg-success/15 text-success no-underline">
+          <ins key={index} className="rounded-sm bg-diff-add-bg text-diff-add-fg no-underline">
             {part.text}
           </ins>
         ),
@@ -149,7 +150,7 @@ function Review({ detail }: { detail: GeneratedResumeDetail }) {
         {bySection.map((group) => (
           <section key={group.section} className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <h3 className="mr-auto text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t(`review.sections.${group.section}`)}</h3>
+              <h2 className="mr-auto text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t(`review.sections.${group.section}`)}</h2>
               <button type="button" className="text-xs text-fg-muted hover:text-success" onClick={() => send(group.changes, "accepted")}>
                 {t("review.acceptSection")}
               </button>
@@ -186,6 +187,9 @@ export default function GeneratedView({ tab }: TabViewProps) {
   const update = useUpdateGenerated(tab.id!);
   const remove = useDeleteGenerated();
   const detail = generated.data;
+  // Phones show the changes or the preview (FRONTEND.md §2.5).
+  const phone = usePhone();
+  const [phonePane, setPhonePane] = useState<"changes" | "preview">("changes");
 
   useEffect(() => {
     if (detail) useTabsStore.getState().update(tab.key, { title: detail.offer.title });
@@ -212,10 +216,12 @@ export default function GeneratedView({ tab }: TabViewProps) {
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3">
         <div className="mr-auto flex min-w-0 flex-col">
-          <button type="button" onClick={() => open({ kind: "offer", id: detail.offer.id })} className="flex min-w-0 items-center gap-1.5 text-left font-semibold hover:text-accent">
-            <Briefcase size={15} className="shrink-0 text-fg-subtle" />
-            <span className="truncate">{detail.offer.title}</span>
-          </button>
+          <h1 className="min-w-0">
+            <button type="button" onClick={() => open({ kind: "offer", id: detail.offer.id })} className="flex min-w-0 max-w-full items-center gap-1.5 text-left font-semibold hover:text-accent">
+              <Briefcase size={15} className="shrink-0 text-fg-subtle" />
+              <span className="truncate">{detail.offer.title}</span>
+            </button>
+          </h1>
           <span className="truncate text-xs text-fg-muted">
             {[detail.offer.companyName, detail.resume?.name, formatDate(detail.createdAt, i18n.language), detail.modifierStrength && t(`generate.strengths.${detail.modifierStrength}`)].filter(Boolean).join(" · ")}
           </span>
@@ -253,11 +259,27 @@ export default function GeneratedView({ tab }: TabViewProps) {
           <Trash2 size={15} />
         </button>
       </header>
+      {phone && (
+        <div role="tablist" className="flex border-b border-border">
+          {(["changes", "preview"] as const).map((pane) => (
+            <button
+              key={pane}
+              type="button"
+              role="tab"
+              aria-selected={phonePane === pane}
+              onClick={() => setPhonePane(pane)}
+              className={`flex-1 py-2 text-sm transition-colors ${phonePane === pane ? "border-b-2 border-accent font-medium text-fg" : "text-fg-muted"}`}
+            >
+              {t(`review.panes.${pane}`)}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
-        <div className="flex w-[44%] min-w-80 max-w-[560px] flex-col border-r border-border">
+        <div className={`flex flex-col border-border ${phone ? (phonePane === "changes" ? "w-full" : "hidden") : "w-[44%] min-w-80 max-w-[560px] border-r"}`}>
           <Review detail={detail} />
         </div>
-        <div className="min-w-0 flex-1 bg-hover p-4">
+        <div className={`min-w-0 flex-1 bg-hover p-4 ${phone && phonePane !== "preview" ? "hidden" : ""}`}>
           {/* Re-rendered after every change (address changes with the last update). */}
           <iframe
             title={t("review.preview")}

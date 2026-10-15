@@ -2,7 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { AlertTriangle, ChevronDown, MapPin, NotebookPen, Star, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { SAVED_OFFER_STATUSES, type SavedOfferListItem, type SavedOfferListResponse, type SavedOfferStatus } from "@job/shared";
+import type { SavedOfferListItem, SavedOfferListResponse } from "@job/shared";
+import { SAVED_OFFER_STATUSES, type SavedOfferStatus } from "@job/shared/src/constants";
 import { api } from "../api/client";
 import { MenuChoice, MenuContent, MenuRoot, MenuTrigger } from "../layout/menu";
 import { confirm } from "../lib/confirm";
@@ -60,8 +61,8 @@ function SavedRow({ item }: { item: SavedOfferListItem }) {
     <li className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-start gap-3">
         <button type="button" onClick={() => open({ kind: "offer", id: offer.id })} className="flex min-w-0 flex-1 flex-col items-start text-left">
-          <span className={`truncate font-medium hover:text-accent ${offer.closed ? "text-fg-muted" : ""}`}>{offer.title}</span>
-          <span className="flex items-center gap-1 truncate text-xs text-fg-muted">
+          <span className={`max-w-full truncate font-medium hover:text-accent ${offer.closed ? "text-fg-muted" : ""}`}>{offer.title}</span>
+          <span className="flex max-w-full items-center gap-1 truncate text-xs text-fg-muted">
             {offer.location && <MapPin size={11} className="shrink-0" />}
             {details.join(" · ")}
           </span>
@@ -148,7 +149,7 @@ export default function SavedView() {
     `h-7 rounded-full border px-2.5 text-xs transition-colors duration-150 ${selected ? "border-accent bg-accent-soft text-accent" : "border-border text-fg-muted hover:bg-hover hover:text-fg"}`;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-8 py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 sm:px-8 sm:py-8">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
         <Star size={20} className="text-warning" /> {t("tools.saved")}
       </h1>

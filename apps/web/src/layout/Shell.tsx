@@ -1,13 +1,12 @@
 import { ArrowLeft, Layers } from "lucide-react";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router";
 import { useTabsStore } from "../tabs/store";
 import { useAddressSync, useWorkspace } from "../tabs/workspace";
 import { preloadViews, VIEWS } from "../views/registry";
-import { AuthDialog } from "../auth/AuthDialog";
 import { GenerateDialog } from "../generated/GenerateDialog";
-import { useAccountLanguage } from "../auth/session";
+import { useAccountLanguage, useAuthDialog } from "../auth/session";
 import { ConfirmDialog } from "../lib/confirm";
 import { Toaster } from "../lib/toast";
 import { ConfirmCloseDialog } from "./close-tabs";
@@ -86,16 +85,25 @@ function PhoneTabLabel({ tabKey }: { tabKey: string }) {
   return <span className="truncate">{useTabTitle(tab)}</span>;
 }
 
+// The account dialog (with its form validation) loads when first opened; it is fetched in
+// the background once the page is idle (preloadViews).
+const AuthDialog = lazy(() => import("../auth/AuthDialog").then((module) => ({ default: module.AuthDialog })));
+
 export function Shell() {
   const phone = usePhone();
   useAddressSync(phone);
   useEffect(preloadViews, []);
   useAccountLanguage();
+  const authOpened = useAuthDialog((state) => state.mode !== null);
   return (
     <>
       {phone ? <Phone /> : <Desktop />}
       <ConfirmCloseDialog />
-      <AuthDialog />
+      {authOpened && (
+        <Suspense fallback={null}>
+          <AuthDialog />
+        </Suspense>
+      )}
       <GenerateDialog />
       <ConfirmDialog />
       <Toaster />

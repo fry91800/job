@@ -1,6 +1,6 @@
 # Frontend (`apps/web`) — plan, version 1
 
-The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **steps 1–6 done** (§9), step 7 next.
+The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **version 1 done** (steps 1–7, §9). Remaining items are listed at the end of §9.
 
 ## 1. Goals
 
@@ -187,4 +187,15 @@ Smoothness is a requirement, checked like a feature:
 * Accessibility fixes found by the checks: labels linked to their fields by id (a label wrapping a menu read the options into its name), the tracking menu named "Tracking: …", the radius menu labelled.
 * Checked in a headless browser against an API on the test database (1 AI call per run): saved offers (filter, note kept after reload, removal), settings saved, wrong then right current password, interface switched to English, unreadable address → paste, extraction (title, company, Nantes, permanent, 45 000–52 000 read in about 3 s), save and edit of the private offer, known address, account deletion. First load 222 KB compressed over 11 files.
 * Every tab kind now has its view; the step placeholders are gone.
+
+**Step 7 — phones, accessibility, speed (2026-10-16)**:
+* Phones (390 px checked on every screen, nothing wider than the screen): the Resumes tab shows the list, then the editor with "All my resumes" to go back; a generated resume shows "Changes" or "Preview"; content views use narrower side margins; the resume name takes its own row in the editor.
+* Accessibility, audited with axe-core (WCAG 2.1 A/AA and best practices) on 11 screens in both themes — **0 violations** after the fixes:
+  * contrast: text greys and status colours darkened in the light theme (4.5:1 at least), the subtle grey lightened in the dark theme, dedicated diff colours for removed and added words;
+  * tabs: a tab is a button next to its close button (no control inside another); the tab list holds tabs only — the close button is for the pointer, the keyboard uses Delete (announced on the tab); arrows, Home and End move between tabs;
+  * the account button's name includes what it shows ("Account: Guest"); main headings on every tab; labels for the responsibility and highlight fields (read by screen readers only); review sections as level-2 headings.
+* Speed (production build, real API on the test database; FRONTEND.md §5): first results 0.57–0.63 s after a cold load (largest paint ≈ 0.6 s), layout shift 0, opening an offer 69–98 ms, tab switch 44 ms, theme 34 ms, account menu 100 ms, search results ≈ 30 ms after the 250 ms typing pause, list scrolling at 61 frames/s.
+* First load 222 → **191 KB** compressed (5 files): the validation library (zod) and the API schemas left it. The shared package now has a zod-free `constants.ts` (and `resumes/empty.ts`); the schema modules re-export its values, so "@job/shared" is unchanged for the API; the web app takes values from `@job/shared/src/constants` and `@job/shared/src/match` and only types from "@job/shared". The account dialog and the offer edit form load on first use and are fetched when the page is idle.
+
+**Not done in version 1** (candidates for the next round): editing a generated resume with the full form (M3) and the review's "Show original / Show result" toggle (M4); the planned split view (§7); the remaining English strings returned by the API in rare errors are shown through the generic message.
 

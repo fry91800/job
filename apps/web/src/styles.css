@@ -5,7 +5,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Colours are variables (FRONTEND.md §4): components use the tokens below, never raw
-   colours, so both themes stay complete. */
+   colours, so both themes stay complete. Text colours keep a contrast of at least 4.5:1
+   on the backgrounds they are used on (WCAG AA), checked with axe. */
 :root {
   --bg: #ffffff;
   --sidebar: #fafafa;
@@ -14,16 +15,20 @@
   --selected: #eef2ff;
   --border: #e4e4e7;
   --fg: #18181b;
-  --fg-muted: #71717a;
-  --fg-subtle: #a1a1aa;
+  --fg-muted: #52525b;
+  --fg-subtle: #6b6b74;
   --accent: #4f46e5;
   --accent-hover: #4338ca;
   --accent-fg: #ffffff;
   --accent-soft: #eef2ff;
-  --success: #16a34a;
-  --danger: #dc2626;
-  --warning: #d97706;
+  --success: #15803d;
+  --danger: #c81e1e;
+  --warning: #b45309;
   --overlay: rgb(9 9 11 / 0.4);
+  --diff-add-fg: #14532d;
+  --diff-add-bg: #dcfce7;
+  --diff-del-fg: #991b1b;
+  --diff-del-bg: #fee2e2;
   --shadow: 0 8px 24px rgb(9 9 11 / 0.12), 0 2px 6px rgb(9 9 11 / 0.06);
 }
 
@@ -36,7 +41,7 @@
   --border: #27272a;
   --fg: #f4f4f5;
   --fg-muted: #a1a1aa;
-  --fg-subtle: #71717a;
+  --fg-subtle: #8d8d96;
   --accent: #818cf8;
   --accent-hover: #a5b4fc;
   --accent-fg: #0b0b0e;
@@ -45,6 +50,10 @@
   --danger: #f87171;
   --warning: #fbbf24;
   --overlay: rgb(0 0 0 / 0.6);
+  --diff-add-fg: #86efac;
+  --diff-add-bg: rgb(34 197 94 / 0.16);
+  --diff-del-fg: #fca5a5;
+  --diff-del-bg: rgb(239 68 68 / 0.16);
   --shadow: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
 }
 
@@ -67,6 +76,10 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-overlay: var(--overlay);
+  --color-diff-add-fg: var(--diff-add-fg);
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-del-fg: var(--diff-del-fg);
+  --color-diff-del-bg: var(--diff-del-bg);
   --shadow-float: var(--shadow);
   --radius-control: 6px;
   --radius-box: 8px;

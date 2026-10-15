@@ -1,11 +1,10 @@
 import { z } from "zod";
+import { RESUME_SCHEMA_VERSION } from "../constants";
 
 // ResumeContent v1 (DATABASE.md "JSON formats"). One schema for parsing, editing,
 // generation and rendering.
 
-export const RESUME_SCHEMA_VERSION = 1;
-export const RESUME_LANGUAGES = ["fr", "en"] as const;
-export type ResumeLanguage = (typeof RESUME_LANGUAGES)[number];
+export { RESUME_LANGUAGES, RESUME_SCHEMA_VERSION, type ResumeLanguage } from "../constants";
 
 const MAX_TEXT = 5000;
 const MAX_SHORT = 300;
@@ -145,17 +144,4 @@ export function withItemIds(content: ResumeContentInput, newId: () => string): R
   return copy as ResumeContent;
 }
 
-export function emptyResumeContent(fullName: string): ResumeContent {
-  return {
-    schemaVersion: RESUME_SCHEMA_VERSION,
-    basics: { fullName, title: null, email: null, phone: null, location: null, links: [] },
-    summary: null,
-    skills: [],
-    workExperience: [],
-    projects: [],
-    education: [],
-    languages: [],
-    certifications: [],
-    interests: [],
-  };
-}
+export { emptyResumeContent } from "./empty";

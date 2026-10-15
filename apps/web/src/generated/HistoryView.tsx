@@ -12,7 +12,7 @@ export default function HistoryView() {
   const list = useGeneratedList();
   const items = list.data?.results ?? [];
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-8 py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 sm:px-8 sm:py-8">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
         <History size={20} className="text-accent" /> {t("tools.history")}
       </h1>
