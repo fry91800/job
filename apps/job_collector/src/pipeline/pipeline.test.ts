@@ -134,6 +134,9 @@ describe("pipeline", () => {
       record(offer({ source: "test-aggregator", company, description: { format: "text", content: "Une tout autre offre de la même entreprise : comptable en cabinet, tenue de la comptabilité générale et clôtures mensuelles." } })),
     );
     assert.equal(different.result, "created");
+
+    const sameSource = await processRecord(record(offer({ company, location: { city: "Yerres", postcode: "91330", countryCode: "FR" } })));
+    assert.equal(sameSource.result, "created", "another posting of the same source (another town) is another offer");
   });
 
   test("a private user-added offer with the same URL becomes public", async () => {

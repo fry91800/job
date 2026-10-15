@@ -132,4 +132,9 @@ describe("autocomplete with Geoapify", () => {
     assert.ok(id);
     assert.equal((await prisma.location.findUniqueOrThrow({ where: { id } })).countyCode, "91");
   });
+
+  test("table names match without hyphens, accents or case", async () => {
+    const id = await matchLocation(prisma, { city: "saint denis", region: null, countryCode: "FR" });
+    assert.equal(id && (await prisma.location.findUniqueOrThrow({ where: { id } })).name, "Saint-Denis");
+  });
 });

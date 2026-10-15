@@ -6,6 +6,7 @@ export * from "./locations/french-departements";
 export * from "./locations/geoapify";
 export * from "./locations/location-match";
 export * from "./locations/location-store";
+export * from "./net/safe-fetch";
 export * from "./prisma";
 export * from "./queue";
 export * from "./text/html-to-markdown";

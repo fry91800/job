@@ -1,6 +1,6 @@
 import type { CollectedOffer } from "@job/shared";
 import { collectorConfig } from "../../config";
-import { firstPathSegment, type AtsAdapter } from "../adapter";
+import { firstPathSegment, refreshDue, type AtsAdapter } from "../adapter";
 import { fetchJson, NotFoundError, pause } from "../http";
 import { contractFrom, isoDate } from "../mapping";
 
@@ -62,11 +62,17 @@ export const smartRecruiters: AtsAdapter = {
     const [all, france] = await Promise.all([page(slug, 0), page(slug, 0, "fr")]);
     return { companyName: all.content[0]?.company?.name ?? null, jobCount: all.totalFound, franceJobCount: france.totalFound };
   },
-  // The list API filters on France; the description needs one detail request per offer.
-  async *collect(slug, companyName) {
+  // The list API filters on France; the description needs one detail request per offer,
+  // so known offers with the same release date are only reported as still listed.
+  async *collect(slug, companyName, known) {
     for (let offset = 0; ; offset += PAGE) {
       const { totalFound, content } = await page(slug, offset, "fr");
       for (const posting of content) {
+        const externalId = `${slug}:${posting.id}`;
+        if (known?.has(externalId) && known.get(externalId) === (posting.releasedDate ?? null) && !refreshDue(externalId)) {
+          yield { stillListed: externalId };
+          continue;
+        }
         await pause(collectorConfig.ats.pauseBetweenRequestsMs);
         let detail: Detail;
         try {

@@ -18,6 +18,7 @@ describe("pipeline text helpers", () => {
     assert.equal(normalizeTitle("Développeur C++ h/f/x"), "developpeur c++");
     assert.equal(offerFingerprint("cloudine", "Dev React (H/F)", "44"), "cloudine|dev react|44");
     assert.equal(offerFingerprint(null, "Dev React", "44"), null, "no company, no fingerprint");
+    assert.equal(offerFingerprint("cloudine", "Dev React", null), null, "no département, no fingerprint");
   });
 
   test("personal data: emails and phone numbers removed", () => {

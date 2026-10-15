@@ -33,7 +33,7 @@ async function main() {
   // Company discovery and board checks (COLLECTOR.md §5.2).
   await boss.work<BoardsJob>(QUEUES.boards, async ([job]) => {
     if (job.data.action === "discover") {
-      for (const adapter of atsAdapters) await discoverBoards(adapter);
+      for (const adapter of atsAdapters.filter((item) => item.discovery)) await discoverBoards(adapter);
     } else {
       await checkBoards({ limit: collectorConfig.discovery.checkBatch });
     }

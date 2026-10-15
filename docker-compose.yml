@@ -27,5 +27,24 @@ services:
       - "127.0.0.1:1026:1025"
       - "127.0.0.1:8026:8025"
 
+  # Job collector worker (COLLECTOR.md): scheduled collection, board checks, discovery,
+  # expiry. Runs the repository's code (mounted) with its node_modules; restart it after a
+  # code change: `docker compose restart collector`. Logs: `docker compose logs -f collector`.
+  collector:
+    image: node:24.13.0-bookworm-slim
+    container_name: job-collector
+    restart: unless-stopped
+    profiles: ["collector"] # started on demand: npm run collector:up
+    working_dir: /app
+    command: ["node", "--import", "tsx", "apps/job_collector/src/main.ts"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://job:job_dev_password@postgres:5432/job
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   job_pgdata:

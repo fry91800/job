@@ -21,13 +21,21 @@ export function mentionsFrance(text: string | null | undefined): boolean {
   return !!text && PLACE_PATTERN.test(plain(text));
 }
 
-// The French city named in a location text, as written in the list above (title case
-// is restored by the pipeline's location lookup, which ignores case and accents).
+// The French city named in a location text: a city of the list above, else the text's
+// first part when it reads like a place name ("Sanary-sur-mer", "Mandelieu la napoule,
+// France"), for offers already known to be in France. The pipeline's location lookup
+// (table, then Geoapify) resolves it, ignoring case and accents, or falls back to the
+// country.
+const NOT_A_PLACE = /\b(france|remote|teletravail|hybrid|hybride|anywhere|multiple|locations?|sites?|europe|emea|home|office|siege|national|nationale|region|regions)\b/;
+
 export function frenchCity(text: string | null | undefined): string | null {
   if (!text) return null;
-  const match = PLACE_PATTERN.exec(plain(text));
-  const place = match?.[2];
-  return place && !["france", "ile-de-france", "ile de france"].includes(place) ? place : null;
+  // The first city named ("France - Paris" → paris), skipping the country and region.
+  const generic = ["france", "ile-de-france", "ile de france"];
+  const place = [...plain(text).matchAll(new RegExp(PLACE_PATTERN, "g"))].map((match) => match[2]).find((name) => !generic.includes(name));
+  if (place) return place;
+  const first = text.split(/,|\s[-–|/]\s|\(|;/)[0].replace(/\s+/g, " ").trim();
+  return /^[\p{L}][\p{L}' -]{1,48}$/u.test(first) && !NOT_A_PLACE.test(plain(first)) ? first : null;
 }
 
 export function isFranceCountry(value: string | null | undefined): boolean {

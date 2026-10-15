@@ -37,7 +37,7 @@ export function slugsFromIndexLines(adapter: AtsAdapter, text: string): Set<stri
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     try {
-      const slug = adapter.discovery.slugFromUrl(new URL(JSON.parse(line).url));
+      const slug = adapter.discovery?.slugFromUrl(new URL(JSON.parse(line).url));
       if (slug) slugs.add(slug);
     } catch {
       // Not a JSON line or not a URL: ignored.
@@ -59,10 +59,10 @@ export async function discoverBoards(
   const failedPrefixes: string[] = [];
   let added = 0;
 
-  for (const prefix of adapter.discovery.prefixes) {
+  for (const prefix of adapter.discovery?.prefixes ?? []) {
     const slugs = new Set<string>();
     try {
-      const query = `url=${encodeURIComponent(prefix)}&matchType=prefix&pageSize=1`;
+      const query = `url=${encodeURIComponent(prefix)}&matchType=${adapter.discovery?.matchType ?? "prefix"}&pageSize=1`;
       const { pages } = JSON.parse((await fetchText(`${endpoint}?${query}&showNumPages=true`)) || '{"pages":0}') as { pages: number };
       const last = Math.min(pages, options.maxPages ?? pages);
       for (let page = 0; page < last; page++) {

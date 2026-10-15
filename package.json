@@ -23,7 +23,9 @@
     "jobs:cleanup": "tsx apps/api/src/jobs/run-cleanup.ts",
     "ai:check": "tsx apps/api/src/ai/check.ts",
     "collector": "tsx apps/job_collector/src/cli.ts",
-    "collector:start": "tsx apps/job_collector/src/main.ts"
+    "collector:start": "tsx apps/job_collector/src/main.ts",
+    "collector:up": "docker compose --profile collector up -d collector",
+    "collector:logs": "docker compose logs -f --tail 100 collector"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

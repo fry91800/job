@@ -25,11 +25,12 @@ export async function findDuplicate(offer: NormalizedOffer, fingerprint: string 
   }
 
   // 3. Same company, title and département, published around the same time, with a
-  //    similar description.
+  //    similar description, from another source: two records of one source are two
+  //    postings the company chose to publish (the same job in two towns).
   if (fingerprint) {
     const windowMs = collectorConfig.dedupe.publishedWithinDays * 24 * 3600 * 1000;
     const candidates = await prisma.offer.findMany({
-      where: { fingerprint, closedAt: null },
+      where: { fingerprint, closedAt: null, sources: { none: { source: offer.source } } },
       select: { id: true, description: true, publishedAt: true },
       take: 20,
     });

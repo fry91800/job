@@ -10,6 +10,7 @@ import { normalizeCompanyName } from "../pipeline/text";
 // Checks boards: does it exist, how many offers, how many in France? Boards with French
 // offers become active (collected); the others are checked again later (recheckDays).
 
+
 export type CheckResult = { status: string; jobCount: number | null; franceJobCount: number | null };
 
 export async function checkBoard(board: CompanySource): Promise<CheckResult> {
@@ -17,7 +18,9 @@ export async function checkBoard(board: CompanySource): Promise<CheckResult> {
   if (!adapter) throw new Error(`No adapter for ${board.ats}`);
   try {
     const result = await adapter.check(board.slug);
-    const status = result.jobCount === 0 ? "empty" : result.franceJobCount === 0 ? "no-france" : "active";
+    // Sandbox accounts hold fake offers: set aside, never collected or re-checked.
+    const sandbox = /sandbox$/i.test(board.slug) || /\bsandbox\b/i.test(result.companyName ?? "");
+    const status = sandbox ? "paused" : result.jobCount === 0 ? "empty" : result.franceJobCount === 0 ? "no-france" : "active";
     let companyId = board.companyId;
     if (status === "active" && !companyId) {
       const name = result.companyName ?? nameFromSlug(board.slug);

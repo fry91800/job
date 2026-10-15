@@ -7,6 +7,8 @@ import { collectorConfig } from "../config";
 import { checkBoards } from "../discovery/check-boards";
 import { discoverBoards, slugsFromIndexLines } from "../discovery/common-crawl";
 import { runConnector } from "../runs/run-connector";
+import type { CollectedRecord } from "../connectors/types";
+import type { KnownOffers } from "./adapter";
 import { atsConnector } from "./connector";
 import { contractFrom, frenchCity, mentionsFrance, nameFromSlug, remoteFrom, salaryPeriod } from "./mapping";
 import { findAdapter } from "./registry";
@@ -75,6 +77,20 @@ function route(url: URL): [number, unknown] {
     const ids = france ? ["s1", "s2", "s2gone"] : ["s1", "s2", "s3"];
     return [200, { totalFound: ids.length, content: ids.map((id) => ({ id, name: id, company: { name: "Test Acme SR" } })) }];
   }
+  // Workable
+  if (path === "/api/v1/widget/accounts/test-acme") {
+    return [200, { name: "Test Acme W", jobs: [
+      { title: "Stage Développeur Python", shortcode: "W1", employment_type: "Internship", telecommuting: false, url: "https://apply.workable.com/test-acme/j/W1/", application_url: "https://apply.workable.com/test-acme/j/W1/apply", published_on: "2026-10-05", country: "France", city: "Lille", state: "Hauts-de-France", locations: [{ country: "France", countryCode: "FR", city: "Lille", region: "Hauts-de-France" }], description: `<p>${LONG}</p>` },
+      { title: "Account Executive", shortcode: "W2", country: "Germany", city: "Berlin", locations: [{ country: "Germany", countryCode: "DE", city: "Berlin" }], description: "<p>x</p>" },
+    ] }];
+  }
+  // Recruitee (one host per company; the test base has no {slug})
+  if (path === "/api/offers/") {
+    return [200, { offers: [
+      { id: 101, slug: "dev", title: "Développeur Go", careers_url: "https://test-acme.recruitee.com/o/dev", careers_apply_url: "https://test-acme.recruitee.com/o/dev/c/new", location: "Bordeaux, France", locations: [{ country_code: "FR", city: "Bordeaux", name: "Bordeaux, France", postal_code: "33000" }], hybrid: true, employment_type_code: "fulltime_permanent", description: `<p>${LONG}</p>`, requirements: "<p>Go, Kubernetes</p>", published_at: "2026-10-06 09:30:00 UTC", company_name: "Test Acme R", salary: { min: "48000", max: "58000", period: "year", currency: "EUR" } },
+      { id: 102, slug: "us", title: "US Sales", locations: [{ country_code: "US", city: "Austin" }], country_code: "US", description: "<p>x</p>" },
+    ] }];
+  }
   // Common Crawl index
   if (path === "/collinfo.json") return [200, [{ id: "CC-TEST" }]];
   if (path === "/CC-TEST-index") {
@@ -118,10 +134,14 @@ after(async () => {
   await prisma.$disconnect();
 });
 
-const collectAll = async (ats: string, slug: string) => {
-  const records = [];
-  for await (const record of findAdapter(ats)!.collect(slug, "Test Acme")) records.push(record);
-  return records;
+const collectAll = async (ats: string, slug: string, known?: KnownOffers) => {
+  const records: CollectedRecord[] = [];
+  const stillListed: string[] = [];
+  for await (const record of findAdapter(ats)!.collect(slug, "Test Acme", known)) {
+    if ("stillListed" in record) stillListed.push(record.stillListed);
+    else records.push(record);
+  }
+  return Object.assign(records, { stillListed });
 };
 
 describe("ATS mapping helpers", () => {
@@ -130,6 +150,11 @@ describe("ATS mapping helpers", () => {
     for (const text of ["London, UK", "Remote EMEA", "Brussels", null]) assert.ok(!mentionsFrance(text), String(text));
     assert.equal(frenchCity("Paris, France"), "paris");
     assert.equal(frenchCity("Remote - France"), null);
+    assert.equal(frenchCity("France - Paris"), "paris");
+    assert.equal(frenchCity(" Sanary-sur-mer "), "Sanary-sur-mer", "a town missing from the list: the text itself");
+    assert.equal(frenchCity("Mandelieu la napoule, France"), "Mandelieu la napoule");
+    assert.equal(frenchCity("Multiple locations"), null);
+    assert.equal(frenchCity("France (télétravail)"), null);
   });
 
   test("contract and remote only from explicit words", () => {
@@ -183,6 +208,44 @@ describe("adapters", () => {
     const offer = records[0].offer;
     assert.match(offer.description.content, /^<h2>L'entreprise<\/h2><p>Test Acme<\/p>\n<h2>Le poste<\/h2>/);
     assert.deepEqual([offer.contractType, offer.remote, offer.location?.latitude, offer.company?.name], ["apprenticeship", "hybrid", 43.6, "Test Acme SR"]);
+  });
+
+  test("SmartRecruiters: known offers with the same release date skip their detail request", async () => {
+    const refreshDays = collectorConfig.ats.detailRefreshDays;
+    try {
+      collectorConfig.ats.detailRefreshDays = 1_000_000_000; // no weekly refresh today
+      const known: KnownOffers = new Map([["TestAcme:s1", null], ["TestAcme:s2", "2026-01-01T00:00:00Z"]]);
+      const records = await collectAll("smartrecruiters", "TestAcme", known);
+      assert.deepEqual(records.stillListed, ["TestAcme:s1"]);
+      assert.deepEqual(records.map((record) => record.offer.externalId), ["TestAcme:s2"], "another release date: fetched again");
+
+      collectorConfig.ats.detailRefreshDays = 1; // the refresh day of every offer
+      assert.deepEqual((await collectAll("smartrecruiters", "TestAcme", known)).stillListed, []);
+    } finally {
+      collectorConfig.ats.detailRefreshDays = refreshDays;
+    }
+  });
+});
+
+describe("Workable and Recruitee", () => {
+  test("Workable: France only, internship, apply link", async () => {
+    assert.deepEqual(await findAdapter("workable")!.check("test-acme"), { companyName: "Test Acme W", jobCount: 2, franceJobCount: 1 });
+    const records = await collectAll("workable", "test-acme");
+    assert.equal(records.length, 1);
+    const offer = records[0].offer;
+    assert.deepEqual([offer.externalId, offer.location?.city, offer.contractType, offer.publishedAt], ["test-acme:W1", "Lille", "internship", "2026-10-05T00:00:00.000Z"]);
+  });
+
+  test("Recruitee: France only, contract code, salary, requirements in the description", async () => {
+    assert.deepEqual(await findAdapter("recruitee")!.check("test-acme"), { companyName: "Test Acme R", jobCount: 2, franceJobCount: 1 });
+    const [{ offer }] = await collectAll("recruitee", "test-acme");
+    assert.deepEqual(
+      [offer.location?.city, offer.location?.postcode, offer.contractType, offer.remote, offer.salary, offer.publishedAt],
+      ["Bordeaux", "33000", "permanent", "hybrid", { min: 48000, max: 58000, currency: "EUR", period: "year" }, "2026-10-06T09:30:00.000Z"],
+    );
+    assert.match(offer.description.content, /Kubernetes/);
+    assert.equal(findAdapter("recruitee")!.discovery!.slugFromUrl(new URL("https://test-acme.recruitee.com/o/dev")), "test-acme");
+    assert.equal(findAdapter("recruitee")!.discovery!.slugFromUrl(new URL("https://www.recruitee.com/")), null);
   });
 });
 

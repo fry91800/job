@@ -1,6 +1,8 @@
 import { departementCode, matchInText, matchLabels, matchLocation, prisma } from "@job/backend";
+import { collectorConfig } from "../config";
 import type { NormalizedOffer } from "./normalize";
 import { detectLanguage } from "./text";
+import { itOccupationCodes } from "./title-rules";
 
 // Stage 5 (COLLECTOR.md §6): location, occupations (ROME + ESCO), skills (ESCO), language.
 
@@ -28,18 +30,44 @@ export async function resolveLocation(location: NormalizedOffer["location"]): Pr
   return { id: null, countyCode: county };
 }
 
+// ROME family occupations (M18 = IT): code → id, loaded once.
+let romeFamily: Promise<Map<string, number>> | null = null;
+function romeFamilyIds(): Promise<Map<string, number>> {
+  romeFamily ??= prisma.occupation
+    .findMany({ where: { source: "rome", externalId: { startsWith: collectorConfig.itRome.family } }, select: { id: true, externalId: true } })
+    .then((rows) => new Map(rows.map((row) => [row.externalId!, row.id])));
+  return romeFamily;
+}
+
+// After a catalogue import or in tests.
+export function resetOccupationRules(): void {
+  romeFamily = null;
+}
+
 // Occupations given by the source (ROME codes, ESCO URIs), else found in the title; each
 // completed with its equivalents in the other catalogue (ROME ↔ ESCO correspondence).
-export async function resolveOccupations(offer: NormalizedOffer, language: string | null): Promise<number[]> {
+// From titles, IT (ROME M18) occupations come from the IT title rules only: the
+// dictionary's M18 matches mostly come from generic names ("Chef de projet", "Spécialiste
+// support", ESCO "project manager") and catch construction or accounting jobs.
+export async function resolveOccupations(offer: Pick<NormalizedOffer, "title" | "occupations">, language: string | null): Promise<number[]> {
   const given = offer.occupations.length
     ? await prisma.occupation.findMany({
         where: { OR: offer.occupations.map(({ scheme, code }) => ({ source: scheme, externalId: code })) },
         select: { id: true },
       })
     : [];
-  const ids = given.length ? given.map((row) => row.id) : await matchInText("occupation", offer.title, language);
-  if (ids.length === 0) return [];
+  if (given.length) return withRelated(given.map((row) => row.id));
 
+  const family = await romeFamilyIds();
+  const ruleIds = itOccupationCodes(offer.title).flatMap((code) => family.get(code) ?? []);
+  const familyIds = new Set(family.values());
+  const allowed = new Set(ruleIds);
+  const ids = [...(await matchInText("occupation", offer.title, language)), ...ruleIds];
+  return (await withRelated(ids)).filter((id) => !familyIds.has(id) || allowed.has(id));
+}
+
+async function withRelated(ids: number[]): Promise<number[]> {
+  if (ids.length === 0) return [];
   const related = await prisma.occupationRelationship.findMany({
     where: { OR: [{ occupationId: { in: ids } }, { relatedOccupationId: { in: ids } }] },
     select: { occupationId: true, relatedOccupationId: true },

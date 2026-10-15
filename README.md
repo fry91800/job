@@ -154,7 +154,11 @@ Other scripts:
 * `npm test` — all tests (shared, API, collector), against their own database `job_test` (created on first run, migrated and reseeded on every run) and storage folder `storage-test`, with the fake AI provider: development data is never touched. `npm test -- path/to/file.test.ts` runs only some files. Running a test file directly against the development database is refused
 * `npm run ai:check` — one tiny request to the configured AI provider/model (checks the key, the model and the latency; uses one request of the quota)
 * `npm run collector -- catalogue [--esco data/esco]` — import the ROME + ESCO catalogue (run again after `db:seed`, which empties it; see COLLECTOR.md §8.1)
-* `npm run collector:start` — job collector worker; `npm run collector -- discover | boards check|add|list | run <connector> | metrics | token <source> <name> | contract` (see COLLECTOR.md §13–14)
+* `npm run collector -- boards add careersite <address>` — add a company career site to crawl (schema.org JobPosting; see COLLECTOR.md §15)
+* `npm run collector -- reenrich` — recompute the occupations of collected offers from their titles (after a change of the matching rules or the catalogue)
+* `npm run collector -- boards export` / `boards import <file>` — save the board registry to `data/` / merge it into a database (keep it before `db:seed` or `db:reset`, which empty it)
+* `npm run collector:up` — start the collector worker in Docker (restarts with Docker; `npm run collector:logs` follows its logs, `docker compose restart collector` after a code change)
+* `npm run collector:start` — job collector worker in the terminal; `npm run collector -- discover | boards check|add|list | run <connector> | metrics | token <source> <name> | contract` (see COLLECTOR.md §13–14)
 * `npm run jobs:cleanup` — run the cleanup job once (the API also runs it every 24 h)
 * `npm run db:reset` — drop everything, re-apply the migrations and reseed
 * `npm run db:studio` — browse the data in Prisma Studio

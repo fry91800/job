@@ -2,14 +2,19 @@
 //   catalogue [--esco <folder>] [--refresh]   import ROME, the ROME ↔ ESCO links, ESCO, manual skills
 //   run <connector>                           run one connector now
 //   maintenance                               close expired offers
+//   reenrich                                  recompute collected offers' occupations from their title
 //   metrics                                   coverage and quality numbers
 //   discover [--ats greenhouse,ashby] [--pages N] [--crawl CC-MAIN-…]   find boards in Common Crawl
 //   boards check [--ats X] [--limit N]        check candidate / due boards
-//   boards add <ats> <slug>                   add a board by hand (checked right away)
+//   boards add <ats> <slug>                   add a board by hand (checked right away); careersite <address>
 //   boards list [--status S]                  boards by tool and status
+//   boards export [file]                      save the board registry (default data/boards-<date>.json.gz)
+//   boards import <file>                      merge a saved registry (newer checks win)
 //   token <source> <name>                     create a token for POST /api/collector/ingest
 //   contract                                  the ingestion contract as JSON Schema
 import { createHash, randomBytes } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { prisma } from "@job/backend";
 import { collectedOfferJsonSchema } from "@job/shared";
 import { atsAdapters, findAdapter } from "./ats/registry";
@@ -17,8 +22,10 @@ import { importCatalogue } from "./catalogue/import";
 import { connectors, findConnector } from "./connectors/registry";
 import { checkBoard, checkBoards } from "./discovery/check-boards";
 import { discoverBoards } from "./discovery/common-crawl";
+import { exportBoards, importBoards } from "./discovery/registry-file";
 import { collectorMetrics } from "./metrics";
 import { runMaintenance } from "./pipeline/close";
+import { reenrichOccupations } from "./pipeline/reenrich";
 import { runConnector } from "./runs/run-connector";
 
 function option(args: string[], name: string): string | undefined {
@@ -39,7 +46,7 @@ async function main() {
       break;
     }
     case "discover": {
-      const names = option(args, "--ats")?.split(",") ?? atsAdapters.map((adapter) => adapter.ats);
+      const names = option(args, "--ats")?.split(",") ?? atsAdapters.filter((adapter) => adapter.discovery).map((adapter) => adapter.ats);
       const pages = option(args, "--pages");
       for (const name of names) {
         const adapter = findAdapter(name);
@@ -54,7 +61,9 @@ async function main() {
         const limit = option(rest, "--limit");
         await checkBoards({ ats: option(rest, "--ats"), limit: limit ? Number(limit) : undefined });
       } else if (action === "add") {
-        const [ats, slug] = rest;
+        const [ats, given] = rest;
+        // Career sites: an address is accepted ("https://careers.x.com/" → careers.x.com).
+        const slug = ats === "careersite" && given ? given.replace(/^https?:\/\//, "").replace(/\/+$/, "") : given;
         if (!ats || !slug || !findAdapter(ats)) throw new Error(`Usage: boards add <${atsAdapters.map((item) => item.ats).join("|")}> <slug>`);
         const board = await prisma.companySource.upsert({
           where: { ats_slug: { ats, slug } },
@@ -66,11 +75,21 @@ async function main() {
         const status = option(rest, "--status");
         const rows = await prisma.companySource.groupBy({ by: ["ats", "status"], _count: true, where: status ? { status } : {}, orderBy: [{ ats: "asc" }, { status: "asc" }] });
         for (const row of rows) console.log(`${row.ats.padEnd(16)} ${row.status.padEnd(10)} ${row._count}`);
+      } else if (action === "export") {
+        const file = rest[0] ?? `data/boards-${new Date().toISOString().slice(0, 10)}.json.gz`;
+        await mkdir(dirname(file), { recursive: true });
+        console.log(`${await exportBoards(file)} board(s) saved to ${file}`);
+      } else if (action === "import") {
+        if (!rest[0]) throw new Error("Usage: boards import <file>");
+        console.log(await importBoards(rest[0]));
       } else {
-        throw new Error("Usage: boards check|add|list");
+        throw new Error("Usage: boards check|add|list|export|import");
       }
       break;
     }
+    case "reenrich":
+      await reenrichOccupations();
+      break;
     case "maintenance":
       console.log(await runMaintenance());
       break;
@@ -89,7 +108,7 @@ async function main() {
       console.log(JSON.stringify(collectedOfferJsonSchema(), null, 2));
       break;
     default:
-      console.log("Commands: catalogue [--esco <folder>] [--refresh] | discover [--ats …] [--pages N] | boards check|add|list | run <connector> | maintenance | metrics | token <source> <name> | contract");
+      console.log("Commands: catalogue [--esco <folder>] [--refresh] | discover [--ats …] [--pages N] | boards check|add|list|export|import | run <connector> | maintenance | reenrich | metrics | token <source> <name> | contract");
       process.exitCode = command ? 1 : 0;
   }
 }

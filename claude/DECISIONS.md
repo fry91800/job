@@ -300,6 +300,28 @@ Full plan in `COLLECTOR.md`.
 | D118 | The Prisma client refuses to start under `node --test` unless the database name ends in `_test` | A test file run by hand cannot reach development data |
 | D119 | Tests always use the fake AI provider (`AI_PROVIDER=fake` set by the runner) | No paid model calls from tests |
 
+## Update 25 — full discovery run (2026-10-15)
+
+| ID | Decision | Why |
+|---|---|---|
+| D120 | No fingerprint (no fuzzy merge) when the département is unknown | One company posted the same title in ~100 towns; at country level they were merged into one |
+| D121 | A location text that isn't a known city is used as the city name when it reads like a place; names are compared without accents, case, hyphens or apostrophes | Small towns were falling back to "France" |
+| D122 | Sandbox boards are `paused` (never collected or re-checked) | They hold fake offers (382 on one SmartRecruiters sandbox) |
+| D123 | SmartRecruiters: known offers with an unchanged release date skip their detail request; each is fetched again about weekly (spread by id) | A full run took 3 h 15 for ~28 000 offers; regular runs only need the new ones |
+| D124 | The board registry is exported/imported as a file (boards + companies, no offers); on import the more recent check wins | Discovery and checks take hours; offers are re-collected in one run and expire anyway |
+| D125 | IT (ROME M18) occupations from titles come from IT title rules; dictionary M18 matches are kept only when a rule confirms them; the IT scope excludes the weather/climate codes (M1888, M1890, M1891, M1893) | Dictionary matching missed short/English IT titles and its M18 matches were mostly generic names on non-IT jobs (~700 of 1 913) |
+| D126 | `collector reenrich` recomputes stored offers' occupations from their titles | Matching rules change; re-collecting would cost hours of requests |
+
+## Update 26 — collector phase 3 (2026-10-15)
+
+| ID | Decision | Why |
+|---|---|---|
+| D127 | Career sites are boards of the registry (`ats = "careersite"`, slug = start address), collected through the same adapter interface as the ATS (connector kind `crawler`) | One registry, one set of checks, statuses, full sync, closing and export/import |
+| D128 | robots.txt obeyed (RFC 9309) by default — `crawler.respectRobotsTxt` (env `CRAWLER_RESPECT_ROBOTS_TXT`) can turn its rules off, pauses and crawl-delay still apply —, one request at a time per host, ≥ 2 s apart or the site's crawl-delay (capped at 30 s); placeholder contact in the user agent until production | Polite crawling of sites we don't have an agreement with |
+| D129 | Offer pages from sitemaps (else links); a known page whose sitemap date is unchanged isn't fetched again (weekly refresh); ≤ 1 000 new pages per site and run | Big sites (Thales: 7 000 pages) can't be read in full every day at 2 s per page |
+| D130 | The SSRF-safe fetcher moves to `@job/backend`, shared by the API and the crawler | Crawled sites are as untrusted as user-given URLs |
+| D131 | Workable and Recruitee get ATS adapters (public APIs); Teamtailor sites are crawled (JobPosting + sitemaps) and discovered by domain | APIs beat crawling when they exist; Teamtailor needs no dedicated code |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

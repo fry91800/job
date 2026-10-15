@@ -26,9 +26,10 @@ export function normalizeTitle(title: string): string {
 }
 
 // Company + title + département: the same job published by several sources.
+// Without a département, the same title can be many offers (one per town): no fingerprint.
 export function offerFingerprint(companyKey: string | null, title: string, countyCode: string | null): string | null {
-  if (!companyKey) return null;
-  return `${companyKey}|${normalizeTitle(title)}|${countyCode ?? ""}`;
+  if (!companyKey || !countyCode) return null;
+  return `${companyKey}|${normalizeTitle(title)}|${countyCode}`;
 }
 
 // Similarity of two descriptions: Jaccard index of their 3-word shingles (0..1).
