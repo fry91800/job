@@ -52,7 +52,9 @@ export const offerSearchSchema = z.object({
   salaryCurrency: z.preprocess(emptyToUndefined, z.string().regex(/^[A-Za-z]{3}$/).transform((value) => value.toUpperCase()).default("EUR")),
   salaryPeriod: z.preprocess(emptyToUndefined, z.enum(SALARY_PERIODS).default("year")),
   salaryShownOnly: z.preprocess(emptyToUndefined, queryBoolean.default(false)),
-  sort: z.preprocess(emptyToUndefined, z.enum(SEARCH_SORTS).default("recent")),
+  // Relevance by default: keyword and skill matches first, then the most recent (without
+  // keywords or skills it is the same as "recent").
+  sort: z.preprocess(emptyToUndefined, z.enum(SEARCH_SORTS).default("relevance")),
   page: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(500).default(1)),
 });
 

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import type { OfferDetail, OfferSearchResponse, OfferSearchResult } from "@job/shared";
 import { prisma, seedOfferId as offerId, startTestServer } from "../test/helpers";
+import { searchWords } from "./offer-search";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 let baseUrl: string;
@@ -41,6 +42,13 @@ before(async () => {
 
 after(() => server.close());
 
+describe("search words", () => {
+  test("stop words and gender markers are ignored", () => {
+    assert.deepEqual(searchWords("Chef de projet (H/F)"), ["Chef", "projet"]);
+    assert.deepEqual(searchWords("développeur d'applications"), ["développeur", "applications"]);
+  });
+});
+
 describe("GET /api/offers", () => {
   test("lists open public offers, 20 per page, most recent first", async () => {
     const { status, body } = await search({});
@@ -50,6 +58,16 @@ describe("GET /api/offers", () => {
     assert.equal(body.total, 198);
     const dates = body.results.map((offer) => offer.publishedAt ?? "");
     assert.deepEqual(dates, [...dates].sort().reverse());
+  });
+
+  test("keyword searches are sorted by relevance by default", async () => {
+    const byDefault = await search({ q: "développeur react" });
+    const relevance = await search({ q: "développeur react", sort: "relevance" });
+    const recent = await search({ q: "développeur react", sort: "recent" });
+    const ids = (body: OfferSearchResponse) => body.results.map((offer) => offer.id);
+    assert.deepEqual(ids(byDefault.body), ids(relevance.body));
+    assert.ok(byDefault.body.total > 1);
+    assert.equal(byDefault.body.total, recent.body.total, "same offers, another order");
   });
 
   test("never returns closed or private offers", async () => {

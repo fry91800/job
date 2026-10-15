@@ -322,6 +322,13 @@ Full plan in `COLLECTOR.md`.
 | D130 | The SSRF-safe fetcher moves to `@job/backend`, shared by the API and the crawler | Crawled sites are as untrusted as user-given URLs |
 | D131 | Workable and Recruitee get ATS adapters (public APIs); Teamtailor sites are crawled (JobPosting + sitemaps) and discovered by domain | APIs beat crawling when they exist; Teamtailor needs no dedicated code |
 
+## Update 27 — search performance (2026-10-15)
+
+| ID | Decision | Why |
+|---|---|---|
+| D132 | Keyword search: each word is a union of offer ids from indexed lookups (title ILIKE / word similarity, company ILIKE, offers linked to occupations whose name matches); trigram index on `occupation_names.name`; French/English stop words and H/F markers ignored | With 35 000 offers the OR form was evaluated offer by offer: 2–3 s per word, 26 s for "chef de projet"; now 50–450 ms with the same results |
+| D133 | Offer search is sorted by relevance by default (keyword and skill matches first, then most recent); "recent" stays available | Keyword matches through linked occupations are broad; with date order, loosely related offers came first |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

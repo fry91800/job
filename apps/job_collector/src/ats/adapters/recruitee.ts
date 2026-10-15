@@ -75,7 +75,7 @@ export function recruiteeOffer(offer: Offer, slug: string, companyName: string):
 }
 
 // {company}.recruitee.com, but not Recruitee's own hosts.
-const NOT_COMPANIES = new Set(["www", "app", "api", "help", "blog", "careers", "status", "support", "docs", "partners"]);
+const NOT_COMPANIES = new Set(["www", "app", "api", "auth", "help", "blog", "careers", "status", "support", "docs", "partners"]);
 
 export const recruitee: AtsAdapter = {
   ats: "recruitee",

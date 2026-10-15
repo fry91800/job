@@ -160,7 +160,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
   * **company** — text;
   * filters: remote type, contract type, published within (24 h / 7 d / 30 d), minimum salary (only compares offers with the same currency and period; offers without salary are included unless "salary shown only" is ticked).
 * Only `is_public = true` and `closed_at IS NULL` offers.
-* Sort: most recent (default) or relevance (skill/keyword matches). Sorting by match % is **not** in the MVP (would require scoring every offer).
+* Sort: relevance (default: keyword and skill matches first, then most recent) or most recent. Sorting by match % is **not** in the MVP (would require scoring every offer).
 * Pagination: 20 per page, offset-based.
 * Results show title, company, location, remote/contract, salary, published date, saved state, and **match %** if the user has a selected resume (O4). Each result includes the offer's skill and occupation ids so the frontend can compute the match.
 * The last searched location is saved in `users.search_location_id` for existing users (does not create a guest on its own). Other criteria live in the URL query string (shareable, restorable via browser history).

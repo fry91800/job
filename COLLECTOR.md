@@ -356,3 +356,10 @@ Not in phase 1 (planned with the first real sources): AI for missing fields and 
 
 **Checked live (2026-10-15)**: Teamtailor's own site (15 offers, JSON-LD complete, none in France — correctly skipped); Thales (`careers.thalesgroup.com`, a Phenom site: 7 152 offer pages in its sitemaps, about two thirds in France; JSON-LD with city, postcode, département; the `jobs.thalesgroup.com` address redirects there — sites are compared by registered domain); Hugging Face on Workable (6 offers, 3 in France). Common Crawl's index was unavailable for several hours (504 on every query) — discovery tolerates it, and boards can always be added by hand.
 
+**First results (2026-10-15)**:
+* **Workable**: 747 accounts discovered (index stopped part-way) → 31 with offers in France → 79 offers (89 received).
+* **Recruitee**: 326 companies discovered from one older crawl (the domain query timed out on the others) → 33 active → 238 offers (251 received, 11 rejected); the most complete source: contract type 98 %, salary 32 %, quality 82.
+* **Career sites**: 40 Teamtailor sites discovered → 5 active → 20 offers (small French companies: Biscuit International, Epsor, CybelAngel…); Thales added by hand: 1 000 pages read in the first run (40 min) → 584 French offers, 19 % IT (111); the rest of its ~7 000 pages follows over the next daily runs.
+* **Overlap with phase 2: none** — every phase 3 offer is new (no merge with an ATS offer), which is the expected value of new sources. Phase 3's IT share is low except for Thales; the IT companies already known come through phase 2.
+* **Discovery limits**: Common Crawl's public index answers 504 to most whole-domain queries (`*.recruitee.com`, `*.teamtailor.com`) and was down for hours; results above are partial. Next: its columnar (Parquet) index, which is queried in bulk instead of through the overloaded API.
+

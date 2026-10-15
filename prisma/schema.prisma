@@ -419,6 +419,7 @@ model OccupationName {
 
   @@unique([occupationId, language, normalizedName])
   @@index([language, normalizedName])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin) // offer search by occupation name
   @@map("occupation_names")
 }
 

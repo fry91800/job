@@ -32,7 +32,7 @@ type Form = {
 
 const emptyForm: Form = {
   q: "", company: "", radius: "25", includeRemote: true, skills: "", remoteType: [], contractType: [],
-  publishedWithin: "", salaryMin: "", salaryCurrency: "EUR", salaryPeriod: "year", salaryShownOnly: false, sort: "recent",
+  publishedWithin: "", salaryMin: "", salaryCurrency: "EUR", salaryPeriod: "year", salaryShownOnly: false, sort: "relevance",
 };
 
 function toggle(list: string[], value: string): string[] {

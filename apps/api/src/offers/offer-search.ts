@@ -55,21 +55,35 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+// Words that would match almost every offer ("chef DE projet").
+const STOP_WORDS = new Set([
+  "a", "à", "au", "aux", "d", "de", "des", "du", "en", "et", "l", "la", "le", "les", "ou", "par", "pour", "sur", "un", "une",
+  "an", "and", "at", "for", "in", "of", "on", "or", "the", "to", "h", "f", "hf", "fh", "x",
+]);
+
+export function searchWords(q: string): string[] {
+  const words = q
+    .split(/[\s'’/()]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 0 && !STOP_WORDS.has(word.toLowerCase()));
+  return words.slice(0, MAX_KEYWORDS);
+}
+
 // Each keyword must match the title (substring, or trigram word similarity so missing
 // accents and small typos still match), the company name, or a linked occupation name.
+// Written as a union of offer ids, each part answered by an index (trigram indexes on
+// offers.title, offers.company_name and occupation_names.name): an OR of the same tests
+// would be evaluated offer by offer (26 s for "chef de projet" on 35 000 offers).
 function keywordConditions(q: string): Prisma.Sql[] {
-  const words = q.split(/\s+/).filter(Boolean).slice(0, MAX_KEYWORDS);
-  return words.map((word) => {
+  return searchWords(q).map((word) => {
     const pattern = `%${escapeLike(word)}%`;
-    return sql`(
-      o.title ILIKE ${pattern}
-      OR ${word} <% o.title
-      OR o.company_name ILIKE ${pattern}
-      OR EXISTS (
-        SELECT 1 FROM offer_occupations oo
-        JOIN occupation_names n ON n.occupation_id = oo.occupation_id
-        WHERE oo.offer_id = o.id AND (n.name ILIKE ${pattern} OR ${word} <% n.name)
-      )
+    return sql`o.id IN (
+      SELECT id FROM offers WHERE title ILIKE ${pattern}
+      UNION SELECT id FROM offers WHERE ${word} <% title
+      UNION SELECT id FROM offers WHERE company_name ILIKE ${pattern}
+      UNION SELECT offer_id FROM offer_occupations WHERE occupation_id = ANY (ARRAY(
+        SELECT DISTINCT occupation_id FROM occupation_names WHERE name ILIKE ${pattern} OR ${word} <% name
+      ))
     )`;
   });
 }
