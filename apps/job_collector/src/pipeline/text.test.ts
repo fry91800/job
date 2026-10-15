@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { htmlToMarkdown } from "@job/backend";
 import { describe, test } from "node:test";
 import { tokenize } from "@job/backend";
 import { labelVariants } from "../catalogue/labels";
@@ -66,5 +67,8 @@ describe("catalogue helpers", () => {
 
   test("tokens keep technical names whole", () => {
     assert.deepEqual(tokenize("Node.js, C#, C++ et .NET ; front-end. PostgreSQL."), ["node.js", "c#", "c++", "et", ".net", "front", "end", "postgresql"]);
+  });
+  test("HTML lists: the item's text stays on its dash, even inside a paragraph", () => {
+    assert.equal(htmlToMarkdown("<p>Missions :</p><ul><li><p>Concevoir</p></li><li>Livrer <b>vite</b></li></ul>"), "Missions :\n\n- Concevoir\n- Livrer **vite**");
   });
 });

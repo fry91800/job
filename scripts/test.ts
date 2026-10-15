@@ -3,12 +3,14 @@
 // never wipes development data (collected offers, catalogue, uploads).
 //   npm test                              every test
 //   npm test -- apps/api/src/x.test.ts   only these files
+// Server tests run with Node's test runner; the web app's (apps/web) with Vitest, which
+// loads modules the way its bundler does.
 // Each run applies the migrations and reseeds the test database first.
 import "dotenv/config";
 import { spawnSync } from "node:child_process";
 import pg from "pg";
 
-const DEFAULT_TESTS = ["packages/shared/src/**/*.test.ts", "apps/api/src/**/*.test.ts", "apps/job_collector/src/**/*.test.ts", "apps/web/src/**/*.test.ts"];
+const DEFAULT_TESTS = ["packages/shared/src/**/*.test.ts", "apps/api/src/**/*.test.ts", "apps/job_collector/src/**/*.test.ts"];
 
 const devUrl = process.env.DATABASE_URL;
 if (!devUrl) throw new Error("DATABASE_URL is not defined");
@@ -53,7 +55,14 @@ async function main() {
   run("npx", ["prisma", "migrate", "deploy", "--config", "prisma7.config.ts"]);
   run("npx", ["prisma", "db", "seed", "--config", "prisma7.config.ts"]);
   const files = process.argv.slice(2);
-  run(process.execPath, ["--import", "tsx", "--test", "--test-concurrency=1", ...(files.length ? files : DEFAULT_TESTS)]);
+  const webFiles = files.filter((file) => file.startsWith("apps/web/"));
+  const serverFiles = files.filter((file) => !file.startsWith("apps/web/"));
+  if (!files.length || serverFiles.length) {
+    run(process.execPath, ["--import", "tsx", "--test", "--test-concurrency=1", ...(files.length ? serverFiles : DEFAULT_TESTS)]);
+  }
+  if (!files.length || webFiles.length) {
+    run("npx", ["vitest", "run", "--root", "apps/web", ...webFiles.map((file) => file.slice("apps/web/".length))]);
+  }
 }
 
 void main();

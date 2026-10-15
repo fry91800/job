@@ -1,6 +1,6 @@
 # Frontend (`apps/web`) — plan, version 1
 
-The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **step 1 done** (§9), step 2 next.
+The real user interface, replacing the test client for users. Features and rules come from `FEATURE.md` (IDs such as O4, M1); this document describes how they are presented. Status: **steps 1–2 done** (§9), step 3 next.
 
 ## 1. Goals
 
@@ -141,4 +141,13 @@ Smoothness is a requirement, checked like a feature:
 * Phones: the list full screen at `/`, a tab full screen with a back button and a switcher between open tabs.
 * Checked in a headless browser (both themes, phone size, tab restore and closing, no console error). First load: 149 KB of compressed JavaScript (budget 250 KB, §5).
 * Technical note: React Router 7.18 (version 8, released June 2026, can come later). The API accepts state-changing requests from `http://localhost:5174` by default (`WEB_ORIGINS`).
+
+**Step 2 — search, results, offer tab (2026-10-16)**:
+* Search (`src/search/`): keywords searched as you type (250 ms pause) and a place picked from suggestions (accessible combobox: arrows, Enter, Escape); "Filters" reveals contract, remote work, publication date, minimum salary, radius and fully-remote (when a place is set), with a counter of active filters. The search lives in the address (`?q=…&locationId=…&location=Lyon…`, defaults left out), so it survives reloads and links; result count and sort (relevance by default).
+* Results: TanStack Query (one cache shared with the tabs) and a virtualized list (only visible rows rendered, 20 more loaded while scrolling); previous results stay, dimmed, while a new search loads; skeleton rows on first load; match % with the selected resume (shared formula, FEATURE O4), saved star, "whole area" tag for offers found through their wider area. Click = preview tab, double-click = kept open, resting the pointer on a row loads the offer beforehand.
+* Offer tab (`src/offers/`): title (also the tab's), company, place, contract and remote, salary, publication age; Save and tracking status (shown at once, confirmed in the background, undone on failure; saving or tracking keeps a preview tab open); "Generate a resume" (disabled until step 5); original offer link; match panel (score, skills you have, skills to highlight, shared occupation; invitation to upload a resume); skills; description; resumes already generated. Closed and private offers have a banner.
+* Descriptions: a small Markdown renderer (headings, lists, bold, italic, http(s) links) producing React elements only — HTML in descriptions stays text. The collector's HTML conversion now keeps a list item's text on its dash when the item wraps a paragraph; the renderer also accepts the older form.
+* Speed, measured on the production build (`npm run web:build`, `npx vite preview apps/web` on port 5175) with the real database: results visible about 0.75 s after a cold page load; opening an offer 60–95 ms (first of the session 130–180 ms); 208 KB of compressed JavaScript at first load. The offer tab is part of the first load (a lazy view waits one round on first display); other views' code is fetched when the page is idle.
+* Web unit tests run with Vitest (`npm test` runs them after the server tests): tabs, search address, Markdown parsing.
+* Seen with real data, outside the frontend: on English offers the skill matching adds noise (e.g. "Recruitment", "rhetoric", "Scratch (computer programming)", a skill shown twice) — to fix in the collector's matcher; it also weighs on the match %.
 

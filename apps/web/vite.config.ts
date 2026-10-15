@@ -15,5 +15,11 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: { "/api": `http://localhost:${apiPort}` },
     },
+    // `vite preview`: the production build, to measure real speed.
+    preview: {
+      port: 5175,
+      strictPort: true,
+      proxy: { "/api": `http://localhost:${apiPort}` },
+    },
   };
 });

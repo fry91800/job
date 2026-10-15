@@ -21,8 +21,11 @@ function walk(node: Node, out: string[]): void {
     return;
   }
   if (tag === "li") {
-    out.push("\n- ");
-    element.childNodes.forEach((child) => walk(child, out));
+    // The item's text right after its dash, even when it is wrapped in a paragraph
+    // (<li><p>…</p></li>).
+    const inner: string[] = [];
+    element.childNodes.forEach((child) => walk(child, inner));
+    out.push(`\n- ${inner.join("").trim().replace(/\n{2,}/g, "\n")}`);
     return;
   }
   const block = BLOCKS.has(tag);

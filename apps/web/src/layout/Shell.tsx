@@ -1,9 +1,10 @@
 import { ArrowLeft, Layers } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router";
 import { useTabsStore } from "../tabs/store";
 import { useAddressSync, useWorkspace } from "../tabs/workspace";
-import { VIEWS } from "../views/registry";
+import { preloadViews, VIEWS } from "../views/registry";
 import { ConfirmCloseDialog } from "./close-tabs";
 import { IconButton } from "./IconButton";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "./menu";
@@ -83,6 +84,7 @@ function PhoneTabLabel({ tabKey }: { tabKey: string }) {
 export function Shell() {
   const phone = usePhone();
   useAddressSync(phone);
+  useEffect(preloadViews, []);
   return (
     <>
       {phone ? <Phone /> : <Desktop />}

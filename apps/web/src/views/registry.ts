@@ -1,19 +1,32 @@
 import { Briefcase, FileText, History, Image, type LucideIcon, Plus, Settings, Sparkles, Star } from "lucide-react";
-import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { lazy, type ComponentType } from "react";
+import OfferView from "../offers/OfferView";
 import type { Tab, TabKind } from "../tabs/model";
 
-// What each kind of tab shows (FRONTEND.md §2.3). Views load when a tab of their kind is
-// first opened (smaller first load, FRONTEND.md §5). Until their step of the plan is built
+// What each kind of tab shows (FRONTEND.md §2.3). Until their step of the plan is built
 // (§8), tabs show a placeholder.
 
 export type TabViewProps = { tab: Tab; active: boolean };
 
-type ViewEntry = { icon: LucideIcon; view: LazyExoticComponent<ComponentType<TabViewProps>>; step: number };
+type ViewEntry = { icon: LucideIcon; view: ComponentType<TabViewProps>; step: number };
 
-const placeholder = lazy(() => import("./Placeholder"));
+// The offer tab, the most used, is part of the first load (a lazy view waits one round on
+// its first display, even preloaded); the others load on first use.
+const loaders = {
+  placeholder: () => import("./Placeholder"),
+};
+const placeholder = lazy(loaders.placeholder);
+
+// Once the page is idle, every view's code is fetched in the background, so the first
+// tab of each kind opens without waiting for its code (FRONTEND.md §5).
+export function preloadViews(): void {
+  const run = () => Object.values(loaders).forEach((load) => void load());
+  if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 3000 });
+  else setTimeout(run, 1500);
+}
 
 export const VIEWS: Record<TabKind, ViewEntry> = {
-  offer: { icon: Briefcase, view: placeholder, step: 2 },
+  offer: { icon: Briefcase, view: OfferView, step: 2 },
   generated: { icon: Sparkles, view: placeholder, step: 5 },
   resumes: { icon: FileText, view: placeholder, step: 4 },
   photos: { icon: Image, view: placeholder, step: 4 },

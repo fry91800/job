@@ -1,15 +1,16 @@
-import { FileText, History, Image, MapPin, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, SlidersHorizontal, Star } from "lucide-react";
+import { FileText, History, Image, PanelLeftClose, PanelLeftOpen, Settings, Star } from "lucide-react";
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { TabKind } from "../tabs/model";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
+import { ResultList } from "../search/ResultList";
+import { SearchBlock } from "../search/SearchBlock";
 import { AccountMenu } from "./AccountMenu";
 import { IconButton } from "./IconButton";
 import { useSidebarStore } from "./sidebar-store";
 
-// The sidebar (FRONTEND.md §2.1): tools and account, search, results. The search and the
-// results come with step 2.
+// The sidebar (FRONTEND.md §2.1): tools and account, search, results.
 
 const TOOLS: { kind: TabKind; icon: typeof FileText; label: string }[] = [
   { kind: "resumes", icon: FileText, label: "tools.resumes" },
@@ -28,33 +29,6 @@ function Tools({ vertical = false }: { vertical?: boolean }) {
       {TOOLS.map((tool) => (
         <IconButton key={tool.kind} icon={tool.icon} label={t(tool.label)} active={activeKey === tool.kind} onClick={() => open({ kind: tool.kind })} />
       ))}
-    </div>
-  );
-}
-
-// Search fields: shown now, connected in step 2.
-function SearchBlock() {
-  const { t } = useTranslation();
-  const { open } = useWorkspace();
-  const field = "flex h-9 items-center gap-2 rounded-control border border-border bg-surface px-2.5 transition-colors duration-150 focus-within:border-accent";
-  return (
-    <div className="flex flex-col gap-2 border-b border-border p-3">
-      <label className={field}>
-        <Search size={16} className="shrink-0 text-fg-subtle" />
-        <input className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-subtle" placeholder={t("search.keywords")} aria-label={t("search.keywords")} />
-      </label>
-      <label className={field}>
-        <MapPin size={16} className="shrink-0 text-fg-subtle" />
-        <input className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-subtle" placeholder={t("search.location")} aria-label={t("search.location")} />
-      </label>
-      <div className="flex items-center justify-between">
-        <button type="button" className="flex h-7 items-center gap-1.5 rounded-control px-2 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg">
-          <SlidersHorizontal size={14} /> {t("search.filters")}
-        </button>
-        <button type="button" onClick={() => open({ kind: "add-offer" })} className="flex h-7 items-center gap-1.5 rounded-control px-2 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg">
-          <Plus size={14} /> {t("search.addOffer")}
-        </button>
-      </div>
     </div>
   );
 }
@@ -121,7 +95,7 @@ export function Sidebar({ phone = false }: { phone?: boolean }) {
         </div>
       </div>
       <SearchBlock />
-      <div className="flex flex-1 items-start justify-center overflow-y-auto p-6 text-center text-sm text-fg-subtle">{t("search.comingSoon")}</div>
+      <ResultList />
       {!phone && <ResizeHandle />}
     </aside>
   );
