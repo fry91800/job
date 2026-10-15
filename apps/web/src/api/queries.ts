@@ -98,6 +98,7 @@ export function useSavedOfferMutation(offerId: string) {
     onError: (_error, _change, context) => setSavedEverywhere(client, offerId, context?.previous ?? null),
     onSuccess: (saved) => {
       if (saved) setSavedEverywhere(client, offerId, saved);
+      void client.invalidateQueries({ queryKey: ["saved-offers"] });
       // The first save creates the guest (FEATURE G1): the session changed.
       void client.invalidateQueries({ queryKey: keys.me });
     },

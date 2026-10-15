@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import { confirm } from "../lib/confirm";
 import { errorMessage } from "../lib/errors";
 import { toast } from "../lib/toast";
+import { CropDialog } from "./CropDialog";
 
 // Photos tab (FEATURE R6): the user's photos, the selected one (or none) used on generated
 // resumes; upload (JPEG, PNG, WEBP; the server removes metadata and resizes), rename,
@@ -104,7 +105,9 @@ export default function PhotosView() {
   const upload = usePhotoMutation((file: File) => api<Photo>("POST", "/api/photos", { file }));
   const noPhoto = usePhotoMutation(() => api("DELETE", "/api/photos/selection"), (list) => list.map((item) => ({ ...item, isSelected: false })));
   const list = photos.data?.results ?? [];
-  const send = (file: File | undefined) => file && upload.mutate(file);
+  // A chosen file is offered for cropping first (FEATURE R6, optional).
+  const [toCrop, setToCrop] = useState<File | null>(null);
+  const send = (file: File | undefined) => file && setToCrop(file);
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
     setOver(false);
@@ -127,7 +130,16 @@ export default function PhotosView() {
           {upload.isPending ? <Loader2 size={20} className="animate-spin text-accent" /> : <UploadCloud size={20} className="text-accent" />}
           <span className="font-medium">{t("photos.upload")}</span>
           <span className="px-3 text-center text-xs text-fg-subtle">{t("photos.uploadHint")}</span>
-          <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => send(event.target.files?.[0])} />
+          <input
+            ref={input}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(event) => {
+              send(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
         </button>
         {list.length > 0 && (
           <div className="flex flex-col gap-2">
@@ -148,6 +160,14 @@ export default function PhotosView() {
           <PhotoCard key={photo.id} photo={photo} />
         ))}
       </div>
+      <CropDialog
+        file={toCrop}
+        onCancel={() => setToCrop(null)}
+        onDone={(file) => {
+          setToCrop(null);
+          upload.mutate(file);
+        }}
+      />
     </div>
   );
 }

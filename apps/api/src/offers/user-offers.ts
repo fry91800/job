@@ -6,6 +6,7 @@ import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
 import { saveOffer } from "../saved-offers/saved-offers";
 import { syncOfferLinks } from "@job/backend";
+import { toLocationSummary } from "./offer-access";
 import { getOfferDetail } from "./offer-detail";
 import { extractOfferDraft } from "./offer-extractor";
 
@@ -40,7 +41,9 @@ export async function extractUserOffer(user: SessionUser, ip: string, input: { u
 
   await checkQuota(user);
   consumeAiRateLimit(ip);
-  return { draft: await extractOfferDraft(input) };
+  const draft = await extractOfferDraft(input);
+  const location = draft.locationId ? await prisma.location.findUnique({ where: { id: draft.locationId } }) : null;
+  return { draft, location: toLocationSummary(location) };
 }
 
 async function checkLocation(locationId: number | null | undefined) {

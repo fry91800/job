@@ -60,6 +60,13 @@ describe("resumes (R1–R5)", () => {
     assert.equal(second.body.isSelected, false, "the first one stays selected");
   });
 
+  test("the default name follows the interface language", async () => {
+    const client = server.client();
+    await client.patch("/api/settings", { uiLanguage: "fr" });
+    const { body } = await client.post<ResumeDetail>("/api/resumes", { language: "en", content: emptyResumeContent("Camille Martin") });
+    assert.equal(body.name, "CV 1");
+  });
+
   test("invalid content is rejected", async () => {
     const content = { ...emptyResumeContent("X"), summary: 3 };
     const { status, body } = await server.client().post("/api/resumes", { language: "fr", content });

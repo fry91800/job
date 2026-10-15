@@ -76,6 +76,7 @@ describe("user-added offers (O5)", () => {
     assert.equal(body.draft.salaryCurrency, "EUR");
     const brunoy = await prisma.location.findFirstOrThrow({ where: { name: "Brunoy" } });
     assert.equal(body.draft.locationId, brunoy.id, "location matched to the locations table");
+    assert.equal(body.location?.name, "Brunoy", "the place's name, for display");
     assert.ok(client.session, "extraction creates the guest");
 
     const request = server.ai.requests.at(-1)!;

@@ -1,16 +1,21 @@
-import { AlertTriangle, Briefcase, Building2, ChevronDown, Clock, ExternalLink, Lock, MapPin, Sparkles, Star, Wallet } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Briefcase, Building2, ChevronDown, Clock, ExternalLink, Lock, MapPin, Pencil, Sparkles, Star, Wallet } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { computeMatch, SAVED_OFFER_STATUSES, type OfferDetail, type SavedOfferStatus } from "@job/shared";
-import { ApiError } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { useMe, useOffer, useSavedOfferMutation } from "../api/queries";
+import { useGenerateDialog } from "../generated/GenerateDialog";
 import { MenuChoice, MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "../layout/menu";
+import { errorMessage } from "../lib/errors";
 import { formatAge, formatDate, formatSalary } from "../lib/format";
+import { toast } from "../lib/toast";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
 import type { TabViewProps } from "../views/registry";
 import { Markdown } from "./Markdown";
 import { MatchBadge } from "./MatchBadge";
+import { OfferForm } from "./OfferForm";
 
 // Offer tab (FRONTEND.md §2.3, FEATURE O2): the offer, its match with the selected resume
 // (O4), saving and tracking (O3). Saving or tracking keeps a preview tab open.
@@ -121,10 +126,51 @@ function OfferSkeleton() {
   );
 }
 
+// The creator of a private offer may edit it (FEATURE O5).
+function EditOffer({ offer, onDone }: { offer: OfferDetail; onDone: () => void }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const save = useMutation({
+    mutationFn: (draft: object) => api<OfferDetail>("PUT", `/api/user-offers/${offer.id}`, { body: draft }),
+    onSuccess: (updated) => {
+      client.setQueriesData<OfferDetail>({ queryKey: ["offer", offer.id] }, () => updated);
+      void client.invalidateQueries({ queryKey: ["offer", offer.id] });
+      void client.invalidateQueries({ queryKey: ["saved-offers"] });
+      toast(t("addOffer.updated"));
+      onDone();
+    },
+  });
+  return (
+    <OfferForm
+      initial={{
+        title: offer.title,
+        companyName: offer.companyName,
+        description: offer.description,
+        language: (offer.language as "fr" | "en" | null) ?? null,
+        url: offer.url,
+        locationId: offer.location?.id ?? null,
+        location: offer.location ? { id: offer.location.id, name: offer.location.name } : null,
+        remoteType: offer.remoteType,
+        contractType: offer.contractType,
+        salaryMin: offer.salary?.min ?? null,
+        salaryMax: offer.salary?.max ?? null,
+        salaryCurrency: offer.salary?.currency ?? null,
+        salaryPeriod: offer.salary?.period ?? null,
+      }}
+      submitLabel={t("resume.save")}
+      pending={save.isPending}
+      error={save.error ? errorMessage(t, save.error) : null}
+      onSubmit={(draft) => save.mutate(draft)}
+      onCancel={onDone}
+    />
+  );
+}
+
 export default function OfferView({ tab }: TabViewProps) {
   const { t, i18n } = useTranslation();
   const { open, keep } = useWorkspace();
   const offer = useOffer(tab.id!, i18n.language);
+  const [editing, setEditing] = useState(false);
   const title = offer.data?.title;
 
   // The tab shows the offer's title.
@@ -139,6 +185,13 @@ export default function OfferView({ tab }: TabViewProps) {
   }
 
   const data = offer.data;
+  if (editing) {
+    return (
+      <div className="mx-auto max-w-3xl px-8 py-8">
+        <EditOffer offer={data} onDone={() => setEditing(false)} />
+      </div>
+    );
+  }
   const salary = formatSalary(data.salary, i18n.language, t);
   const age = formatAge(data.publishedAt, i18n.language);
   const card = "rounded-box border border-border bg-surface p-4";
@@ -177,12 +230,23 @@ export default function OfferView({ tab }: TabViewProps) {
           <SaveControls offer={data} onUsed={() => keep(tab.key)} />
           <button
             type="button"
-            disabled
-            title={t("offer.generateSoon")}
-            className="flex h-8 items-center gap-1.5 rounded-control bg-accent px-3 text-sm font-medium text-accent-fg opacity-50"
+            onClick={() => useGenerateDialog.getState().open({ id: data.id, title: data.title })}
+            className="flex h-8 items-center gap-1.5 rounded-control bg-accent px-3 text-sm font-medium text-accent-fg transition-colors duration-150 hover:bg-accent-hover"
           >
             <Sparkles size={15} /> {t("offer.generate")}
           </button>
+          {data.isOwn && !data.isPublic && (
+            <button
+              type="button"
+              onClick={() => {
+                keep(tab.key);
+                setEditing(true);
+              }}
+              className="flex h-8 items-center gap-1.5 rounded-control px-3 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg"
+            >
+              <Pencil size={15} /> {t("addOffer.edit")}
+            </button>
+          )}
           {data.url && (
             <a
               href={data.url}

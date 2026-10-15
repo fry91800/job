@@ -6,6 +6,7 @@ import { useTabsStore } from "../tabs/store";
 import { useAddressSync, useWorkspace } from "../tabs/workspace";
 import { preloadViews, VIEWS } from "../views/registry";
 import { AuthDialog } from "../auth/AuthDialog";
+import { GenerateDialog } from "../generated/GenerateDialog";
 import { useAccountLanguage } from "../auth/session";
 import { ConfirmDialog } from "../lib/confirm";
 import { Toaster } from "../lib/toast";
@@ -95,6 +96,7 @@ export function Shell() {
       {phone ? <Phone /> : <Desktop />}
       <ConfirmCloseDialog />
       <AuthDialog />
+      <GenerateDialog />
       <ConfirmDialog />
       <Toaster />
     </>

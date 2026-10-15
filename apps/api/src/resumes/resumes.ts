@@ -85,11 +85,14 @@ export async function createResume(user: SessionUser, input: NewResume): Promise
   if (count >= limit) throw new HttpError(429, "limit_reached", `You can keep at most ${limit} resumes`);
 
   const content = withItemIds(input.content, newItemId);
+  // The default name is in the user's interface language (R2).
+  const { uiLanguage } = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { uiLanguage: true } });
+  const defaultName = `${uiLanguage === "fr" ? "CV" : "Resume"} ${count + 1}`;
   const resume = await prisma.$transaction(async (tx) => {
     const created = await tx.resume.create({
       data: {
         userId: user.id,
-        name: input.name ?? `Resume ${count + 1}`,
+        name: input.name ?? defaultName,
         language: input.language,
         content,
         sourceFileKey: input.sourceFileKey ?? null,

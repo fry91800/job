@@ -1,11 +1,13 @@
 // Calls to the API (same origin: the dev server proxies /api). Errors carry the API's
-// error code, which the interface translates (FRONTEND.md §3).
+// error code, which the interface translates (FRONTEND.md §3). The interface's language
+// is sent as Accept-Language: a guest created by a request gets it (FEATURE G1).
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details?: unknown, // e.g. the language_mismatch details (FEATURE M1)
   ) {
     super(message);
   }
@@ -18,7 +20,10 @@ export async function api<T>(method: string, path: string, options: { body?: unk
     response = await fetch(path, {
       method,
       signal: options.signal,
-      headers: options.file ? { "Content-Type": options.file.type || "application/octet-stream" } : options.body === undefined ? {} : { "Content-Type": "application/json" },
+      headers: {
+        "Accept-Language": document.documentElement.lang || "fr", // kept up to date by i18n
+        ...(options.file ? { "Content-Type": options.file.type || "application/octet-stream" } : options.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
       body: options.file ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
     });
   } catch (error) {
@@ -34,8 +39,8 @@ export async function api<T>(method: string, path: string, options: { body?: unk
     throw new ApiError(response.status, "invalid_response", `Unexpected answer (${response.status})`);
   }
   if (!response.ok) {
-    const error = (json as { error?: { code?: string; message?: string } } | undefined)?.error;
-    throw new ApiError(response.status, error?.code ?? "http_error", error?.message ?? response.statusText);
+    const error = (json as { error?: { code?: string; message?: string; details?: unknown } } | undefined)?.error;
+    throw new ApiError(response.status, error?.code ?? "http_error", error?.message ?? response.statusText, error?.details);
   }
   return json as T;
 }

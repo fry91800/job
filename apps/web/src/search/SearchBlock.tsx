@@ -47,7 +47,7 @@ function Filters({ state, update }: { state: SearchState; update: (change: Parti
         <div className="flex flex-wrap items-center gap-3 text-xs text-fg-muted">
           <label className="flex items-center gap-1.5">
             {t("search.radius")}
-            <select className={select} value={state.radius} onChange={(event) => update({ radius: Number(event.target.value) })}>
+            <select aria-label={t("search.radius")} className={select} value={state.radius} onChange={(event) => update({ radius: Number(event.target.value) })}>
               {SEARCH_RADIUS_CHOICES.map((km) => (
                 <option key={km} value={km}>
                   {km === 0 ? t("search.exactPlace") : t("search.radiusValue", { km })}

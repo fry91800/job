@@ -122,7 +122,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * **Upload** PDF or DOCX (≤ 5 MB, ≤ 10 pages) → text extraction → AI converts to ResumeContent v1 → language detected → resume is **saved immediately** and opened in the edit form with a "check the imported data" banner.
 * **Create from scratch** via the same form (empty content; only `basics.fullName` required).
 * Parsing normalizes the content: grouped skills are split into one skill per item, "Technologies: …" lines move to `technologies`, "Present" becomes `isCurrent`, empty strings become `null`.
-* Name defaults to `Resume {n}` (n = count of user's resumes + 1); editable.
+* Name defaults to `CV {n}` in French or `Resume {n}` in English, following the user's interface language (n = count of user's resumes + 1); editable.
 * If the user had no selected resume, the new one becomes selected.
 * Edge cases: scanned PDF with no text layer → error "We couldn't read text from this file" (OCR out of scope); password-protected file → error; parse returns invalid JSON → one automatic retry, then error; non-resume document → saved anyway, user corrects (no classifier in MVP).
 

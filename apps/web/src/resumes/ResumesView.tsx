@@ -117,7 +117,7 @@ function ResumeRow({ item, open, onOpen }: { item: ResumeListItem; open: boolean
           {!item.isSelected && <MenuItem onSelect={() => select.mutate(item.id)}>{t("resume.select")}</MenuItem>}
           {targets.map((language) => (
             <MenuItem key={language} onSelect={() => void startTranslation(language)}>
-              <Languages size={14} /> {t("resume.translateTo", { language: t(`resume.languages.${language}`) })}
+              <Languages size={14} /> {t("resume.translateTo", { language: t(`resume.languagesInText.${language}`) })}
             </MenuItem>
           ))}
           {item.hasSourceFile && (

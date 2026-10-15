@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LocationSummary } from "../locations";
 import { CONTRACT_TYPES, REMOTE_TYPES, SALARY_PERIODS } from "./search";
 
 // User-added offers (FEATURE O5).
@@ -71,6 +72,6 @@ export const offerDraftSchema = z
 
 export type OfferDraft = z.output<typeof offerDraftSchema>;
 
-// Response of the extract step: either a draft to review, or the existing offer with
-// the same URL (already saved for the user).
-export type OfferExtractResponse = { draft: OfferDraft } | { existingOfferId: string };
+// Response of the extract step: either a draft to review (with its detected place, for
+// display), or the existing offer with the same URL (already saved for the user).
+export type OfferExtractResponse = { draft: OfferDraft; location: LocationSummary | null } | { existingOfferId: string };
