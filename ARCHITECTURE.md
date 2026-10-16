@@ -2,7 +2,7 @@
 
 ## Overview
 
-Job Platform is a web application built around a React frontend, an Express backend, and a PostgreSQL database.
+MonPoste (monposte.com) is a web application built around a React frontend, an Express backend, and a PostgreSQL database.
 
 The project is organized as a monorepo with separate applications for the frontend, backend API, and job collector, plus one shared package for code that both the frontend and the backend need.
 

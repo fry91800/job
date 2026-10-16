@@ -12,7 +12,7 @@ async function fetchText(url: string): Promise<string> {
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
       const response = await fetch(url, {
-        headers: { "User-Agent": "JobPlatformBot/0.1 (company discovery)" },
+        headers: { "User-Agent": "MonPosteBot/0.1 (company discovery)" },
         signal: AbortSignal.timeout(120_000),
       });
       if (response.ok) return response.text();

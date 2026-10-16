@@ -16,6 +16,7 @@ import { Sidebar } from "./Sidebar";
 import { TabBar, useTabTitle } from "./TabBar";
 import { TabPanels } from "./TabPanels";
 import { usePhone } from "./use-media-query";
+import { useDocumentTitle } from "./document-title";
 import { Welcome } from "./Welcome";
 
 function Desktop() {
@@ -94,6 +95,7 @@ export function Shell() {
   useAddressSync(phone);
   useEffect(preloadViews, []);
   useAccountLanguage();
+  useDocumentTitle();
   const authOpened = useAuthDialog((state) => state.mode !== null);
   return (
     <>

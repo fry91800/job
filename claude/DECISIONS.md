@@ -346,6 +346,7 @@ Full plan in `COLLECTOR.md`.
 | D139 | Backups: a daily `pg_dump` (custom format) kept 14 days by a `backup` service, copied off the server by the operator; restore = recreate the database empty, then `pg_restore` (`--clean` fails on pg-boss's partitioned tables) | Simple and tested end to end; the off-server copy depends on the operator's means |
 | D140 | The resume templates are created by a migration (they were only in the development seed); `users.template_id` defaults to 1, so without them no user could be created on a fresh database | Found while rehearsing a fresh production database |
 | D141 | Raw collected records are pruned (older versions after 90 days, records without offer after 30) by the collector's maintenance; the crawler identifies itself with a contact page (`/bot.html`, served by the site) and an email | Bounded database growth; site owners can see what the bot does and how to stop it |
+| D142 | The product is **MonPoste** (monposte.com): page title and favicon, the name on the welcome screen, browser tab titles ("Offer · MonPoste"), emails signed, legal pages, crawler `MonPosteBot` (every collector request names the contact page and address), production examples; www redirects to the bare domain. Package, database and storage-key names stay `job` | The domain was bought; what users and site owners see carries the name, internal names would only cost churn |
 
 ## Assumptions made (change if wrong)
 

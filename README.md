@@ -1,4 +1,6 @@
-# Job Platform
+# MonPoste
+
+[monposte.com](https://monposte.com): job offers, and a resume tailored to each one. (The code and packages keep their original names: `@job/*`, database `job`.)
 
 Web application for finding job offers, managing professional profiles and resumes, and automatically adapting resumes to job offers.
 

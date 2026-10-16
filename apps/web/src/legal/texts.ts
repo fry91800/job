@@ -10,7 +10,7 @@ export type LegalPage = "privacy" | "terms";
 const fr: Record<LegalPage, string> = {
   privacy: `Dernière mise à jour : ${O.updatedAt}
 
-Cette page explique quelles données le site traite, pourquoi, combien de temps il les garde et quels sont vos droits. Le responsable du traitement est **${O.name}**, ${O.address} (contact : ${O.contactEmail}).
+Cette page explique quelles données ${O.site} traite, pourquoi, combien de temps il les garde et quels sont vos droits. Le responsable du traitement est **${O.name}**, ${O.address} (contact : ${O.contactEmail}).
 
 ## Données traitées
 - **Compte** : adresse e-mail et mot de passe (stocké uniquement sous forme chiffrée, jamais en clair).
@@ -18,7 +18,7 @@ Cette page explique quelles données le site traite, pourquoi, combien de temps 
 - **Session** : un identifiant de session aléatoire, dans un cookie.
 - **Technique** : pour la sécurité, l'adresse IP est utilisée quelques minutes, en mémoire, pour limiter les tentatives de connexion et d'inscription ; elle n'est pas enregistrée. Les journaux du serveur notent chaque requête (adresse appelée, résultat, durée) sans adresse IP ni contenu.
 
-Le site n'utilise ni publicité, ni outil de mesure d'audience, ni traceur tiers.
+MonPoste n'utilise ni publicité, ni outil de mesure d'audience, ni traceur tiers.
 
 ## Pourquoi
 - Fournir le service que vous demandez : recherche d'offres, gestion de vos CV, génération de CV adaptés à une offre (exécution du contrat).
@@ -60,7 +60,7 @@ Cette page peut évoluer avec le service. En cas de changement important, les ti
   terms: `Dernière mise à jour : ${O.updatedAt}
 
 ## Le service
-Le site aide à trouver des offres d'emploi et à préparer des CV adaptés à chacune. Il est accessible sans compte (espace invité) ; un compte gratuit garde votre travail durablement et sur plusieurs appareils.
+${O.site} aide à trouver des offres d'emploi et à préparer des CV adaptés à chacune. Le service est accessible sans compte (espace invité) ; un compte gratuit garde votre travail durablement et sur plusieurs appareils.
 
 ## Votre compte
 Vous fournissez une adresse e-mail valide et gardez votre mot de passe pour vous. Vous pouvez supprimer votre compte à tout moment depuis les Réglages.
@@ -96,7 +96,7 @@ Ces conditions sont soumises au droit français. En cas de litige, une solution 
 const en: Record<LegalPage, string> = {
   privacy: `Last updated: ${O.updatedAt}
 
-This page explains what data the site processes, why, how long it keeps it and what your rights are. The data controller is **${O.name}**, ${O.address} (contact: ${O.contactEmail}).
+This page explains what data ${O.site} processes, why, how long it keeps it and what your rights are. The data controller is **${O.name}**, ${O.address} (contact: ${O.contactEmail}).
 
 ## Data processed
 - **Account**: email address and password (stored only in hashed form, never in clear).
@@ -104,7 +104,7 @@ This page explains what data the site processes, why, how long it keeps it and w
 - **Session**: a random session identifier, in a cookie.
 - **Technical**: for security, your IP address is used for a few minutes, in memory, to limit login and signup attempts; it is not stored. Server logs record each request (address called, result, duration) without IP address or content.
 
-The site uses no advertising, no audience measurement and no third-party trackers.
+MonPoste uses no advertising, no audience measurement and no third-party trackers.
 
 ## Why
 - To provide the service you ask for: offer search, managing your resumes, generating resumes tailored to an offer (performance of the contract).
@@ -146,7 +146,7 @@ This page may change with the service. Account holders are told by email of any 
   terms: `Last updated: ${O.updatedAt}
 
 ## The service
-The site helps you find job offers and prepare a resume tailored to each one. It can be used without an account (guest space); a free account keeps your work for good and across devices.
+${O.site} helps you find job offers and prepare a resume tailored to each one. It can be used without an account (guest space); a free account keeps your work for good and across devices.
 
 ## Your account
 You give a valid email address and keep your password to yourself. You can delete your account at any time from the Settings.

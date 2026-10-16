@@ -9,6 +9,9 @@ export function Welcome() {
   return (
     <div className="animate-fade-in flex h-full items-center justify-center p-8">
       <div className="flex max-w-md flex-col items-start gap-4">
+        <span className="flex items-center gap-2 text-sm font-semibold text-accent">
+          <img src="/favicon.svg" alt="" className="size-6" /> {t("app.name")}
+        </span>
         <h1 className="text-2xl font-semibold tracking-tight">{t("welcome.title")}</h1>
         <p className="leading-relaxed text-fg-muted">{t("welcome.text")}</p>
         <button

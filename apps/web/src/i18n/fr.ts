@@ -1,6 +1,6 @@
 // French texts. Keys are shared with en.ts (same shape, checked by TypeScript).
 export const fr = {
-  app: { name: "Job" },
+  app: { name: "MonPoste" },
   tools: {
     resumes: "CV",
     photos: "Photos",

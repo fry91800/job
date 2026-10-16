@@ -79,7 +79,7 @@ export const config = {
   // http://localhost:8026). `transport: "memory"` keeps messages in memory (tests).
   mail: {
     transport: (process.env.MAIL_TRANSPORT ?? "smtp") as "smtp" | "memory",
-    from: process.env.MAIL_FROM ?? "Job Platform <no-reply@job.local>",
+    from: process.env.MAIL_FROM ?? "MonPoste <no-reply@monposte.local>",
     smtpHost: process.env.SMTP_HOST ?? "localhost",
     smtpPort: Number(process.env.SMTP_PORT ?? 1026),
     smtpSecure: process.env.SMTP_SECURE === "true",
@@ -99,7 +99,7 @@ export const config = {
     timeoutMs: 10 * 1000,
     maxBytes: 2 * 1024 * 1024,
     maxRedirects: 5,
-    userAgent: "JobPlatformBot/0.1 (offer import requested by a user)",
+    userAgent: "MonPosteBot/0.1 (offer import requested by a user)",
     allowedPrivateAddresses: [] as string[],
   },
 

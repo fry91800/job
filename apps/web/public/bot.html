@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>JobPlatformBot</title>
+<title>MonPosteBot</title>
 <!-- The page CRAWLER_CONTACT_URL points to (DEPLOYMENT.md): what the job collector does
      and how to stop it. Keep it in step with apps/job_collector/src/config.ts
      (crawler.respectRobotsTxt, delays). -->
@@ -17,13 +17,14 @@
   h2 { font-size: 1.05rem; margin: 28px 0 6px; }
   p, li { color: var(--muted); }
   pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+  a { color: inherit; }
   hr { border: 0; border-top: 1px solid var(--code); margin: 36px 0; }
 </style>
 </head>
 <body>
 <main>
-  <h1>JobPlatformBot</h1>
-  <p>The job collector of a job search service.</p>
+  <h1>MonPosteBot</h1>
+  <p>The job collector of <a href="/">MonPoste</a> (monposte.com), a job search service.</p>
 
   <h2>What it does</h2>
   <ul>
@@ -34,7 +35,7 @@
 
   <h2>Stopping it</h2>
   <p>For your career site, add this to your robots.txt; it is read again within a day. For a job board tool (Greenhouse, Lever…), write to the contact address below.</p>
-  <pre>User-agent: JobPlatformBot
+  <pre>User-agent: MonPosteBot
 Disallow: /</pre>
 
   <h2>Contact</h2>
@@ -42,9 +43,9 @@ Disallow: /</pre>
 
   <hr>
 
-  <h1 lang="fr">JobPlatformBot</h1>
+  <h1 lang="fr">MonPosteBot</h1>
   <div lang="fr">
-    <p>Le collecteur d'offres d'un service de recherche d'emploi.</p>
+    <p>Le collecteur d'offres de <a href="/">MonPoste</a> (monposte.com), un service de recherche d'emploi.</p>
     <h2>Ce qu'il fait</h2>
     <ul>
       <li>Il ne lit que des <strong>offres d'emploi publiques</strong> : les API publiques des outils de recrutement (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee) et les pages carrières qui décrivent leurs offres avec des données schema.org <code>JobPosting</code>.</li>
@@ -53,7 +54,7 @@ Disallow: /</pre>
     </ul>
     <h2>L'arrêter</h2>
     <p>Pour votre site carrières, ajoutez ceci à votre robots.txt ; il est relu dans la journée. Pour un outil de recrutement (Greenhouse, Lever…), écrivez à l'adresse de contact ci-dessous.</p>
-    <pre>User-agent: JobPlatformBot
+    <pre>User-agent: MonPosteBot
 Disallow: /</pre>
     <h2>Contact</h2>
     <p>L'adresse e-mail de contact figure dans l'user agent du robot, dans les journaux de votre serveur. Écrivez-y pour toute question ou pour faire retirer vos offres.</p>

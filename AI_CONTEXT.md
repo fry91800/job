@@ -2,7 +2,7 @@
 
 ## Project
 
-Job Platform is a web application for finding job offers, managing professional profiles and resumes, and automatically adapting resumes to job offers.
+MonPoste (monposte.com, formerly "Job Platform") is a web application for finding job offers, managing professional profiles and resumes, and automatically adapting resumes to job offers.
 
 The project is currently in early development.
 

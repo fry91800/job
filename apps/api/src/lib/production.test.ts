@@ -76,7 +76,7 @@ describe("production readiness", () => {
       assert.equal(await sendAlert("test-run", "Collection failed"), true);
       assert.equal(await sendAlert("test-run", "Collection failed again"), false, "same alert within the interval");
       assert.equal(received.length, 1);
-      assert.match(received[0].text, /^\[job\] Collection failed$/);
+      assert.match(received[0].text, /^\[monposte\] Collection failed$/);
       assert.equal(received[0].content, received[0].text, "Slack and Discord fields");
     } finally {
       backendConfig.alerts.webhookUrl = previous;

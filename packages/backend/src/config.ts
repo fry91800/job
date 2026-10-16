@@ -23,6 +23,6 @@ export const backendConfig = {
   alerts: {
     webhookUrl: process.env.ALERT_WEBHOOK_URL,
     minIntervalMs: 15 * 60 * 1000,
-    appName: process.env.APP_NAME ?? "job",
+    appName: process.env.APP_NAME ?? "monposte",
   },
 };

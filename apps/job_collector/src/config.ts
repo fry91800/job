@@ -1,6 +1,11 @@
 import "dotenv/config";
 
 // Job collector configuration (COLLECTOR.md).
+// Who the collector says it is, on every request (job board APIs and career sites): the
+// page explaining it (apps/web/public/bot.html) and an address for site owners.
+const botContactUrl = process.env.CRAWLER_CONTACT_URL ?? "https://example.invalid/bot";
+const botContactEmail = process.env.CRAWLER_CONTACT_EMAIL ?? "bot@example.invalid";
+
 export const collectorConfig = {
   databaseUrl: process.env.DATABASE_URL!,
 
@@ -33,7 +38,7 @@ export const collectorConfig = {
     pauseBetweenBoardsMs: 500,
     pauseBetweenRequestsMs: 150, // SmartRecruiters needs one request per offer
     detailRefreshDays: 7, // SmartRecruiters: known offers fetched again about once a week
-    userAgent: "JobPlatformBot/0.1 (job search service; collects public job board APIs)",
+    userAgent: `MonPosteBot/0.1 (+${botContactUrl}; job search service; collects public job board APIs; contact: ${botContactEmail})`,
     timeoutMs: 20000,
   },
 
@@ -56,8 +61,8 @@ export const collectorConfig = {
     // for its sitemaps and crawl-delay, and requests stay spaced; only its rules are
     // ignored. Env override: CRAWLER_RESPECT_ROBOTS_TXT=false.
     respectRobotsTxt: process.env.CRAWLER_RESPECT_ROBOTS_TXT !== "false",
-    agent: "JobPlatformBot", // the token robots.txt rules are matched against
-    userAgent: `JobPlatformBot/0.1 (+${process.env.CRAWLER_CONTACT_URL ?? "https://example.invalid/bot"}; job search service; contact: ${process.env.CRAWLER_CONTACT_EMAIL ?? "bot@example.invalid"})`,
+    agent: "MonPosteBot", // the token robots.txt rules are matched against
+    userAgent: `MonPosteBot/0.1 (+${botContactUrl}; job search service; contact: ${botContactEmail})`,
     minDelayMs: 2000, // between two requests to the same host (more if robots.txt asks)
     maxDelayMs: 30000, // a larger robots.txt crawl-delay is capped (and the site is slow)
     timeoutMs: 20000,

@@ -4,7 +4,7 @@ type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
 
 // English texts: same keys as fr.ts.
 export const en: Shape<typeof fr> = {
-  app: { name: "Job" },
+  app: { name: "MonPoste" },
   tools: {
     resumes: "Resumes",
     photos: "Photos",

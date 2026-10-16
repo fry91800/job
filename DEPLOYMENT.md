@@ -31,7 +31,9 @@ Decisions and accounts to have ready:
 - [ ] **A server**: Ubuntu 24.04 LTS or Debian 12, at least 2 vCPU, 4 GB RAM, 40 GB disk
   (PostgreSQL with the catalogue and ~35 000 offers is about 2 GB; Chromium needs ~500 MB
   while rendering a PDF). In the EU, for the privacy policy (Hetzner, Scaleway, OVHcloud…).
-- [ ] **A domain**, with access to its DNS records.
+- [ ] **The domain**: `monposte.com` (registered 2026-10-16; turn on auto-renewal), with
+  access to its DNS records. `monposte.fr` was in its redemption period then: worth taking
+  when it is released, redirected to the `.com`.
 - [ ] **An email provider** with SMTP (Brevo, Postmark, Mailjet, Amazon SES…), for the
   address confirmation and password reset emails (§5).
 - [ ] **API keys**: Gemini (with a billing budget alert set in Google Cloud, §8) and Geoapify.
@@ -76,10 +78,11 @@ certificate as soon as it starts, and that needs the domain to point to the serv
 
 | Type | Name | Value |
 |---|---|---|
-| `A` | `jobs.example.com` | the server's IPv4 address |
-| `AAAA` | `jobs.example.com` | the server's IPv6 address (if it has one) |
+| `A` | `monposte.com` | the server's IPv4 address |
+| `AAAA` | `monposte.com` | the server's IPv6 address (if it has one) |
+| `CNAME` | `www.monposte.com` | `monposte.com` (Caddy redirects it to the bare domain) |
 
-Plus the email records of §5. Check with `dig +short jobs.example.com`.
+Plus the email records of §5. Check with `dig +short monposte.com`.
 
 ## 4. First start
 
@@ -104,8 +107,8 @@ dc ps                   # api "healthy", the others "Up"
 dc logs --tail 50 api web
 ```
 
-Then open `https://jobs.example.com`: the site loads, with a valid certificate. Check
-`https://jobs.example.com/api/health` → `{"status":"ok"}`.
+Then open `https://monposte.com`: the site loads, with a valid certificate. Check
+`https://monposte.com/api/health` → `{"status":"ok"}`.
 
 ### Catalogue and boards (once, then when they change)
 
@@ -115,7 +118,7 @@ them again. Copy the files from your computer to the server:
 
 ```bash
 # On your computer, from the repository:
-rsync -av data/esco data/boards-2026-10-15.json.gz deploy@jobs.example.com:job/data/
+rsync -av data/esco data/boards-2026-10-15.json.gz deploy@monposte.com:job/data/
 ```
 
 Then on the server (the worker runs as user 1000, which is `deploy` on a fresh server; else
@@ -145,14 +148,21 @@ the first offers appear within hours, the full collection takes about a day.
 
 ## 5. Email
 
-The emails come from `MAIL_FROM`. For them to reach inboxes, the domain must prove the
+**Receiving.** The addresses the site shows or sends from must reach you: `contact@` (legal
+pages), `bot@` (crawler contact), `admin@` (certificate notices), `dmarc@` (reports). The SMTP
+provider below only sends. Free forwarding to your own mailbox is enough: your registrar's
+email redirections (OVHcloud includes them) or Cloudflare Email Routing; it adds `MX` (and
+SPF) records, which must sit alongside the provider's. A full mailbox (Proton, Infomaniak,
+Google Workspace…) if you want to answer from `@monposte.com`.
+
+**Sending.** The emails come from `MAIL_FROM`. For them to reach inboxes, the domain must prove the
 provider may send for it. Your provider's dashboard gives the exact records; typically:
 
 | Record | Purpose | Example |
 |---|---|---|
 | SPF (`TXT` on the domain) | Which servers may send | `v=spf1 include:<provider's> ~all` (one SPF record only: merge if one exists) |
 | DKIM (`TXT` or `CNAME`, given by the provider) | Signs each email | as given |
-| DMARC (`TXT` on `_dmarc`) | What to do with failures, and reports | `v=DMARC1; p=none; rua=mailto:dmarc@jobs.example.com` (move to `p=quarantine` after a few weeks of clean reports) |
+| DMARC (`TXT` on `_dmarc`) | What to do with failures, and reports | `v=DMARC1; p=none; rua=mailto:dmarc@monposte.com` (move to `p=quarantine` after a few weeks of clean reports) |
 
 Then verify the domain in the provider's dashboard and put its SMTP settings in
 `.env.production` (`SMTP_HOST`, `SMTP_PORT` 587 with `SMTP_SECURE=false`, or 465 with
@@ -170,7 +180,7 @@ example, every night on another machine (your computer, a NAS, a second small se
 
 ```bash
 # crontab -e on the other machine (needs SSH access to the server):
-30 3 * * * rsync -a --delete deploy@jobs.example.com:/var/lib/docker/volumes/job_backups/_data/ ~/job-backups/db/ && ssh deploy@jobs.example.com 'docker run --rm -v job_storage:/s:ro alpine tar -cz -C /s .' > ~/job-backups/storage.tar.gz
+30 3 * * * rsync -a --delete deploy@monposte.com:/var/lib/docker/volumes/job_backups/_data/ ~/job-backups/db/ && ssh deploy@monposte.com 'docker run --rm -v job_storage:/s:ro alpine tar -cz -C /s .' > ~/job-backups/storage.tar.gz
 ```
 
 (Volume names start with the compose project name, `job` when the folder is `~/job`:
@@ -208,7 +218,7 @@ curl -X POST -H 'Content-Type: application/json' -d '{"text":"test","content":"t
 ```
 
 **Uptime**: alerts come from inside; if the server is down, nothing is sent. Add an
-external check of `https://jobs.example.com/api/health` every few minutes (UptimeRobot,
+external check of `https://monposte.com/api/health` every few minutes (UptimeRobot,
 Better Stack… free plans are enough).
 
 **Logs** are one JSON object per line (no personal data, no IP addresses); Docker keeps

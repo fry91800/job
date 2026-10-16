@@ -80,8 +80,8 @@ after(async () => {
 describe("robots.txt", () => {
   test("our group, else *; longest rule wins; wildcards; crawl-delay and sitemaps", () => {
     const robots = parseRobots(
-      ["User-agent: *", "Disallow: /", "", "User-agent: JobPlatformBot", "Disallow: /private", "Allow: /private/jobs", "Disallow: /*.pdf$", "Crawl-delay: 5", "Sitemap: https://x.example/sitemap.xml"].join("\n"),
-      "JobPlatformBot",
+      ["User-agent: *", "Disallow: /", "", "User-agent: MonPosteBot", "Disallow: /private", "Allow: /private/jobs", "Disallow: /*.pdf$", "Crawl-delay: 5", "Sitemap: https://x.example/sitemap.xml"].join("\n"),
+      "MonPosteBot",
     );
     assert.equal(robots.allows("/jobs/1"), true);
     assert.equal(robots.allows("/private/team"), false);
@@ -91,7 +91,7 @@ describe("robots.txt", () => {
     assert.equal(robots.crawlDelayMs, 5000);
     assert.deepEqual(robots.sitemaps, ["https://x.example/sitemap.xml"]);
 
-    const others = parseRobots("User-agent: *\nDisallow: /admin\nDisallow:\n", "JobPlatformBot");
+    const others = parseRobots("User-agent: *\nDisallow: /admin\nDisallow:\n", "MonPosteBot");
     assert.equal(others.allows("/admin/x"), false);
     assert.equal(others.allows("/jobs"), true);
   });
