@@ -78,6 +78,7 @@ export const collectorConfig = {
     maxListingPages: 20, // pages followed to find offers when a site has no sitemap
     maxOfferPagesPerRun: 1000, // new or changed offer pages fetched per site and run (~35 min at 2 s)
     checkSamplePages: 3, // offer pages read to check a site
+    talentsoftMaxListPages: 100, // Talentsoft lists 12 offers per page
     scheme: "https", // tests serve sites over http
     allowedPrivateAddresses: [] as string[], // tests only
   },

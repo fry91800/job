@@ -478,3 +478,36 @@ Findings:
 * Next dedicated adapters (step 3), by expected French offers: **Talentsoft** (French,
   large employers, many offers each), then iCIMS, Flatchr, Breezy after checking their
   public endpoints and terms; Workday only if a legitimate access exists.
+
+### 17.6 Step 3 — Talentsoft adapter (2026-10-17)
+
+`ats/adapters/talentsoft.ts`, source `talentsoft`, a "crawler" adapter run daily at 04:00
+with the career sites' politeness (robots.txt, per-site delay, `crawler.maxOfferPagesPerRun`).
+
+* **Boards**: `{company}.talent-soft.com`, found by discovery (`*.talent-soft.com`: 116 sites
+  over 6 crawls, 78 with French pages). Many sites redirect to the employer's domain
+  (`efsrecrute.fr`): the address after the redirect is used for every request.
+* **Offers**: the list of all offers (`/offre-de-emploi/liste-toutes-offres.aspx`, 12 per
+  page, `?page=N`) gives every offer's id: offers missing from it are closed (full sync). An
+  offer page is fetched when new, when the date on its card changed, or on its weekly
+  refresh day; offers read and skipped (not in France) are remembered the same way. The RSS
+  feed (`/handlers/offerRss.ashx`) only lists the 20 newest offers: not used.
+* **Fields**: by their headings (labels differ between employers: "Contrat" / "Type de
+  contrat", "Lieu" / "Site" / "Secteur et lieu"…), with the meta description ("… de 'Title'.
+  Lieu : X. Date : dd/mm/yyyy") and the content block as fallback for free-form pages
+  (Dassault Aviation). Pay: amounts read from the pay fields (month when "mois"/"mensuel" or
+  under 10 000). Application deadline → `expiresAt`.
+* **France**: the location field ("France, Région, Département (71)") when present; else a
+  département "(44)", a 5-digit postcode or a known French city; else the place is looked up
+  (`locations` table, then Geoapify, stored): sites of other countries (Abilis, Belgium) use
+  the same pages.
+* The check reads the first list page only (the total is printed there) and samples 3
+  offers for the French share.
+* **First run (2026-10-17)**: 116 sites → 61 active with ~12 760 offers in France (estimate
+  from the checks; e.g. Ministère de l'Intérieur ~4 700, SPIE ~1 360, EFS 238, Framatome,
+  Dassault Aviation, Groupe ADP, Radio France, AMF, Sciences Po), 16 abroad (AGL, CFAO,
+  Fenaco, MSF Suisse…), 29 without offers. A first collection of two sites: 56 offers, all
+  with a place and a contract type. The location field varies: "Europe, France, …",
+  "Ile-de-France, Paris (75)", "Occitanie", "Bagneux": a field without a country means
+  France when it names a région, département, known city or postcode, else the town is
+  looked up; only a field starting with another country means abroad.
