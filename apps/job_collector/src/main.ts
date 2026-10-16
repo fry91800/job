@@ -10,9 +10,9 @@ import { runMaintenance } from "./pipeline/close";
 import { processRecord } from "./pipeline/process";
 import { runConnector } from "./runs/run-connector";
 
-// Settings a production worker must have (DEPLOYMENT.md).
+// Settings a production worker must have (DEPLOYMENT.md); Geoapify places the offers.
 function productionProblems(env: NodeJS.ProcessEnv): string[] {
-  return ["DATABASE_URL", "CRAWLER_CONTACT_URL", "CRAWLER_CONTACT_EMAIL"].filter((name) => !env[name]?.trim()).map((name) => `${name} is missing`);
+  return ["DATABASE_URL", "CRAWLER_CONTACT_URL", "CRAWLER_CONTACT_EMAIL", "GEOAPIFY_API_KEY"].filter((name) => !env[name]?.trim()).map((name) => `${name} is missing`);
 }
 
 // A failed background job (discovery, board checks, maintenance) alerts someone.

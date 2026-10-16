@@ -13,6 +13,8 @@ export function productionProblems(env: NodeJS.ProcessEnv): string[] {
   need("SMTP_HOST", "email provider");
   need("MAIL_FROM", "sender of the emails");
   need("STORAGE_LOCAL_DIR", "uploaded files, on a persistent volume");
+  // A new database has no places: search by place and offer locations come from Geoapify.
+  need("GEOAPIFY_API_KEY", "place search and offer locations");
   if ((env.AI_PROVIDER ?? "gemini") === "gemini") need("GEMINI_API_KEY", "AI features");
   if (env.AI_PROVIDER === "fake") problems.push("AI_PROVIDER=fake is for tests only");
   if (env.WEB_BASE_URL && !env.WEB_BASE_URL.startsWith("https://")) problems.push("WEB_BASE_URL must be an https:// address");

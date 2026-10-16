@@ -25,6 +25,7 @@ const goodEnv = {
   MAIL_FROM: "Jobs <no-reply@jobs.example.com>",
   STORAGE_LOCAL_DIR: "/data/storage",
   GEMINI_API_KEY: "key",
+  GEOAPIFY_API_KEY: "key",
 };
 
 describe("production readiness", () => {
