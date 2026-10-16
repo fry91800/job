@@ -9,6 +9,6 @@ export const OPERATOR = {
   contactEmail: "contact@monposte.com", // must reach you (DEPLOYMENT.md §5)
   publicationDirector: "[Directeur de la publication]",
   host: "[Hébergeur : nom, adresse, téléphone]",
-  emailProvider: "[Prestataire d'envoi des e-mails]",
+  emailProvider: "Brevo (Sendinblue SAS, France)", // DEPLOYMENT.md §5
   updatedAt: "[date]",
 };

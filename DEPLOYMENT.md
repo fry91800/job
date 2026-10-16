@@ -169,6 +169,25 @@ Then verify the domain in the provider's dashboard and put its SMTP settings in
 `true`; `SMTP_USER`, `SMTP_PASSWORD`). Test with [mail-tester.com](https://www.mail-tester.com):
 send a password reset to its address. A failed send is logged (`email_not_sent`) and alerted.
 
+**With Brevo** (the provider named in the privacy policy, `apps/web/src/legal/operator.ts`):
+
+1. Create an account at brevo.com and complete the company profile (they may check new
+   accounts before allowing larger volumes).
+2. *Senders, Domains & Dedicated IPs → Domains → Add a domain*: `monposte.com`. Brevo shows
+   the records to add at your DNS provider: a `brevo-code` `TXT` (ownership), DKIM and,
+   if asked, DMARC. Add them, then *Authenticate* (minutes to a few hours).
+3. *Senders → Add a sender*: `MonPoste`, `no-reply@monposte.com`.
+4. *SMTP & API → SMTP*: generate an SMTP key. Settings:
+   `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`,
+   `SMTP_USER=` the login shown on that page, `SMTP_PASSWORD=` the key.
+5. Turn off open and click tracking for transactional emails if the settings offer it: the
+   privacy policy says there are no trackers, and rewritten links in password reset emails
+   only add a detour.
+
+To try it before deploying, put the same settings in the development `.env` (instead of
+MailHog's), restart the API and ask for a password reset to your own address; put the
+MailHog settings back afterwards.
+
 ## 6. Backups and restore
 
 The `backup` service writes `job-<date>.dump` to the `backups` volume every day at
