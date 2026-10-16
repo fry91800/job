@@ -55,6 +55,8 @@ export function useGenerate() {
       void client.invalidateQueries({ queryKey: generatedKeys.list, exact: true });
       void client.invalidateQueries({ queryKey: ["offer", detail.offer.id] });
       void client.invalidateQueries({ queryKey: ["search"] });
+      // Generating saves the offer (M1): the Saved tab lists it.
+      void client.invalidateQueries({ queryKey: ["saved-offers"] });
       void client.invalidateQueries({ queryKey: ["settings"] });
       void client.invalidateQueries({ queryKey: keys.me });
     },

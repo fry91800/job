@@ -184,10 +184,12 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Deterministic, computed from the **selected resume** vs the offer (no AI, nothing stored except the snapshot in generated resumes).
 * **Computed in the frontend**: the API returns the selected resume's skill and occupation ids once, and each offer's ids with the search results and offer detail. Switching the selected resume updates every score instantly with no new request.
 * The formula is written **once**, in the shared package (`packages/shared`, see ARCHITECTURE.md), imported by the web app (display) and by the API (the `match_score` snapshot in M1). It must never be re-implemented elsewhere.
-* Formula (v1):
-  * `skillScore = |offerSkills ∩ resumeSkills| / |offerSkills|`
+* Formula (v2, 2026-10-16; settings in `MATCH_CONFIG`, `packages/shared/src/match.ts`):
+  * `skillScore = min(1, |offerSkills ∩ resumeSkills| / min(|offerSkills|, skillsForFull))` (8 by default: an offer listing 25 skills is fully covered by 8 of them)
   * `occupationScore = 1` if resume and offer share an occupation, else `0`
-  * if the offer has occupations: `match = round(100 × (0.8 × skillScore + 0.2 × occupationScore))`; otherwise `match = round(100 × skillScore)`
+  * `raw = skillWeight × skillScore + (1 − skillWeight) × occupationScore` if the offer has occupations (weight 0.8), else `raw = skillScore`
+  * shown: `match = round(100 × raw^displayExponent)` (0.6 by default), at most 99 unless `raw = 1`: lifts low and middle scores, keeps their order, 100 % only for a perfect match
+  * `npm run match:preview -- --email <account>` shows the spread over the stored offers for several settings, to tune them (`--full-at`, `--exponents`)
 * If the offer has **no extracted skills** → show "Not enough data" instead of a number. No selected resume → show a prompt to add/select one.
 * Detail view lists matched skills and missing skills (explainability).
 * Later improvements (not MVP): weight required vs optional skills, use `equivalent` skill relationships, seniority. Sorting or filtering by match % and match alerts would need the score on the server side (SQL), which is why they are out of scope.

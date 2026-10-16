@@ -148,10 +148,14 @@ describe("photos in generated resumes", () => {
     assert.equal(generated.photoId, null);
 
     const photo = (await upload(client, await jpegWithExif())).body as Photo;
+    const html = async () => (await send(client, "GET", `/api/generated-resumes/${generated.id}/html`)).text();
     const withPhoto = await client.patch<GeneratedResumeDetail>(`/api/generated-resumes/${generated.id}`, { photoId: photo.id });
     assert.equal(withPhoto.body.photoId, photo.id);
+    assert.match(await html(), /data:image/);
     const without = await client.patch<GeneratedResumeDetail>(`/api/generated-resumes/${generated.id}`, { photoId: null });
     assert.equal(without.body.photoId, null);
+    assert.notEqual(without.body.updatedAt, withPhoto.body.updatedAt, "the preview address changes, so it reloads");
+    assert.doesNotMatch(await html(), /data:image/);
 
     const me = (await client.get<MeResponse>("/api/auth/me")).body.user!;
     const foreign = await prisma.userPhoto.findFirst({ where: { userId: { not: me.id } } });

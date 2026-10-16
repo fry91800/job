@@ -243,7 +243,9 @@ export async function updateGeneratedResume(
   input: { templateId?: number; photoId?: string | null; generatedContent?: ResumeContentInput },
 ): Promise<GeneratedResumeDetail> {
   const row = await findOwn(userId, id);
-  const data: Prisma.GeneratedResumeUpdateInput = {};
+  // Set here: Prisma doesn't refresh `updatedAt` when only a relation changes (template,
+  // photo), and the preview reloads when it changes.
+  const data: Prisma.GeneratedResumeUpdateInput = { updatedAt: new Date() };
   if (input.templateId !== undefined) {
     const template = await prisma.template.findFirst({ where: { id: input.templateId, deletedAt: null } });
     if (!template) throw new HttpError(400, "unknown_template", "This template does not exist");

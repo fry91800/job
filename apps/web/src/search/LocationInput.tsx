@@ -100,9 +100,12 @@ export function LocationInput({ value, onChange }: { value: { id: number; name: 
               id={`${listId}-${index}`}
               role="option"
               aria-selected={index === highlight}
-              // Before the input's blur, so the click counts.
+              // Before the input's blur, so the click counts. A click (or tap) is the end of
+              // the input: the field lets go of the focus, and on phones the keyboard closes.
+              // Blurred first, so the field's blur handler doesn't undo the choice.
               onPointerDown={(event) => {
                 event.preventDefault();
+                inputRef.current?.blur();
                 pick(place);
               }}
               onPointerEnter={() => setHighlight(index)}

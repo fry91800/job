@@ -376,3 +376,68 @@ Rules now (`packages/backend/src/catalogue/matcher.ts`), for skills in free text
 
 `npm run collector -- reenrich` now recomputes stored offers' skills, occupations and quality score, and maps resumes' skills to the merged ids.
 
+
+## 17. Plan: more sources, and bots (2026-10-16)
+
+### 17.1 More sources, by value for effort
+
+Each source is judged on new offers per week that no other source has (duplicates add
+nothing), completeness (`collector metrics`), cost to build and keep, and terms (§10).
+
+| Order | Source | Why | Effort |
+|---|---|---|---|
+| 1 | **More boards for the existing tools** | Same code, more companies: Common Crawl's columnar index (bulk, not the overloaded API), Sirene's large employers, career sites found from company websites (crawler seeds) | Low |
+| 2 | **More ATS adapters**, most used in France first: Teamtailor, Welcome to the Jungle (Welcome Kit), Personio (public XML feed), DigitalRecruiters, Flatchr, Talentsoft/Cegid, Workday (large employers), BambooHR, Breezy | One adapter covers every company on the tool. Measure first which tools the registry's career sites use (open question 3); endpoints and terms to verify one by one | Low–medium each |
+| 3 | **Public sources**: Choisir le service public (weekly open data), La bonne alternance (terms), **France Travail access request** (send it: §5.1) | Large volumes, official, structured | Low–medium |
+| 4 | **Aggregators and feeds**: Adzuna (self-service key), then Jooble / Careerjet / partner XML feeds | Wide coverage; descriptions often excerpts, attribution required | Medium |
+| 5 | **Bots** (§17.2) for valuable sites with no API, ATS or `JobPosting` data, whose terms allow it | Fills the gaps the above leave | Medium per site, plus upkeep |
+
+### 17.2 Bots: thin bots, central extraction
+
+**Decision proposed: bots send what they saw (the offer page, raw), with the few facts only
+they know; the collector turns it into an offer.** The strict endpoint (`CollectedOffer`,
+§4) stays for sources that already produce clean data (partners, the browser extension).
+
+| | Strict format (AI in each bot) | Raw page (extraction in the collector) |
+|---|---|---|
+| Fixing an extraction mistake | In every bot, and past offers stay wrong | Once; stored raw pages are processed again (like `reenrich`) |
+| AI cost and keys | Spread over bots, hard to cap | One place: cache by content hash (an unchanged page costs nothing), daily budget |
+| Consistency | Each bot interprets fields its own way | Same rules for every source |
+| Bot code | Bigger, needs an AI key | Navigation only: list pages, offer pages, ids |
+
+What a bot sends (`POST /api/collector/pages`, per-source token as today):
+`{ source, externalId, url, title?, html | text, publishedAt?, fetchedAt }`, at most
+~300 KB per page (scripts and styles stripped by the bot). The bot owns what only it can
+know reliably: **which offers exist** (ids and URLs) and **the page content**.
+
+The collector then: stores the page in `raw_offers` → reads `JobPosting` JSON-LD if present
+(the crawler's code) → otherwise extracts with AI (Gemini; same prompt and validation as user
+offers, O5), only for pages whose content hash changed → a `CollectedOffer` → the usual
+pipeline (dedup, enrichment, closing).
+
+### 17.3 Offers that expire
+
+Bots rarely see an offer "close": it just stops being listed. Four layers, cheapest first:
+
+1. **Complete snapshots** (main rule): after each run, a bot reports the full list of offer
+   ids it currently sees for a scope (`POST /api/collector/snapshots`
+   `{ source, scope, externalIds, complete: true }`). Ids missing from a complete snapshot are
+   closed, like the ATS full sync. Safety: if a snapshot loses more than half the open offers
+   at once, nothing is closed and an alert is sent (the bot probably broke, not the site).
+2. **Not seen for too long**: `offer_sources.last_seen_at` already exists; daily maintenance
+   closes bot offers not seen for N days (per source, default twice its schedule, at least
+   7 days). Covers bots that stopped.
+3. **Expiry date** when the page gives one (`validThrough`, "date limite"): `expires_at`,
+   already handled by maintenance.
+4. **Spot checks**: open bot offers older than 30 days are fetched again now and then
+   (politely); 404/410 or a redirect to a listing page closes them.
+
+Plus an alert when a source sends nothing for two schedules.
+
+### 17.4 Order of work
+
+1. Measure which ATS tools the registry's companies use; add the top 2–3 adapters.
+2. Send the France Travail access request; add Choisir le service public.
+3. Pages endpoint + central extraction + snapshots + "not seen" closing (§17.2–17.3), with
+   one first bot on a site whose terms allow it, to validate the design.
+4. Aggregators whose terms fit.
