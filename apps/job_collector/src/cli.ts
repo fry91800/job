@@ -2,7 +2,7 @@
 //   catalogue [--esco <folder>] [--refresh]   import ROME, the ROME ↔ ESCO links, ESCO, manual skills
 //   run <connector>                           run one connector now
 //   maintenance                               close expired offers
-//   reenrich                                  recompute collected offers' occupations from their title
+//   reenrich                                  recompute stored offers' skills, occupations and quality; resumes' merged skills
 //   metrics                                   coverage and quality numbers
 //   discover [--ats greenhouse,ashby] [--pages N] [--crawl CC-MAIN-…]   find boards in Common Crawl
 //   boards check [--ats X] [--limit N]        check candidate / due boards
@@ -25,7 +25,7 @@ import { discoverBoards } from "./discovery/common-crawl";
 import { exportBoards, importBoards } from "./discovery/registry-file";
 import { collectorMetrics } from "./metrics";
 import { runMaintenance } from "./pipeline/close";
-import { reenrichOccupations } from "./pipeline/reenrich";
+import { reenrich } from "./pipeline/reenrich";
 import { runConnector } from "./runs/run-connector";
 
 function option(args: string[], name: string): string | undefined {
@@ -88,7 +88,7 @@ async function main() {
       break;
     }
     case "reenrich":
-      await reenrichOccupations();
+      await reenrich();
       break;
     case "maintenance":
       console.log(await runMaintenance());

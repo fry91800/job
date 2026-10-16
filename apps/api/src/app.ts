@@ -4,7 +4,9 @@ import { ingestRouter } from "./collector/ingest.routes";
 import { loadSession } from "./auth/session";
 import { generatedResumesRouter } from "./generated-resumes/generated-resumes.routes";
 import { errorHandler, notFound } from "./lib/error-handler";
+import { config } from "./config";
 import { checkOrigin } from "./lib/origin-check";
+import { requestLog, securityHeaders } from "./lib/request-log";
 import { locationsRouter } from "./locations/locations.routes";
 import { offersRouter } from "./offers/offers.routes";
 import { userOffersRouter } from "./offers/user-offers.routes";
@@ -16,6 +18,9 @@ import { settingsRouter, templatesRouter } from "./settings/settings.routes";
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", config.trustProxy);
+  app.use(requestLog);
+  app.use(securityHeaders);
   // The ingestion endpoint takes batches of up to 100 offers.
   app.use("/api/collector", express.json({ limit: "5mb" }));
   app.use(express.json({ limit: "100kb" }));

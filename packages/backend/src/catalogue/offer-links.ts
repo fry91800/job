@@ -7,11 +7,12 @@ type OfferText = { title: string; description: string; language: string | null }
 // Skill & occupation extraction for offers (FEATURE M2): skills from the title and the
 // description, occupations from the title only (descriptions mention other roles).
 export async function extractOfferLinks(offer: OfferText) {
-  const [skillIds, occupationIds] = await Promise.all([
-    matchInText("skill", `${offer.title}\n${offer.description}`, offer.language),
+  const [fromTitle, fromText, occupationIds] = await Promise.all([
+    matchInText("skill", offer.title, offer.language, { title: true }),
+    matchInText("skill", offer.description, offer.language),
     matchInText("occupation", offer.title, offer.language),
   ]);
-  return { skillIds, occupationIds };
+  return { skillIds: [...new Set([...fromTitle, ...fromText])], occupationIds };
 }
 
 // Rewrites an offer's catalogue links; call in the same transaction as the offer save.

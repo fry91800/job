@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
+import { errorFields, logEvent, sendAlert } from "@job/backend";
 import { ZodError } from "zod";
 import { HttpError } from "./http-error";
 
@@ -6,7 +7,7 @@ export const notFound: RequestHandler = (_req, res) => {
   res.status(404).json({ error: { code: "not_found", message: "Route not found" } });
 };
 
-export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof ZodError) {
     res.status(400).json({
       error: {
@@ -27,6 +28,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(error.status).json({ error: { code: error.code, message: error.message, ...(error.details !== undefined && { details: error.details }) } });
     return;
   }
-  console.error(error);
+  logEvent("error", "internal_error", { id: req.requestId, method: req.method, path: req.path, ...errorFields(error) });
+  void sendAlert("api-internal-error", `API error on ${req.method} ${req.baseUrl}${req.route?.path ?? ""}: ${error instanceof Error ? error.message : String(error)} (request ${req.requestId})`);
   res.status(500).json({ error: { code: "internal_error", message: "Internal server error" } });
 };

@@ -363,3 +363,16 @@ Not in phase 1 (planned with the first real sources): AI for missing fields and 
 * **Overlap with phase 2: none** — every phase 3 offer is new (no merge with an ATS offer), which is the expected value of new sources. Phase 3's IT share is low except for Thales; the IT companies already known come through phase 2.
 * **Discovery limits**: Common Crawl's public index answers 504 to most whole-domain queries (`*.recruitee.com`, `*.teamtailor.com`) and was down for hours; results above are partial. Next: its columnar (Parquet) index, which is queried in bulk instead of through the overloaded API.
 
+## 16. Skill matching in offer texts (2026-10-16)
+
+Measured on 4 000 collected offers, most wrong skills came from everyday words: French words that are also skill names ("paris" = betting, "politique" = politics, "vue" = Vue.js, "transformer"), English words matched in French offers through the English fallback ("plan", "transport", "design", "lead"), and boilerplate ("notre processus de recrutement" → Recruitment, in 19 % of offers). Duplicates also counted twice in the match %: the development seed's hand-made skills and the same ESCO concepts ("Python" and "Python (computer programming)").
+
+Rules now (`packages/backend/src/catalogue/matcher.ts`), for skills in free text:
+* names in another language than the offer's only when they look technical (a capital letter, a digit or a symbol: "Python", "AWS", "Node.js", "C#");
+* ambiguous single words never (paris, politique, plan, vue, lead, source, transport, transformer, lecture, passerelles, physique, communiquer, plus the earlier go, r, swift…);
+* a few generic words only in the title (recrutement / recruitment, communication, informatique);
+* the same skill in two catalogues has one id (a hand-made skill and any ESCO entry sharing one of its names; ESCO entries with the same main name — alternative names alone never join two entries), for offers and resumes alike (`canonicalIds`);
+* labels given as such by a source are always looked up.
+
+`npm run collector -- reenrich` now recomputes stored offers' skills, occupations and quality score, and maps resumes' skills to the merged ids.
+

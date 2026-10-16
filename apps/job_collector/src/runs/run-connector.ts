@@ -1,4 +1,4 @@
-import { prisma } from "@job/backend";
+import { prisma, sendAlert } from "@job/backend";
 import type { Prisma } from "@prisma/client";
 import type { Connector } from "../connectors/types";
 import { processRecord } from "../pipeline/process";
@@ -50,6 +50,7 @@ export async function runConnector(connector: Connector, options: { signal?: Abo
       where: { id: run.id },
       data: { status: "failed", finishedAt: new Date(), counts: counts as Prisma.InputJsonValue, error: error instanceof Error ? error.message : String(error) },
     });
+    await sendAlert(`run:${connector.key}`, `Collection run "${connector.key}" failed after ${counts.received} record(s): ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
   return { runId: run.id, counts };

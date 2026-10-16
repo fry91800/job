@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { canonicalIds } from "@job/backend";
 import { normalizeCatalogueName, type ResumeContent } from "@job/shared";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -29,7 +30,8 @@ export async function extractCatalogueLinks(db: Db, content: ResumeContent, lang
   ]);
 
   return {
-    skillIds: [...new Set(skills.map((row) => row.skillId))],
+    // The same skill in two catalogues counts once, as in offers (matcher.ts).
+    skillIds: await canonicalIds("skill", skills.map((row) => row.skillId)),
     occupationIds: [...new Set(occupations.map((row) => row.occupationId))],
   };
 }

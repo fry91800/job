@@ -170,6 +170,27 @@ describe("pipeline", () => {
     assert.equal((await load(offerId)).closedAt, null, "reopened");
   });
 
+  test("maintenance removes old raw versions and old records that never became offers, keeps the latest", async () => {
+    const value = offer();
+    await processRecord(record(value));
+    const old = new Date(Date.now() - 200 * 24 * 3600 * 1000);
+    const recent = new Date(Date.now() - 2 * 24 * 3600 * 1000);
+    const row = (externalId: string, hash: string, receivedAt: Date) => ({ source: "test-api", externalId, payload: {}, contentHash: hash, receivedAt });
+    const latest = `recent-version-${uid()}`;
+    await prisma.rawOffer.updateMany({ where: { source: "test-api", externalId: value.externalId }, data: { receivedAt: old } });
+    await prisma.rawOffer.createMany({
+      data: [
+        row(value.externalId, `old-version-${uid()}`, new Date(old.getTime() - 1000)), // older version of an offer: removed
+        row(value.externalId, latest, recent), // the latest one: kept
+        row(`rejected-${uid()}`, "rejected", old), // never became an offer: removed
+      ],
+    });
+    const result = await runMaintenance();
+    assert.ok(result.prunedRawRecords >= 3, String(result.prunedRawRecords));
+    const left = await prisma.rawOffer.findMany({ where: { source: "test-api", externalId: value.externalId }, orderBy: { receivedAt: "asc" } });
+    assert.deepEqual(left.map((raw) => raw.contentHash), [latest], "only the latest version stays (older than 90 days removed)");
+  });
+
   test("maintenance closes sources past their expiry date", async () => {
     const value = offer({ expiresAt: new Date(Date.now() - 3600 * 1000).toISOString() });
     const { offerId } = (await processRecord(record(value))) as { offerId: string };

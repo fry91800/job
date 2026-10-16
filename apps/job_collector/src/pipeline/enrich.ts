@@ -76,11 +76,12 @@ async function withRelated(ids: number[]): Promise<number[]> {
 }
 
 export async function resolveSkills(offer: NormalizedOffer, language: string | null): Promise<number[]> {
-  const [fromLabels, fromText] = await Promise.all([
+  const [fromLabels, fromTitle, fromText] = await Promise.all([
     matchLabels("skill", offer.skillLabels, language),
-    matchInText("skill", `${offer.title}\n${offer.description}`, language),
+    matchInText("skill", offer.title, language, { title: true }),
+    matchInText("skill", offer.description, language),
   ]);
-  return [...new Set([...fromLabels, ...fromText])];
+  return [...new Set([...fromLabels, ...fromTitle, ...fromText])];
 }
 
 export function resolveLanguage(offer: NormalizedOffer): string | null {

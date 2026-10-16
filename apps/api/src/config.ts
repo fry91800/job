@@ -3,12 +3,24 @@ import type { ModifierConfig, ModifierStrength } from "@job/shared";
 // Configuration values (FEATURE: limits are configuration, not code or database).
 // Defaults are the initial values from FEATURE.md; environment variables override some.
 
-const isProduction = process.env.NODE_ENV === "production";
+export const isProduction = process.env.NODE_ENV === "production";
+
+// Express "trust proxy": behind the reverse proxy (Caddy), the visitor's address comes from
+// X-Forwarded-For — needed for rate limits per address. "1" = one proxy in front.
+function trustProxy(value: string | undefined): boolean | number | string {
+  if (value === undefined || value === "" || value === "false") return false;
+  if (value === "true") return true;
+  return /^\d+$/.test(value) ? Number(value) : value;
+}
 
 const DAY_MS = 24 * 3600 * 1000;
 
 export const config = {
   port: Number(process.env.PORT ?? 3000),
+  trustProxy: trustProxy(process.env.TRUST_PROXY),
+  // One log line per request (method, route, status, duration; no query string, no
+  // personal data). On by default in production.
+  logRequests: process.env.LOG_REQUESTS ? process.env.LOG_REQUESTS === "true" : isProduction,
 
   session: {
     lifetimeMs: 30 * DAY_MS,

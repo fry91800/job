@@ -335,6 +335,12 @@ Full plan in `COLLECTOR.md`.
 |---|---|---|
 | D134 | The strength decides which resume sections the AI may rewrite (`config.modifier.sectionsByStrength`: soft = summary, skills; medium = + title, work experience; hard = + projects). `config.modifier.userChoosesSections: true` restores the per-user choice (still stored); generated resumes keep recording the sections actually used; GET /api/settings returns the mapping and whether users choose | One choice (the strength) instead of two keeps generation simple for users; the mapping stays easy to tune and the old behaviour one switch away |
 
+## Update 29 — skill matching noise (2026-10-16)
+
+| ID | Decision | Why |
+|---|---|---|
+| D135 | Skills in offer texts: other-language names only when technical-looking; ambiguous single words never; generic words (recrutement, communication, informatique) only in titles; the same skill in two catalogues gets one id for offers and resumes; `reenrich` recomputes stored offers' skills and quality | Everyday words, the English fallback and boilerplate produced most wrong skills (betting from "Paris", Vue.js from "point de vue"), and duplicates counted twice in the match % |
+
 ## Assumptions made (change if wrong)
 
 1. Session token: random 32 bytes, SHA-256 hash stored, sent in an HttpOnly cookie (not `localStorage`), CSRF handled with `SameSite=Lax` + `Origin` check.

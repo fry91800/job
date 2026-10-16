@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
-import { matchInText, prisma, resetCatalogueMatcher } from "@job/backend";
+import { canonicalIds, matchInText, matchLabels, prisma, resetCatalogueMatcher } from "@job/backend";
 import { zipSync } from "fflate";
 import { importCatalogue, parseRomeEscoMapping } from "./import";
 
@@ -13,6 +13,7 @@ import { importCatalogue, parseRomeEscoMapping } from "./import";
 const ESCO_DEV = "http://data.europa.eu/esco/occupation/test-dev";
 const ESCO_ADMIN = "http://data.europa.eu/esco/occupation/test-admin";
 const ESCO_SKILL = "http://data.europa.eu/esco/skill/test-kotlin-multiplatform";
+const TEST_SKILLS = ["test-python-esco", "test-planning", "test-gambling"].map((name) => `http://data.europa.eu/esco/skill/${name}`);
 
 // ROME files are Windows-1252 (accents as single bytes).
 const cp1252 = (value: unknown) => Buffer.from(JSON.stringify(value), "latin1");
@@ -55,7 +56,7 @@ before(async () => {
 
 after(async () => {
   await prisma.occupation.deleteMany({ where: { OR: [{ source: "rome", externalId: { startsWith: "Z99" } }, { source: "esco", externalId: { in: [ESCO_DEV, ESCO_ADMIN] } }] } });
-  await prisma.skill.deleteMany({ where: { source: "esco", externalId: ESCO_SKILL } });
+  await prisma.skill.deleteMany({ where: { source: "esco", externalId: { in: [ESCO_SKILL, ...TEST_SKILLS] } } });
   await rm(dir, { recursive: true, force: true });
   resetCatalogueMatcher();
   await prisma.$disconnect();
@@ -110,5 +111,30 @@ describe("catalogue import (ROME + ESCO)", () => {
     const before = await prisma.occupationName.count();
     await importCatalogue({ cacheDir: dir, escoDir: join(dir, "esco"), log: () => {} });
     assert.equal(await prisma.occupationName.count(), before);
+  });
+
+  test("skills in free text: no everyday words, English fallback for technical names only, duplicates once", async () => {
+    // ESCO-like entries: the same Python as the hand-made seed skill, an everyday English
+    // word, and an ambiguous French word.
+    const add = async (externalId: string, names: { language: string; name: string; isCanonical: boolean }[]) =>
+      (await prisma.skill.create({ data: { source: "esco", externalId, names: { create: names.map((name) => ({ ...name, normalizedName: name.name.toLowerCase() })) } } })).id;
+    const escoPython = await add(TEST_SKILLS[0], [{ language: "en", name: "Python (computer programming)", isCanonical: true }, { language: "en", name: "Python", isCanonical: false }]);
+    const planning = await add(TEST_SKILLS[1], [{ language: "en", name: "planning", isCanonical: true }]);
+    const gambling = await add(TEST_SKILLS[2], [{ language: "en", name: "gambling", isCanonical: true }, { language: "fr", name: "paris", isCanonical: true }]);
+    resetCatalogueMatcher();
+    const manualPython = (await prisma.skill.findFirstOrThrow({ where: { source: "manual", externalId: "python" } })).id;
+
+    const found = await matchInText("skill", "Développement en Python, planning des livraisons, poste basé à Paris.", "fr");
+    assert.ok(found.includes(manualPython), "technical names in any language");
+    assert.ok(!found.includes(escoPython), "the ESCO Python is the hand-made one");
+    assert.ok(!found.includes(planning), "everyday English words don't match French text");
+    assert.ok(!found.includes(gambling), "ambiguous words never match free text");
+    assert.ok((await matchInText("skill", "Strong planning skills.", "en")).includes(planning), "in an English text they do");
+    assert.ok((await matchLabels("skill", ["paris"], "fr")).includes(gambling), "a source's own label still matches");
+    assert.deepEqual(await canonicalIds("skill", [escoPython, manualPython]), [manualPython], "resumes count it once too");
+
+    const recruiting = (await prisma.skill.findFirstOrThrow({ where: { source: "manual", externalId: "recruitment" } })).id;
+    assert.ok(!(await matchInText("skill", "Notre processus de recrutement est rapide.", "fr")).includes(recruiting), "generic in a description");
+    assert.ok((await matchInText("skill", "Chargé de recrutement", "fr", { title: true })).includes(recruiting), "meaningful in a title");
   });
 });

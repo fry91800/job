@@ -1,0 +1,12 @@
+# Never in an image: dependencies (installed inside), data, secrets, build output.
+**/node_modules
+**/dist
+.git
+.env
+.env.*
+!.env.example
+!.env.production.example
+data
+storage
+storage-test
+*.log

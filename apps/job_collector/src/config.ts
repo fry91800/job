@@ -9,6 +9,10 @@ export const collectorConfig = {
 
   // An offer whose sources all dropped it, or past its expiry date, is closed.
   maintenanceCron: "30 3 * * *",
+  // Raw records (raw_offers): a new row each time a source's record changes. The latest
+  // row of each record is always kept (reprocessing); older versions and records that
+  // never became an offer (rejected) are removed after these delays.
+  rawRetention: { olderVersionsDays: 90, withoutOfferDays: 30 },
 
   // IT scope (P32): ROME family M18 without cartography (M1808) and the weather and climate
   // jobs (M1809, M1888, M1890, M1891, M1893).
@@ -45,14 +49,15 @@ export const collectorConfig = {
   },
 
   // Career-site crawler (COLLECTOR.md §5.3): schema.org JobPosting on company career sites.
-  // TODO before production: a real contact page and address in the user agent.
+  // Its user agent names a contact page and address for site owners (required in
+  // production: CRAWLER_CONTACT_URL, CRAWLER_CONTACT_EMAIL).
   crawler: {
     // Obey robots.txt Allow/Disallow rules (default). When false, robots.txt is still read
     // for its sitemaps and crawl-delay, and requests stay spaced; only its rules are
     // ignored. Env override: CRAWLER_RESPECT_ROBOTS_TXT=false.
     respectRobotsTxt: process.env.CRAWLER_RESPECT_ROBOTS_TXT !== "false",
     agent: "JobPlatformBot", // the token robots.txt rules are matched against
-    userAgent: "JobPlatformBot/0.1 (+https://example.invalid/bot; job search service; contact: bot@example.invalid)",
+    userAgent: `JobPlatformBot/0.1 (+${process.env.CRAWLER_CONTACT_URL ?? "https://example.invalid/bot"}; job search service; contact: ${process.env.CRAWLER_CONTACT_EMAIL ?? "bot@example.invalid"})`,
     minDelayMs: 2000, // between two requests to the same host (more if robots.txt asks)
     maxDelayMs: 30000, // a larger robots.txt crawl-delay is capped (and the site is slow)
     timeoutMs: 20000,

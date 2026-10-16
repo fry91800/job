@@ -1,6 +1,6 @@
 // The collector worker: schedules the connectors, runs them, and processes the offers
 // sent by the API's ingestion endpoint. `npm run collector:start`.
-import { prisma, QUEUES, startQueue, type BoardsJob, type IngestJob, type RunJob } from "@job/backend";
+import { logEvent, prisma, QUEUES, sendAlert, startQueue, type BoardsJob, type IngestJob, type RunJob } from "@job/backend";
 import { atsAdapters } from "./ats/registry";
 import { checkBoards } from "./discovery/check-boards";
 import { discoverBoards } from "./discovery/common-crawl";
@@ -10,7 +10,29 @@ import { runMaintenance } from "./pipeline/close";
 import { processRecord } from "./pipeline/process";
 import { runConnector } from "./runs/run-connector";
 
+// Settings a production worker must have (DEPLOYMENT.md).
+function productionProblems(env: NodeJS.ProcessEnv): string[] {
+  return ["DATABASE_URL", "CRAWLER_CONTACT_URL", "CRAWLER_CONTACT_EMAIL"].filter((name) => !env[name]?.trim()).map((name) => `${name} is missing`);
+}
+
+// A failed background job (discovery, board checks, maintenance) alerts someone.
+async function alerting(name: string, task: () => Promise<unknown>) {
+  try {
+    await task();
+  } catch (error) {
+    await sendAlert(`job:${name}`, `Collector job "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
+}
+
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    const problems = productionProblems(process.env);
+    if (problems.length) {
+      for (const problem of problems) logEvent("error", "config_problem", { problem });
+      process.exit(1);
+    }
+  }
   const boss = await startQueue(collectorConfig.databaseUrl);
 
   // One run at a time per connector: scheduled runs of the same connector wait.
@@ -31,17 +53,19 @@ async function main() {
   });
 
   // Company discovery and board checks (COLLECTOR.md §5.2).
-  await boss.work<BoardsJob>(QUEUES.boards, async ([job]) => {
-    if (job.data.action === "discover") {
-      for (const adapter of atsAdapters.filter((item) => item.discovery)) await discoverBoards(adapter);
-    } else {
-      await checkBoards({ limit: collectorConfig.discovery.checkBatch });
-    }
-  });
+  await boss.work<BoardsJob>(QUEUES.boards, async ([job]) =>
+    alerting(job.data.action === "discover" ? "discovery" : "board checks", async () => {
+      if (job.data.action === "discover") {
+        for (const adapter of atsAdapters.filter((item) => item.discovery)) await discoverBoards(adapter);
+      } else {
+        await checkBoards({ limit: collectorConfig.discovery.checkBatch });
+      }
+    }),
+  );
 
-  await boss.work(QUEUES.maintenance, async () => {
-    console.log("[maintenance]", JSON.stringify(await runMaintenance()));
-  });
+  await boss.work(QUEUES.maintenance, async () =>
+    alerting("maintenance", async () => logEvent("info", "maintenance", await runMaintenance())),
+  );
 
   for (const connector of connectors) {
     if (connector.schedule) await boss.schedule(QUEUES.run, connector.schedule, { connector: connector.key }, { key: connector.key });
@@ -51,7 +75,7 @@ async function main() {
   await boss.schedule(QUEUES.boards, collectorConfig.discovery.checkCron, { action: "check" }, { key: "check" });
   await boss.schedule(QUEUES.boards, collectorConfig.discovery.discoverCron, { action: "discover" }, { key: "discover" });
 
-  console.log(`collector started: ${connectors.filter((connector) => connector.schedule).length} scheduled connector(s)`);
+  logEvent("info", "collector_started", { scheduledConnectors: connectors.filter((connector) => connector.schedule).length });
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, async () => {
