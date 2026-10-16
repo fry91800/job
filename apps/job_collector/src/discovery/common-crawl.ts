@@ -1,94 +1,90 @@
 import { prisma } from "@job/backend";
 import type { AtsAdapter } from "../ats/adapter";
-import { pause } from "../ats/http";
 import { collectorConfig } from "../config";
+import { capturesFor, surtPrefixes, type Capture } from "./cc-index";
 
 // Company discovery (COLLECTOR.md §5.2): Common Crawl's URL index lists the public job
-// pages it crawled; the board id in each URL gives a candidate board. Read page by page
-// with pauses (the index is a shared public service, often busy), retried on failure.
+// pages it crawled; the board id in each URL gives a candidate board. The index is read
+// from its files (cc-index.ts), over the last few crawls: boards come and go between
+// crawls, and each crawl only sees part of the web. Candidates with French-language pages
+// are marked (":fr") and checked first.
 
-async function fetchText(url: string): Promise<string> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= 4; attempt++) {
-    try {
-      const response = await fetch(url, {
-        headers: { "User-Agent": "MonPosteBot/0.1 (company discovery)" },
-        signal: AbortSignal.timeout(120_000),
-      });
-      if (response.ok) return response.text();
-      if (response.status === 404) return "";
-      lastError = new Error(`HTTP ${response.status}`);
-    } catch (error) {
-      lastError = error;
-    }
-    await pause(5000 * attempt);
-  }
-  throw lastError;
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { headers: { "User-Agent": "MonPosteBot/0.1 (company discovery)" }, signal: AbortSignal.timeout(60_000) });
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+  return (await response.json()) as T;
+}
+
+// The most recent crawl ids, newest first.
+export async function recentCrawls(count: number): Promise<string[]> {
+  const crawls = await fetchJson<{ id: string }[]>(`${collectorConfig.discovery.commonCrawlIndex}/collinfo.json`);
+  return crawls.slice(0, count).map((crawl) => crawl.id);
 }
 
 export async function latestCrawl(): Promise<string> {
-  const crawls = JSON.parse(await fetchText(`${collectorConfig.discovery.commonCrawlIndex}/collinfo.json`)) as { id: string }[];
-  return crawls[0].id;
+  return (await recentCrawls(1))[0];
 }
 
-// Board ids found in a list of index lines (JSON with a "url" field).
-export function slugsFromIndexLines(adapter: AtsAdapter, text: string): Set<string> {
-  const slugs = new Set<string>();
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
+// Board ids found in captures, and whether each has a French-language page.
+export function boardsFromCaptures(adapter: AtsAdapter, captures: Pick<Capture, "url" | "languages">[]): Map<string, { french: boolean }> {
+  const boards = new Map<string, { french: boolean }>();
+  for (const capture of captures) {
+    let slug: string | null = null;
     try {
-      const slug = adapter.discovery?.slugFromUrl(new URL(JSON.parse(line).url));
-      if (slug) slugs.add(slug);
+      slug = adapter.discovery?.slugFromUrl(new URL(capture.url)) ?? null;
     } catch {
-      // Not a JSON line or not a URL: ignored.
+      // Not a URL: ignored.
     }
+    if (!slug) continue;
+    const french = (capture.languages ?? "").split(",").includes("fra");
+    boards.set(slug, { french: french || (boards.get(slug)?.french ?? false) });
   }
-  return slugs;
+  return boards;
 }
 
-// Candidates are saved after each URL prefix; a prefix that keeps failing (the index is
-// often busy) is logged and skipped, the others still count.
+// Candidates are saved after each crawl; a crawl that keeps failing is logged and skipped,
+// the others still count.
 export async function discoverBoards(
   adapter: AtsAdapter,
-  options: { crawl?: string; maxPages?: number; log?: (message: string) => void } = {},
-): Promise<{ found: number; added: number; failedPrefixes: string[] }> {
+  options: { crawls?: string[]; log?: (message: string) => void } = {},
+): Promise<{ found: number; added: number; french: number; failedCrawls: string[] }> {
   const log = options.log ?? ((message: string) => console.log(`[discover:${adapter.ats}] ${message}`));
-  const crawl = options.crawl ?? (await latestCrawl());
-  const endpoint = `${collectorConfig.discovery.commonCrawlIndex}/${crawl}-index`;
-  const all = new Set<string>();
-  const failedPrefixes: string[] = [];
+  const crawls = options.crawls ?? (await recentCrawls(collectorConfig.discovery.crawls));
+  const prefixes = (adapter.discovery?.prefixes ?? []).flatMap((prefix) =>
+    prefix.startsWith("*.") ? surtPrefixes(prefix.slice(2), "domain") : surtPrefixes(prefix, "prefix"),
+  );
+  const all = new Map<string, { french: boolean }>();
+  const failedCrawls: string[] = [];
   let added = 0;
 
-  for (const prefix of adapter.discovery?.prefixes ?? []) {
-    const slugs = new Set<string>();
+  for (const crawl of crawls) {
+    let boards: Map<string, { french: boolean }>;
     try {
-      const query = `url=${encodeURIComponent(prefix)}&matchType=${adapter.discovery?.matchType ?? "prefix"}&pageSize=1`;
-      const { pages } = JSON.parse((await fetchText(`${endpoint}?${query}&showNumPages=true`)) || '{"pages":0}') as { pages: number };
-      const last = Math.min(pages, options.maxPages ?? pages);
-      for (let page = 0; page < last; page++) {
-        const text = await fetchText(`${endpoint}?${query}&output=json&fl=url&page=${page}`);
-        for (const slug of slugsFromIndexLines(adapter, text)) slugs.add(slug);
-        log(`${prefix} page ${page + 1}/${last}: ${slugs.size} board(s)`);
-        await pause(collectorConfig.discovery.pauseBetweenPagesMs);
-      }
+      boards = boardsFromCaptures(adapter, await capturesFor(crawl, prefixes, (message) => log(`${crawl} ${message}`)));
     } catch (error) {
-      failedPrefixes.push(prefix);
-      log(`${prefix}: stopped (${error instanceof Error ? error.message : error}), keeping the ${slugs.size} board(s) found`);
+      failedCrawls.push(crawl);
+      log(`${crawl}: stopped (${error instanceof Error ? error.message : error})`);
+      continue;
     }
     // Board ids found in another letter case ("AbbVie" / "abbvie") are the same board.
     const known = new Set(
       (await prisma.companySource.findMany({ where: { ats: adapter.ats }, select: { slug: true } })).map((row) => row.slug.toLowerCase()),
     );
-    const fresh = new Map<string, string>();
-    for (const slug of slugs) if (!known.has(slug.toLowerCase()) && !fresh.has(slug.toLowerCase())) fresh.set(slug.toLowerCase(), slug);
+    const fresh = new Map<string, { slug: string; french: boolean }>();
+    for (const [slug, { french }] of boards) {
+      const key = slug.toLowerCase();
+      if (!known.has(key)) fresh.set(key, { slug, french: french || (fresh.get(key)?.french ?? false) });
+    }
     const { count } = await prisma.companySource.createMany({
-      data: [...fresh.values()].map((slug) => ({ ats: adapter.ats, slug, status: "candidate", discoveredFrom: `commoncrawl:${crawl}` })),
+      data: [...fresh.values()].map(({ slug, french }) => ({ ats: adapter.ats, slug, status: "candidate", discoveredFrom: `commoncrawl:${crawl}${french ? ":fr" : ""}` })),
       skipDuplicates: true,
     });
     added += count;
-    slugs.forEach((slug) => all.add(slug));
+    for (const [slug, info] of boards) all.set(slug, { french: info.french || (all.get(slug)?.french ?? false) });
+    log(`${crawl}: ${boards.size} board(s), ${count} new candidate(s)`);
   }
 
-  log(`${all.size} board(s) found, ${added} new candidate(s)${failedPrefixes.length ? `, failed: ${failedPrefixes.join(", ")}` : ""}`);
-  return { found: all.size, added, failedPrefixes };
+  const french = [...all.values()].filter((board) => board.french).length;
+  log(`${all.size} board(s) found (${french} with French pages), ${added} new candidate(s)${failedCrawls.length ? `, failed: ${failedCrawls.join(", ")}` : ""}`);
+  return { found: all.size, added, french, failedCrawls };
 }

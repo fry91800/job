@@ -4,7 +4,8 @@
 //   maintenance                               close expired offers
 //   reenrich                                  recompute stored offers' skills, occupations and quality; resumes' merged skills
 //   metrics                                   coverage and quality numbers
-//   discover [--ats greenhouse,ashby] [--pages N] [--crawl CC-MAIN-…]   find boards in Common Crawl
+//   discover [--ats greenhouse,ashby] [--crawls N | --crawl CC-MAIN-…,…]   find boards in Common Crawl
+//   census [--crawls N]                       companies per recruiting tool in Common Crawl, with French pages
 //   boards check [--ats X] [--limit N]        check candidate / due boards
 //   boards add <ats> <slug>                   add a board by hand (checked right away); careersite <address>
 //   boards list [--status S]                  boards by tool and status
@@ -21,7 +22,8 @@ import { atsAdapters, findAdapter } from "./ats/registry";
 import { importCatalogue } from "./catalogue/import";
 import { connectors, findConnector } from "./connectors/registry";
 import { checkBoard, checkBoards } from "./discovery/check-boards";
-import { discoverBoards } from "./discovery/common-crawl";
+import { atsCensus } from "./discovery/ats-census";
+import { discoverBoards, recentCrawls } from "./discovery/common-crawl";
 import { exportBoards, importBoards } from "./discovery/registry-file";
 import { collectorMetrics } from "./metrics";
 import { runMaintenance } from "./pipeline/close";
@@ -45,13 +47,19 @@ async function main() {
       await runConnector(connector);
       break;
     }
+    case "census": {
+      const crawls = option(args, "--crawls");
+      await atsCensus({ crawls: crawls ? Number(crawls) : undefined });
+      break;
+    }
     case "discover": {
       const names = option(args, "--ats")?.split(",") ?? atsAdapters.filter((adapter) => adapter.discovery).map((adapter) => adapter.ats);
-      const pages = option(args, "--pages");
+      const crawl = option(args, "--crawl");
+      const crawlCount = option(args, "--crawls");
       for (const name of names) {
         const adapter = findAdapter(name);
         if (!adapter) throw new Error(`Unknown ATS "${name}". Known: ${atsAdapters.map((item) => item.ats).join(", ")}`);
-        await discoverBoards(adapter, { crawl: option(args, "--crawl"), maxPages: pages ? Number(pages) : undefined });
+        await discoverBoards(adapter, { crawls: crawl ? crawl.split(",") : crawlCount ? await recentCrawls(Number(crawlCount)) : undefined });
       }
       break;
     }
@@ -108,7 +116,7 @@ async function main() {
       console.log(JSON.stringify(collectedOfferJsonSchema(), null, 2));
       break;
     default:
-      console.log("Commands: catalogue [--esco <folder>] [--refresh] | discover [--ats …] [--pages N] | boards check|add|list|export|import | run <connector> | maintenance | reenrich | metrics | token <source> <name> | contract");
+      console.log("Commands: catalogue [--esco <folder>] [--refresh] | discover [--ats …] [--crawls N] | census [--crawls N] | boards check|add|list|export|import | run <connector> | maintenance | reenrich | metrics | token <source> <name> | contract");
       process.exitCode = command ? 1 : 0;
   }
 }

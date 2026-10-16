@@ -328,7 +328,7 @@ Not in phase 1 (planned with the first real sources): AI for missing fields and 
 
 * **Adapters** (`apps/job_collector/src/ats/adapters/`): Greenhouse, Ashby, Lever and Lever EU (`api.eu.lever.co`, a separate instance), SmartRecruiters. Each one `check`s a board (exists? offers? offers in France?) and `collect`s **its offers located in France only** (country field when the tool gives one, else the location text: France, Île-de-France, French cities), mapped to the ingestion contract. Contract and remote types only from explicit signals (CDI/CDD/stage/alternance/freelance words, the tool's own fields); "full time" alone leaves the contract empty. Salaries when published (Ashby, Lever). Greenhouse descriptions are entity-encoded HTML and are decoded. The city is a known French city in the location text, else the text's first part when it reads like a place name ("Sanary-sur-mer"), resolved by the location table then Geoapify (names compared without accents, case, hyphens). SmartRecruiters needs one detail request per offer: known offers whose release date didn't change are only marked as still listed, and each is fetched again about once a week (`ats.detailRefreshDays`, spread by offer id).
 * **One connector per tool** (`ats/connector.ts`), every 6 hours, collects the `active` boards. Each board is a **full sync**: after a successful read, the board's offers that disappeared are closed; a failing board closes nothing (error kept in `company_sources.last_error`); a board that answers 404 becomes `invalid`.
-* **Discovery** (`discovery/common-crawl.ts`, `npm run collector -- discover [--ats …] [--pages N]`, monthly in the worker): Common Crawl's URL index, read page by page with pauses and retries; candidates saved after each URL prefix (a busy index answering 502 doesn't lose what was found). Board ids that only differ by letter case ("AbbVie" / "abbvie") are one board.
+* **Discovery** (`discovery/common-crawl.ts`, `npm run collector -- discover [--ats …] [--crawls N]`, monthly in the worker): Common Crawl's URL index over the last `discovery.crawls` crawls (3), read from its files since 2026-10-16 (`discovery/cc-index.ts`): a binary search in `cluster.idx` with HTTP range requests finds the index blocks of each tool's address prefix, and only those blocks are downloaded (Ashby: 8 blocks, 12 s). The public query service it used before answered 504 most of the time. Candidates are saved after each crawl; those with French-language pages are marked (`discovered_from` ending in `:fr`) and checked first. Board ids that only differ by letter case ("AbbVie" / "abbvie") are one board. `npm run collector -- census [--crawls N]` counts the companies per recruiting tool, supported or not, and how many have French pages (§17).
 * **Board checks** (`discovery/check-boards.ts`, `npm run collector -- boards check [--ats X] [--limit N]`, nightly batch of 500): statuses `candidate` → `active` (offers in France; its company is created) / `no-france` / `empty` / `invalid` / `duplicate`; re-checked after 7 days (active), 30 (no-france, empty), 90 (invalid). Sandbox accounts (slug ending in "sandbox", or "Sandbox" as a word in the company name) hold fake offers and are `paused`. `boards add <ats> <slug>` adds a board by hand, `boards list` counts them. `boards export [file]` saves the registry (boards, statuses, check dates, companies; default `data/boards-<date>.json.gz`) and `boards import <file>` merges it into another database (missing boards added; for a board on both sides the more recent check wins): this is what carries discovery results to production or across a development reset — offers come back with the first collection run.
 * **Runs** interrupted by a stopped process are closed as failed by the next run of the connector.
 
@@ -441,3 +441,40 @@ Plus an alert when a source sends nothing for two schedules.
 3. Pages endpoint + central extraction + snapshots + "not seen" closing (§17.2–17.3), with
    one first bot on a site whose terms allow it, to validate the design.
 4. Aggregators whose terms fit.
+
+### 17.5 Step 1 — which tools French employers use (measured 2026-10-16)
+
+`npm run collector -- census --crawls 3` (Common Crawl, three crawls to September 2026):
+companies with public job pages per tool, and how many have pages detected as French.
+Pages built in the browser (Ashby, Greenhouse's old boards, Workday, BambooHR, Welcome to
+the Jungle) have no detected language: their French count reads 0 and says nothing.
+
+| Tool | Supported | Companies | With French pages | Job pages carry JobPosting? |
+|---|---|---|---|---|
+| SmartRecruiters | yes | 1 032 | 130 | (API) |
+| Teamtailor | yes (career sites) | 1 376 | 125 | yes |
+| Recruitee | yes | 1 168 | 101 | (API) |
+| Greenhouse (new boards) | yes | 6 088 | 78 | (API) |
+| JOIN | **no → career sites** | 2 904 | 69 | yes |
+| iCIMS | no | 3 839 | 62 | not established (samples were marketing pages) |
+| Flatchr | no | 57 | 44 | not established |
+| Talentsoft (Cegid) | no | 69 | 44 | **no**: needs its own adapter; large French employers |
+| Breezy | no | 2 866 | 36 | not established |
+| Personio (.com + .de) | **no → career sites** | 3 282 | 43 | yes (also a public XML feed) |
+| Jobvite | **no → career sites** | 730 | 27 | yes |
+| Taleo | no | 347 | 26 | no |
+| Welcome Kit | **no → career sites** | 41 | 23 | yes |
+| Workable | yes | 5 553 | 18 | (API) |
+| Workday | no | 2 565 | (not measurable) | no sample; large employers; no public API meant for job boards |
+
+Findings:
+
+* Teamtailor was supported but barely discovered: 41 career sites in the registry against
+  1 376 companies, because discovery depended on the overloaded index service.
+* JOIN, Personio, Jobvite and Welcome Kit publish `JobPosting` on their job pages: the
+  career-site crawler reads them as they are; they only needed discovery
+  (`careerSiteFromUrl`, done in step 2). JOIN and Jobvite host every company on one site:
+  the crawler stays in the company's section (`findOfferPages(…, { section: true })`).
+* Next dedicated adapters (step 3), by expected French offers: **Talentsoft** (French,
+  large employers, many offers each), then iCIMS, Flatchr, Breezy after checking their
+  public endpoints and terms; Workday only if a legitimate access exists.

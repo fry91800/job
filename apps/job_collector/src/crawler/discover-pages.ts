@@ -90,7 +90,11 @@ async function fromSitemaps(start: URL): Promise<Map<string, OfferPage> | null> 
 }
 
 // No sitemap: links from the start page, following listing pages ("/jobs?page=2") a little.
-async function fromLinks(start: URL): Promise<Map<string, OfferPage>> {
+// `section`: the start is one company's part of a site shared by many (join.com/companies/x):
+// only addresses under it count, and any deeper address may be an offer.
+async function fromLinks(start: URL, section = false): Promise<Map<string, OfferPage>> {
+  const sectionPath = start.pathname.replace(/\/?$/, "/");
+  const depth = start.pathname.split("/").filter(Boolean).length;
   const pages = new Map<string, OfferPage>();
   const seen = new Set<string>([start.toString()]);
   const queue = [start.toString()];
@@ -115,18 +119,21 @@ async function fromLinks(start: URL): Promise<Map<string, OfferPage>> {
       }
       url.hash = "";
       if (!/^https?:$/.test(url.protocol) || !sameSite(url, start) || seen.has(url.toString())) continue;
+      if (section && (url.host !== start.host || !url.pathname.startsWith(sectionPath))) continue;
       seen.add(url.toString());
       if (looksLikeOfferPage(url)) addPage(pages, url, null);
       else if (JOB_WORDS.test(url.pathname) || /[?&]page=\d+/.test(url.search)) queue.push(url.toString());
+      else if (section && url.pathname.split("/").filter(Boolean).length > depth) addPage(pages, url, null);
     }
   }
   return pages;
 }
 
-export async function findOfferPages(startUrl: string): Promise<OfferPage[]> {
+// `section`: see fromLinks. The shared site's sitemaps list every company: not read.
+export async function findOfferPages(startUrl: string, options: { section?: boolean } = {}): Promise<OfferPage[]> {
   const start = new URL(startUrl);
-  const fromSitemap = await fromSitemaps(start);
-  const pages = fromSitemap && fromSitemap.size > 0 ? fromSitemap : await fromLinks(start);
+  const fromSitemap = options.section ? null : await fromSitemaps(start);
+  const pages = fromSitemap && fromSitemap.size > 0 ? fromSitemap : await fromLinks(start, options.section);
   // Pages robots.txt forbids aren't offers we can read (sitemaps may still list them),
   // unless robots.txt rules are ignored by configuration.
   const robots = await robotsFor(start);

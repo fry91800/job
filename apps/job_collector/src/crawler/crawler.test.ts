@@ -6,8 +6,8 @@ import { backendConfig, prisma } from "@job/backend";
 import { atsConnector } from "../ats/connector";
 import { collectorConfig } from "../config";
 import { runConnector } from "../runs/run-connector";
-import { careerSite, resetCareerSiteMemory } from "./career-site";
-import { looksLikeOfferPage, pageKey, parseSitemap } from "./discover-pages";
+import { careerSite, careerSiteFromUrl, resetCareerSiteMemory } from "./career-site";
+import { findOfferPages, looksLikeOfferPage, pageKey, parseSitemap } from "./discover-pages";
 import { resetCrawler } from "./fetcher";
 import { extractJobPostings, frenchPlace, jobPostingOffer } from "./job-posting";
 import { parseRobots } from "./robots";
@@ -44,6 +44,11 @@ function route(path: string): [number, string, string] {
   if (path === "/sitemap-jobs.xml") {
     const urls = [...Object.keys(jobs), "/jobs/private-1", "/about"].map((key) => `<url><loc>http://${slug}${key}</loc><lastmod>${lastmod}</lastmod></url>`);
     return [200, "application/xml", `<urlset>${urls.join("")}</urlset>`];
+  }
+  // One company's section of a site shared by many (like join.com/companies/{company}).
+  if (path === "/companies/test-co") {
+    const links = ["/companies/test-co/123-developpeur-h-f", "/companies/other-co/9-commercial", "/about", "/companies/test-co"];
+    return [200, "text/html", `<html><body>${links.map((href) => `<a href="${href}">x</a>`).join("")}</body></html>`];
   }
   if (jobs[path]) return [200, "text/html; charset=utf-8", jobs[path]];
   return [404, "text/html", "not found"];
@@ -108,6 +113,23 @@ describe("offer pages", () => {
     for (const path of ["/jobs/123-dev", "/fr/offres/developpeur-h-f", "/global/en/job/R0341671/Architecte", "/carrieres/offre-emploi/42"]) assert.ok(looksLikeOfferPage(new URL(path, "https://x.example")), path);
     for (const path of ["/jobs", "/fr/offres/", "/about/team", "/jobs/brochure.pdf"]) assert.ok(!looksLikeOfferPage(new URL(path, "https://x.example")), path);
     assert.equal(pageKey(new URL("https://x.example/fr/jobs/1")), pageKey(new URL("https://x.example/en/jobs/1")));
+  });
+});
+
+describe("career sites of recruiting tools", () => {
+  test("one host per company, or one company's section of a shared site", () => {
+    const site = (url: string) => careerSiteFromUrl(new URL(url));
+    assert.equal(site("https://acme.teamtailor.com/jobs/1-dev"), "acme.teamtailor.com");
+    assert.equal(site("https://acme.jobs.personio.de/job/2468793"), "acme.jobs.personio.de");
+    assert.equal(site("https://acme.welcomekit.co/jobs/dev"), "acme.welcomekit.co");
+    assert.equal(site("https://join.com/companies/Acme/16703211-dev"), "join.com/companies/acme");
+    assert.equal(site("https://jobs.jobvite.com/acme/job/oGZcAfwb"), "jobs.jobvite.com/acme");
+    for (const url of ["https://www.teamtailor.com/fr/", "https://join.com/pricing", "https://jobs.jobvite.com/careers", "https://example.com/jobs/1"]) assert.equal(site(url), null, url);
+  });
+
+  test("a section of a shared site: only its own addresses, any deeper one may be an offer", async () => {
+    const pages = await findOfferPages(`http://${slug}/companies/test-co`, { section: true });
+    assert.deepEqual(pages.map((item) => item.key), ["/companies/test-co/123-developpeur-h-f"]);
   });
 });
 

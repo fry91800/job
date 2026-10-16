@@ -23,28 +23,47 @@ const startUrl = (slug: string) => `${collectorConfig.crawler.scheme}://${slug}`
 // A site that can't be read at all is "gone" for the registry (status invalid).
 async function offerPages(slug: string) {
   try {
-    return await findOfferPages(startUrl(slug));
+    return await findOfferPages(startUrl(slug), { section: COMPANY_SECTIONS.some(([host, path]) => slug.startsWith(`${host}${path}`)) });
   } catch (error) {
     if (error instanceof PageGoneError) throw new NotFoundError(error.message);
     throw error;
   }
 }
 
-// Teamtailor career sites ({company}.teamtailor.com) carry JobPosting and sitemaps: found
-// by discovery like the ATS boards. Other career sites are added by hand for now.
-const NOT_SITES = new Set(["www", "app", "api", "docs", "support", "help", "status", "partner", "partners", "assets", "blog", "go"]);
+// Recruiting tools whose public job pages carry JobPosting (checked 2026-10-16, COLLECTOR.md
+// §17): their companies' career sites are found by discovery like the ATS boards; other
+// career sites are added by hand. One host per company ({company}.teamtailor.com), or one
+// section of a shared site (join.com/companies/{company}, see crawler.sharedHosts).
+const NOT_SITES = new Set(["www", "app", "api", "docs", "support", "help", "status", "partner", "partners", "assets", "blog", "go", "jobs", "careers"]);
+const COMPANY_HOSTS = ["teamtailor.com", "jobs.personio.de", "jobs.personio.com", "welcomekit.co"];
+const COMPANY_SECTIONS: [host: string, path: string][] = [
+  ["join.com", "/companies/"],
+  ["jobs.jobvite.com", "/"],
+];
+const COMPANY_ID = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
+export function careerSiteFromUrl(url: URL): string | null {
+  const host = url.hostname.toLowerCase();
+  for (const domain of COMPANY_HOSTS) {
+    if (!host.endsWith(`.${domain}`)) continue;
+    const sub = host.slice(0, -domain.length - 1);
+    return COMPANY_ID.test(sub) && !NOT_SITES.has(sub) ? host : null;
+  }
+  for (const [sectionHost, path] of COMPANY_SECTIONS) {
+    if (host !== sectionHost || !url.pathname.startsWith(path)) continue;
+    const company = url.pathname.slice(path.length).split("/")[0]?.toLowerCase();
+    return company && COMPANY_ID.test(company) && !NOT_SITES.has(company) ? `${host}${path}${company}` : null;
+  }
+  return null;
+}
 
 export const careerSite: AtsAdapter = {
   ats: SOURCE,
   kind: "crawler",
   schedule: "0 5 * * *", // daily: slower and more polite than the ATS APIs
   discovery: {
-    prefixes: ["teamtailor.com"],
-    matchType: "domain",
-    slugFromUrl: (url) => {
-      const [sub, ...rest] = url.hostname.toLowerCase().split(".");
-      return rest.join(".") === "teamtailor.com" && /^[a-z0-9][a-z0-9-]{0,62}$/.test(sub) && !NOT_SITES.has(sub) ? url.hostname.toLowerCase() : null;
-    },
+    prefixes: [...COMPANY_HOSTS.map((domain) => `*.${domain}`), ...COMPANY_SECTIONS.map(([host, path]) => `${host}${path}`)],
+    slugFromUrl: careerSiteFromUrl,
   },
 
   async check(slug) {

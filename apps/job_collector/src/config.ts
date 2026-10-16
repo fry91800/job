@@ -42,10 +42,14 @@ export const collectorConfig = {
     timeoutMs: 20000,
   },
 
-  // Company discovery (COLLECTOR.md §5.2): Common Crawl's URL index.
+  // Company discovery (COLLECTOR.md §5.2): Common Crawl's URL index, read from its files.
   discovery: {
-    commonCrawlIndex: "https://index.commoncrawl.org",
-    pauseBetweenPagesMs: 2000,
+    commonCrawlIndex: "https://index.commoncrawl.org", // list of crawls (collinfo.json)
+    commonCrawlData: "https://data.commoncrawl.org", // the index files
+    crawls: 3, // the most recent crawls read by each discovery
+    pauseBetweenBlocksMs: 200, // between two index blocks (~270 KB each)
+    retryPauseMs: 5000, // times the attempt number
+    clusterChunkBytes: 4096, // per read of cluster.idx during the binary search
     checkCron: "0 2 * * *", // nightly: candidates and boards due for a re-check
     checkBatch: 1000,
     discoverCron: "0 1 1 * *", // monthly: Common Crawl publishes a new crawl about monthly

@@ -25,8 +25,8 @@ export interface AtsAdapter {
   schedule?: string; // cron; the ATS schedule by default
   // Discovery: URL prefixes of the tool's public job pages, and the board id in a URL
   // (career sites are found otherwise).
-  // matchType "domain" reads every host of a domain ("*.recruitee.com").
-  discovery?: { prefixes: string[]; matchType?: "prefix" | "domain"; slugFromUrl(url: URL): string | null };
+  // "*.recruitee.com" reads every host of a domain.
+  discovery?: { prefixes: string[]; slugFromUrl(url: URL): string | null };
   // Throws NotFoundError when the board doesn't exist (any more).
   check(slug: string): Promise<BoardCheck>;
   // The board's offers located in France, mapped to the ingestion contract. Tools that need

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import { gzipSync } from "node:zlib";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import { backendConfig, prisma } from "@job/backend";
 import { collectorConfig } from "../config";
 import { checkBoards } from "../discovery/check-boards";
-import { discoverBoards, slugsFromIndexLines } from "../discovery/common-crawl";
+import { surtPrefixes } from "../discovery/cc-index";
+import { boardsFromCaptures, discoverBoards } from "../discovery/common-crawl";
 import { runConnector } from "../runs/run-connector";
 import type { CollectedRecord } from "../connectors/types";
 import type { KnownOffers } from "./adapter";
@@ -91,24 +93,43 @@ function route(url: URL): [number, unknown] {
       { id: 102, slug: "us", title: "US Sales", locations: [{ country_code: "US", city: "Austin" }], country_code: "US", description: "<p>x</p>" },
     ] }];
   }
-  // Common Crawl index
+  // Common Crawl: the list of crawls, and the index files (cluster.idx and blocks)
   if (path === "/collinfo.json") return [200, [{ id: "CC-TEST" }]];
-  if (path === "/CC-TEST-index") {
-    if (url.searchParams.get("showNumPages")) return [200, { pages: 2 }];
-    const lines =
-      url.searchParams.get("page") === "0"
-        ? ['{"url":"https://jobs.ashbyhq.com/test-disc-one/123"}', '{"url":"https://jobs.ashbyhq.com/test-disc-two"}', "not json"]
-        : ['{"url":"https://jobs.ashbyhq.com/test-disc-one/456"}', '{"url":"https://jobs.ashbyhq.com/robots.txt"}'];
-    return [200, lines.join("\n")];
-  }
+  if (path === "/cc-index/collections/CC-TEST/indexes/cluster.idx") return [200, CC_INDEX.cluster];
+  if (path === "/cc-index/collections/CC-TEST/indexes/cdx-00000.gz") return [200, CC_INDEX.cdx];
   return [404, { error: "not found" }];
 }
+
+// A small Common Crawl index: gzip blocks of "SURT timestamp {json}" lines, and a
+// cluster.idx with filler lines around them so the binary search has work to do.
+const CC_INDEX = (() => {
+  const capture = (surt: string, url: string, languages?: string) => `${surt} 20260901000000 ${JSON.stringify({ url, status: "200", ...(languages && { languages }) })}`;
+  const blocks = [
+    [capture("com,ashbyhq,api)/x", "https://api.ashbyhq.com/x"), capture("com,ashbyhq,jobs)/test-disc-one/123", "https://jobs.ashbyhq.com/test-disc-one/123", "fra,eng")],
+    [capture("com,ashbyhq,jobs)/test-disc-one/456", "https://jobs.ashbyhq.com/test-disc-one/456"), capture("com,ashbyhq,jobs)/test-disc-two", "https://jobs.ashbyhq.com/test-disc-two", "eng"), "com,ashbyhq,jobs)/broken 20260901000000 not json", capture("com,ashbyhq,jobs)/robots.txt", "https://jobs.ashbyhq.com/robots.txt")],
+    [capture("com,ashbyhqx)/", "https://ashbyhqx.com/")],
+  ].map((lines) => gzipSync(lines.join("\n") + "\n"));
+  const offsets = blocks.map((_, index) => blocks.slice(0, index).reduce((sum, block) => sum + block.length, 0));
+  const entry = (key: string, block: number) => `${key} 20260901000000\tcdx-00000.gz\t${offsets[block]}\t${blocks[block].length}\t${block + 1}`;
+  const filler = (from: string, count: number) => Array.from({ length: count }, (_, index) => `${from}${String(index).padStart(4, "0")} 20260901000000\tcdx-00000.gz\t0\t1\t0`);
+  const cluster = [...filler("aaa,filler)/", 60), entry("com,ashbyhq,api)/x", 0), entry("com,ashbyhq,jobs)/test-disc-one/456", 1), entry("com,ashbyhqx)/", 2), ...filler("zzz,filler)/", 60)].join("\n") + "\n";
+  return { cluster: Buffer.from(cluster), cdx: Buffer.concat(blocks) };
+})();
 
 let server: http.Server;
 
 before(async () => {
   server = http.createServer((req, res) => {
     const [status, body] = route(new URL(req.url!, "http://localhost"));
+    if (Buffer.isBuffer(body)) {
+      // Index files: HEAD for the size, byte ranges like the real file server.
+      const range = /^bytes=(\d+)-(\d+)$/.exec(req.headers.range ?? "");
+      const start = range ? Number(range[1]) : 0;
+      if (range && start >= body.length) return void res.writeHead(416).end();
+      const part = range ? body.subarray(start, Number(range[2]) + 1) : body;
+      res.writeHead(range ? 206 : status, { "Content-Type": "application/octet-stream", "Content-Length": req.method === "HEAD" ? body.length : part.length });
+      return void res.end(req.method === "HEAD" ? undefined : part);
+    }
     res.writeHead(status, { "Content-Type": "application/json" }).end(typeof body === "string" ? body : JSON.stringify(body));
   });
   server.listen(0, "127.0.0.1");
@@ -116,9 +137,13 @@ before(async () => {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   for (const ats of Object.keys(collectorConfig.ats.baseUrls)) collectorConfig.ats.baseUrls[ats] = base;
   collectorConfig.discovery.commonCrawlIndex = base;
+  collectorConfig.discovery.commonCrawlData = base;
+  collectorConfig.discovery.crawls = 1;
+  collectorConfig.discovery.clusterChunkBytes = 64;
+  collectorConfig.discovery.pauseBetweenBlocksMs = 0;
+  collectorConfig.discovery.retryPauseMs = 0;
   collectorConfig.ats.pauseBetweenBoardsMs = 0;
   collectorConfig.ats.pauseBetweenRequestsMs = 0;
-  collectorConfig.discovery.pauseBetweenPagesMs = 0;
   backendConfig.geoapify.apiKey = undefined;
 });
 
@@ -250,17 +275,32 @@ describe("Workable and Recruitee", () => {
 });
 
 describe("discovery and board checks", () => {
-  test("board ids from Common Crawl index lines", () => {
-    const lines = ['{"url":"https://boards.greenhouse.io/embed/job_board?for=test-embedded"}', '{"url":"https://boards.greenhouse.io/test-path/jobs/1"}', '{"url":"https://boards.greenhouse.io/robots.txt"}'].join("\n");
-    assert.deepEqual([...slugsFromIndexLines(findAdapter("greenhouse")!, lines)], ["test-embedded", "test-path"]);
+  test("index prefixes of an address or a domain", () => {
+    assert.deepEqual(surtPrefixes("boards.greenhouse.io/", "prefix"), ["io,greenhouse,boards)/"]);
+    assert.deepEqual(surtPrefixes("www.welcometothejungle.com/fr/companies/", "prefix"), ["com,welcometothejungle)/fr/companies/"]);
+    assert.deepEqual(surtPrefixes("teamtailor.com", "domain"), ["com,teamtailor)", "com,teamtailor,"]);
   });
 
-  test("discovery adds candidates once", async () => {
+  test("board ids from captures, with their French pages", () => {
+    const captures = [
+      { url: "https://boards.greenhouse.io/embed/job_board?for=test-embedded", languages: "eng" },
+      { url: "https://boards.greenhouse.io/test-path/jobs/1", languages: "eng" },
+      { url: "https://boards.greenhouse.io/test-path/jobs/2", languages: "fra" },
+      { url: "https://boards.greenhouse.io/robots.txt", languages: null },
+      { url: "not a url", languages: null },
+    ];
+    assert.deepEqual([...boardsFromCaptures(findAdapter("greenhouse")!, captures)], [["test-embedded", { french: false }], ["test-path", { french: true }]]);
+  });
+
+  test("discovery reads the index files and adds candidates once", async () => {
     const result = await discoverBoards(findAdapter("ashby")!, { log: () => {} });
-    assert.deepEqual(result, { found: 2, added: 2, failedPrefixes: [] });
+    assert.deepEqual(result, { found: 2, added: 2, french: 1, failedCrawls: [] });
     assert.deepEqual((await discoverBoards(findAdapter("ashby")!, { log: () => {} })).added, 0);
-    const board = await prisma.companySource.findUniqueOrThrow({ where: { ats_slug: { ats: "ashby", slug: "test-disc-one" } } });
-    assert.deepEqual([board.status, board.discoveredFrom], ["candidate", "commoncrawl:CC-TEST"]);
+    const boards = await prisma.companySource.findMany({ where: { ats: "ashby", slug: { startsWith: "test-disc-" } }, orderBy: { slug: "asc" } });
+    assert.deepEqual(boards.map((board) => [board.slug, board.status, board.discoveredFrom]), [
+      ["test-disc-one", "candidate", "commoncrawl:CC-TEST:fr"],
+      ["test-disc-two", "candidate", "commoncrawl:CC-TEST"],
+    ]);
   });
 
   test("board ids differing only by letter case are one board", async () => {
@@ -274,8 +314,8 @@ describe("discovery and board checks", () => {
     const rows = await prisma.companySource.findMany({ where: { ats: "smartrecruiters", slug: { in: ["test-Case", "test-case"] } }, orderBy: { slug: "asc" } });
     assert.deepEqual(rows.map((row) => row.status).sort(), ["active", "duplicate"]);
 
-    const lines = '{"url":"https://jobs.ashbyhq.com/TEST-DISC-ONE/1"}';
-    assert.equal(slugsFromIndexLines(findAdapter("ashby")!, lines).size, 1);
+    const captures = [{ url: "https://jobs.ashbyhq.com/TEST-DISC-ONE/1", languages: null }];
+    assert.equal(boardsFromCaptures(findAdapter("ashby")!, captures).size, 1);
   });
 
   test("checks give each board a status; active boards get their company", async () => {

@@ -65,11 +65,17 @@ export async function checkBoards(options: { ats?: string; limit?: number; where
     status,
     checkedAt: { lt: new Date(Date.now() - days * day) },
   }));
-  const boards = await prisma.companySource.findMany({
-    where: { ...options.where, ...(options.ats && { ats: options.ats }), OR: [{ status: "candidate" }, ...due] },
+  const scope = { ...options.where, ...(options.ats && { ats: options.ats }) };
+  const limit = options.limit ?? 200;
+  // Candidates with French-language pages first (discovery marks them ":fr"), then the
+  // others and the boards due for a re-check, oldest check first.
+  const french = await prisma.companySource.findMany({ where: { ...scope, status: "candidate", discoveredFrom: { endsWith: ":fr" } }, take: limit });
+  const rest = await prisma.companySource.findMany({
+    where: { ...scope, id: { notIn: french.map((board) => board.id) }, OR: [{ status: "candidate" }, ...due] },
     orderBy: [{ checkedAt: { sort: "asc", nulls: "first" } }],
-    take: options.limit ?? 200,
+    take: limit - french.length,
   });
+  const boards = [...french, ...rest];
   const counts: Record<string, number> = {};
   for (const board of boards) {
     const result = await checkBoard(board);

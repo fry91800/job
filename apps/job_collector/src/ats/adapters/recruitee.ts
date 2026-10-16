@@ -80,8 +80,7 @@ const NOT_COMPANIES = new Set(["www", "app", "api", "auth", "help", "blog", "car
 export const recruitee: AtsAdapter = {
   ats: "recruitee",
   discovery: {
-    prefixes: ["recruitee.com"],
-    matchType: "domain",
+    prefixes: ["*.recruitee.com"],
     slugFromUrl: (url) => {
       const [sub, ...rest] = url.hostname.toLowerCase().split(".");
       return rest.join(".") === "recruitee.com" && /^[a-z0-9][a-z0-9-]{0,62}$/.test(sub) && !NOT_COMPANIES.has(sub) ? sub : null;
