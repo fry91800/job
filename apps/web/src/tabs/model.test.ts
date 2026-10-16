@@ -7,7 +7,7 @@ const keys = (state: TabsState) => state.tabs.map((tab) => `${tab.key}${tab.prev
 
 describe("workspace tabs", () => {
   test("addresses both ways", () => {
-    for (const ref of [offer("a b"), { kind: "generated" as const, id: "g1" }, { kind: "history" as const }, { kind: "settings" as const }]) {
+    for (const ref of [offer("a b"), { kind: "generated" as const, id: "g1" }, { kind: "history" as const }, { kind: "settings" as const }, { kind: "privacy" as const }, { kind: "terms" as const }]) {
       assert.deepEqual(tabFromPath(tabPath(ref)), ref);
     }
     assert.deepEqual(tabFromPath("/resumes/"), { kind: "resumes" });

@@ -11,6 +11,7 @@ import { LANGUAGES, type Language } from "../i18n";
 import { confirm } from "../lib/confirm";
 import { errorMessage } from "../lib/errors";
 import { toast } from "../lib/toast";
+import { LegalLinks } from "../legal/LegalLinks";
 import { THEMES, useTheme } from "../theme/theme";
 
 // Settings (FEATURE S1, S2, L1) and the account (A5, A7): resume modifier defaults,
@@ -249,6 +250,8 @@ export default function SettingsView() {
           </div>
         )}
       </Card>
+
+      <LegalLinks className="justify-center" />
     </div>
   );
 }

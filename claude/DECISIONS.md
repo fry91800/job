@@ -340,6 +340,12 @@ Full plan in `COLLECTOR.md`.
 | ID | Decision | Why |
 |---|---|---|
 | D135 | Skills in offer texts: other-language names only when technical-looking; ambiguous single words never; generic words (recrutement, communication, informatique) only in titles; the same skill in two catalogues gets one id for offers and resumes; `reenrich` recomputes stored offers' skills and quality | Everyday words, the English fallback and boilerplate produced most wrong skills (betting from "Paris", Vue.js from "point de vue"), and duplicates counted twice in the match % |
+| D136 | Privacy policy and terms of use as workspace tabs, in both languages, with the operator's details in one placeholder file; signing up shows that it accepts them (links, no checkbox); no cookie banner | Required before opening to the public (GDPR, French LCEN legal notice). The only cookie is the session one and nothing tracks visitors, so no consent is needed; the texts are drafts to have reviewed |
+| D137 | Production on one server with Docker Compose: one Dockerfile (targets `api`, `worker`, `web`), TypeScript run with tsx as in development, Caddy in front (automatic HTTPS, strict CSP, HSTS, `/api` forwarded), PostgreSQL never published, migrations applied by the API at startup, uploads and certificates in named volumes; rehearsed locally under another project name | The simplest setup that is safe for a first launch, movable to any host; one image definition for the whole repository; no build step to keep in step with development |
+| D138 | The API and the worker refuse to start with missing or development settings in production (HTTP addresses, fake AI, local mail, no crawler contact); JSON logs without personal data or IP addresses; alerts (500 errors, emails not sent, failed cleanup, failed collector runs and jobs) to one webhook, at most once per 15 minutes per kind | Misconfigurations show at deploy time, not as user-facing failures; problems reach the operator without a monitoring service to run |
+| D139 | Backups: a daily `pg_dump` (custom format) kept 14 days by a `backup` service, copied off the server by the operator; restore = recreate the database empty, then `pg_restore` (`--clean` fails on pg-boss's partitioned tables) | Simple and tested end to end; the off-server copy depends on the operator's means |
+| D140 | The resume templates are created by a migration (they were only in the development seed); `users.template_id` defaults to 1, so without them no user could be created on a fresh database | Found while rehearsing a fresh production database |
+| D141 | Raw collected records are pruned (older versions after 90 days, records without offer after 30) by the collector's maintenance; the crawler identifies itself with a contact page (`/bot.html`, served by the site) and an email | Bounded database growth; site owners can see what the bot does and how to stop it |
 
 ## Assumptions made (change if wrong)
 
@@ -347,7 +353,7 @@ Full plan in `COLLECTOR.md`.
 2. Location autocomplete uses Geoapify (as in the existing `locations` design).
 3. Guest/registered limits in `FEATURE.md` G4 are starting values.
 4. AI calls are synchronous (no job queue) in the MVP.
-5. A transactional email provider will be chosen for password reset/verification.
+5. A transactional email provider will be chosen for password reset/verification (DEPLOYMENT.md §5).
 
 ## Open questions
 

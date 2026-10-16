@@ -1,3 +1,4 @@
+import { logEvent, sendAlert } from "@job/backend";
 import nodemailer, { type Transporter } from "nodemailer";
 import { config } from "../config";
 
@@ -31,7 +32,13 @@ export async function sendMail(mail: Mail): Promise<void> {
 }
 
 // For flows that must answer the same way whether or not an email is sent (no account
-// enumeration, A4): the email is sent in the background and failures are only logged.
+// enumeration, A4): the email is sent in the background and failures are logged (without
+// the address) and alerted: with the email provider down, nobody can confirm an address
+// or reset a password.
 export function sendMailInBackground(mail: Mail): void {
-  sendMail(mail).catch((error) => console.error("email not sent:", error instanceof Error ? error.message : error));
+  sendMail(mail).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logEvent("error", "email_not_sent", { subject: mail.subject, error: message });
+    void sendAlert("email-not-sent", `Email not sent (${mail.subject}): ${message}`);
+  });
 }

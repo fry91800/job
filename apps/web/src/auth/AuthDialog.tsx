@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { emailSchema, PASSWORD_MIN_LENGTH, passwordSchema } from "@job/shared";
 import { errorMessage } from "../lib/errors";
 import { toast } from "../lib/toast";
@@ -125,6 +125,18 @@ function AuthForm({ mode, token }: { mode: AuthMode; token: string | null }) {
       {mutation.error && (
         <p role="alert" className="rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">
           {errorMessage(t, mutation.error)}
+        </p>
+      )}
+      {mode === "signup" && (
+        // In a new browser tab: the form stays as filled.
+        <p className="text-xs text-fg-muted">
+          <Trans
+            i18nKey="auth.signupLegal"
+            components={{
+              terms: <a href="/terms" target="_blank" rel="noopener" className="text-accent hover:underline" />,
+              privacy: <a href="/privacy" target="_blank" rel="noopener" className="text-accent hover:underline" />,
+            }}
+          />
         </p>
       )}
       <Submit pending={mutation.isPending}>{t(`auth.submit.${mode}`)}</Submit>

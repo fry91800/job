@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { errorFields, logEvent, sendAlert } from "@job/backend";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
 import { deleteFile } from "../lib/storage";
@@ -29,7 +30,7 @@ async function deleteFiles(keys: (string | null)[]): Promise<number> {
       await deleteFile(key);
       deleted++;
     } catch (error) {
-      console.error(`cleanup: could not delete file ${key}`, error);
+      logEvent("warn", "cleanup_file_not_deleted", { key, ...errorFields(error) });
     }
   }
   return deleted;
@@ -100,9 +101,11 @@ export function scheduleCleanup(): (() => void) | undefined {
   const run = async () => {
     try {
       const result = await runCleanup();
-      console.log("cleanup:", JSON.stringify(result));
+      logEvent("info", "cleanup_done", result);
     } catch (error) {
-      console.error("cleanup failed", error);
+      // The retention delays of the privacy policy depend on it.
+      logEvent("error", "cleanup_failed", errorFields(error));
+      void sendAlert("api-cleanup", `Daily cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
   const first = setTimeout(run, 60 * 1000);

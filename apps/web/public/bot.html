@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>JobPlatformBot</title>
+<!-- The page CRAWLER_CONTACT_URL points to (DEPLOYMENT.md): what the job collector does
+     and how to stop it. Keep it in step with apps/job_collector/src/config.ts
+     (crawler.respectRobotsTxt, delays). -->
+<style>
+  :root { color-scheme: light dark; --fg: #1c1d22; --muted: #5d606b; --bg: #fff; --code: #f1f2f5; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e6e7eb; --muted: #a2a5b0; --bg: #16171b; --code: #24262c; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 40px 16px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 28px 0 6px; }
+  p, li { color: var(--muted); }
+  pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+  hr { border: 0; border-top: 1px solid var(--code); margin: 36px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>JobPlatformBot</h1>
+  <p>The job collector of a job search service.</p>
+
+  <h2>What it does</h2>
+  <ul>
+    <li>It reads <strong>public job postings</strong> only: the public APIs of job board tools (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee) and career pages that describe offers with schema.org <code>JobPosting</code> data.</li>
+    <li>On career sites it follows <strong>robots.txt</strong>, including <code>Crawl-delay</code>, and waits at least 2 seconds between two requests to the same site. Job board APIs are read at a slow, steady pace.</li>
+    <li>It never logs in, fills in forms or collects personal data. Offers link back to your site for applying.</li>
+  </ul>
+
+  <h2>Stopping it</h2>
+  <p>For your career site, add this to your robots.txt; it is read again within a day. For a job board tool (Greenhouse, Lever…), write to the contact address below.</p>
+  <pre>User-agent: JobPlatformBot
+Disallow: /</pre>
+
+  <h2>Contact</h2>
+  <p>The contact email address is in the bot's user agent, in your server logs. Write to it for any question or to have your offers removed.</p>
+
+  <hr>
+
+  <h1 lang="fr">JobPlatformBot</h1>
+  <div lang="fr">
+    <p>Le collecteur d'offres d'un service de recherche d'emploi.</p>
+    <h2>Ce qu'il fait</h2>
+    <ul>
+      <li>Il ne lit que des <strong>offres d'emploi publiques</strong> : les API publiques des outils de recrutement (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee) et les pages carrières qui décrivent leurs offres avec des données schema.org <code>JobPosting</code>.</li>
+      <li>Sur les sites carrières, il respecte le <strong>robots.txt</strong>, y compris <code>Crawl-delay</code>, et attend au moins 2 secondes entre deux requêtes vers un même site. Les API des outils de recrutement sont lues à un rythme lent et régulier.</li>
+      <li>Il ne se connecte jamais, ne remplit aucun formulaire et ne collecte aucune donnée personnelle. Les offres renvoient vers votre site pour postuler.</li>
+    </ul>
+    <h2>L'arrêter</h2>
+    <p>Pour votre site carrières, ajoutez ceci à votre robots.txt ; il est relu dans la journée. Pour un outil de recrutement (Greenhouse, Lever…), écrivez à l'adresse de contact ci-dessous.</p>
+    <pre>User-agent: JobPlatformBot
+Disallow: /</pre>
+    <h2>Contact</h2>
+    <p>L'adresse e-mail de contact figure dans l'user agent du robot, dans les journaux de votre serveur. Écrivez-y pour toute question ou pour faire retirer vos offres.</p>
+  </div>
+</main>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import { ChevronDown, CircleUser, MailWarning } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useWorkspace } from "../tabs/workspace";
 import { useMe } from "../api/queries";
 import { chooseLanguage, useAuthDialog, useLogout, useResendVerification } from "../auth/session";
 import { LANGUAGES, type Language } from "../i18n";
@@ -9,7 +10,8 @@ import { THEMES, useTheme } from "../theme/theme";
 import { MenuChoice, MenuContent, MenuItem, MenuLabel, MenuRoot, MenuSeparator, MenuTrigger } from "./menu";
 
 // Account menu (FRONTEND.md §2.1): log in / sign up for visitors and guests; the address,
-// its confirmation and logging out for accounts; theme and language for everyone.
+// its confirmation and logging out for accounts; theme, language and the legal pages for
+// everyone.
 export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
@@ -17,6 +19,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const openAuth = useAuthDialog((state) => state.open);
   const logout = useLogout();
   const resend = useResendVerification();
+  const { open } = useWorkspace();
   const registered = user !== null && !user.isGuest;
   const unverified = registered && !user.emailVerified;
 
@@ -74,6 +77,9 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
           options={LANGUAGES.map((value) => ({ value, label: value === "fr" ? "Français" : "English" }))}
           onChange={chooseLanguage}
         />
+        <MenuSeparator />
+        <MenuItem onSelect={() => open({ kind: "privacy" })}>{t("tabs.kinds.privacy")}</MenuItem>
+        <MenuItem onSelect={() => open({ kind: "terms" })}>{t("tabs.kinds.terms")}</MenuItem>
       </MenuContent>
     </MenuRoot>
   );

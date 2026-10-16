@@ -24,7 +24,7 @@ COPY packages packages
 COPY apps/api apps/api
 COPY apps/job_collector apps/job_collector
 RUN DATABASE_URL=postgresql://build@localhost/build npx prisma generate --config prisma7.config.ts
-ENV NODE_ENV=production
+ENV NODE_ENV=production NPM_CONFIG_UPDATE_NOTIFIER=false
 
 FROM server AS api
 # Headless Chromium for PDF resumes, with its system libraries. `prisma migrate deploy`
@@ -37,7 +37,7 @@ USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD node -e "fetch('http://localhost:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 # The database schema is brought up to date before the API starts.
-CMD ["sh", "-c", "npx prisma migrate deploy --config prisma7.config.ts && exec node --import tsx apps/api/src/server.ts"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --config prisma7.config.ts && exec node --import tsx apps/api/src/server.ts"]
 
 FROM server AS worker
 USER node

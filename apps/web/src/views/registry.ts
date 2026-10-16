@@ -1,4 +1,4 @@
-import { Briefcase, FileText, History, Image, type LucideIcon, Plus, Settings, Sparkles, Star } from "lucide-react";
+import { Briefcase, FileText, History, Image, type LucideIcon, Plus, ScrollText, Settings, Shield, Sparkles, Star } from "lucide-react";
 import { lazy, type ComponentType } from "react";
 import OfferView from "../offers/OfferView";
 import type { Tab, TabKind } from "../tabs/model";
@@ -19,6 +19,7 @@ const loaders = {
   saved: () => import("../saved/SavedView"),
   settings: () => import("../settings/SettingsView"),
   addOffer: () => import("../offers/AddOfferView"),
+  legal: () => import("../legal/LegalView"),
   // Not tabs, but loaded the same way: the account dialog and the offer edit form.
   authDialog: () => import("../auth/AuthDialog"),
   editOffer: () => import("../offers/EditOffer"),
@@ -30,6 +31,7 @@ const history = lazy(loaders.history);
 const saved = lazy(loaders.saved);
 const settings = lazy(loaders.settings);
 const addOffer = lazy(loaders.addOffer);
+const legal = lazy(loaders.legal);
 
 // Once the page is idle, every view's code is fetched in the background, so the first
 // tab of each kind opens without waiting for its code (FRONTEND.md §5).
@@ -48,4 +50,6 @@ export const VIEWS: Record<TabKind, ViewEntry> = {
   history: { icon: History, view: history },
   settings: { icon: Settings, view: settings },
   "add-offer": { icon: Plus, view: addOffer },
+  privacy: { icon: Shield, view: legal },
+  terms: { icon: ScrollText, view: legal },
 };

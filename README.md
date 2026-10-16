@@ -15,6 +15,7 @@ Done:
 
 * Database design, Prisma schema and first migration
 * PostgreSQL setup (Docker)
+* Production setup (`DEPLOYMENT.md`): Docker images, `docker-compose.prod.yml` (Caddy with automatic HTTPS, API, collector, PostgreSQL, daily backups), startup checks of the production settings, JSON logs, alerts to a webhook, privacy policy and terms pages (drafts with placeholders). Rehearsed locally; the hosting, domain and email provider remain to choose
 
 Postponed:
 
@@ -325,5 +326,6 @@ The project aims to remain simple and modular.
 * `DATABASE.md` — Database design, JSON formats, search rules
 * `COLLECTOR.md` — Job collector plan: sources, ingestion contract, pipeline, phases
 * `FRONTEND.md` — Plan of the real frontend: layout, tabs, style, smoothness, technical choices
+* `DEPLOYMENT.md` — Putting the platform on a server: setup, first start, email, backups and restore, monitoring, updates
 * `claude/DECISIONS.md` — Decision log
 * `prisma/schema.prisma` — Draft Prisma schema

@@ -23,7 +23,8 @@ export function TabPanels() {
         const View = VIEWS[tab.kind].view;
         const active = tab.key === activeKey;
         return (
-          <section key={tab.key} role="tabpanel" hidden={!active} className="animate-fade-in absolute inset-0 overflow-y-auto">
+          // Focusable, so the keyboard can scroll a panel without controls (a legal page).
+          <section key={tab.key} role="tabpanel" tabIndex={0} hidden={!active} className="animate-fade-in absolute inset-0 overflow-y-auto focus-visible:-outline-offset-2">
             <Suspense fallback={<TabSkeleton />}>
               <View tab={tab} active={active} />
             </Suspense>
