@@ -2,7 +2,10 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 # (ENV_FILE=other-file selects another settings file for the api and worker, for rehearsals.)
 # Only Caddy (web) is reachable from outside; the database never is. Data lives in named
-# volumes (database, uploaded files, backups, certificates).
+# volumes (database, uploaded files, backups, certificates), named monposte_* after the
+# project name below, wherever the folder is (`-p` overrides it, for rehearsals).
+
+name: monposte
 
 services:
   postgres:

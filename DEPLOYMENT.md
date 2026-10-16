@@ -66,10 +66,31 @@ sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/; s/^#\?P
 # never published).
 sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw allow 443/udp && sudo ufw enable
 
-# Docker (official repository).
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker deploy   # log out and back in afterwards
+# Docker Engine and its Compose plugin from Docker's official apt repository (updated
+# with the system by apt and unattended-upgrades; programs in /usr/bin, data in
+# /var/lib/docker).
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker deploy   # log out and back in afterwards; then `docker ps` works without sudo
+
+# Docker's log files capped (they grow without limit otherwise).
+echo '{ "log-driver": "json-file", "log-opts": { "max-size": "20m", "max-file": "5" } }' | sudo tee /etc/docker/daemon.json
+sudo systemctl restart docker
+
+# The application's folder: /opt/monposte, owned by the admin user.
+sudo mkdir -p /opt/monposte && sudo chown deploy:deploy /opt/monposte
 ```
+
+Layout on the server:
+
+| Path | Content |
+|---|---|
+| `/opt/monposte` | The repository (git clone), with `.env.production` (mode 600) and `data/` (catalogue files, board registry; not in git) |
+| `/var/lib/docker/volumes/monposte_*` | The data: `pgdata` (database), `storage` (uploads), `backups`, `caddy_data` (certificates), `caddy_config` |
+| `/etc/docker/daemon.json` | Docker settings (log size) |
 
 ## 3. DNS
 
@@ -87,7 +108,7 @@ Plus the email records of §5. Check with `dig +short monposte.com`.
 ## 4. First start
 
 ```bash
-git clone <repository> ~/job && cd ~/job
+git clone -b dev https://github.com/fry91800/job.git /opt/monposte && cd /opt/monposte
 cp .env.production.example .env.production && chmod 600 .env.production
 nano .env.production    # fill in every value (comments explain each one)
 ```
@@ -99,7 +120,8 @@ The API and the worker refuse to start when a required value is missing or still
 development one (HTTP addresses, `AI_PROVIDER=fake`, a local mail server…) and say which.
 
 ```bash
-# All commands below are run from ~/job. To type less:
+# All commands below are run from /opt/monposte. To type less (add the line to ~/.bashrc
+# to keep it):
 alias dc='docker compose -f docker-compose.prod.yml --env-file .env.production'
 
 dc up -d --build        # builds the images (~5 min the first time) and starts everything
@@ -118,7 +140,7 @@ them again. Copy the files from your computer to the server:
 
 ```bash
 # On your computer, from the repository:
-rsync -av data/esco data/boards-2026-10-15.json.gz deploy@monposte.com:job/data/
+rsync -av data/esco data/boards-2026-10-15.json.gz deploy@monposte.com:/opt/monposte/data/
 ```
 
 Then on the server (the worker runs as user 1000, which is `deploy` on a fresh server; else
@@ -199,14 +221,13 @@ example, every night on another machine (your computer, a NAS, a second small se
 
 ```bash
 # crontab -e on the other machine (needs SSH access to the server):
-30 3 * * * rsync -a --delete deploy@monposte.com:/var/lib/docker/volumes/job_backups/_data/ ~/job-backups/db/ && ssh deploy@monposte.com 'docker run --rm -v job_storage:/s:ro alpine tar -cz -C /s .' > ~/job-backups/storage.tar.gz
+30 3 * * * mkdir -p ~/monposte-backups/db && ssh deploy@monposte.com 'docker run --rm -v monposte_backups:/b:ro alpine tar -c -C /b .' | tar -x -C ~/monposte-backups/db && ssh deploy@monposte.com 'docker run --rm -v monposte_storage:/s:ro alpine tar -cz -C /s .' > ~/monposte-backups/storage.tar.gz
 ```
 
-(Volume names start with the compose project name, `job` when the folder is `~/job`:
-check with `docker volume ls`. Reading `/var/lib/docker` needs root: either use
-`sudo rsync` on the server side with `--rsync-path="sudo rsync"`, or copy the dumps out first
-with `dc cp backup:/backups/. ~/backups/`.) Many hosts also sell daily server snapshots:
-a good second layer.
+(The volumes are named after the compose project, `monposte`: `docker volume ls`. Going
+through a container avoids needing root to read `/var/lib/docker`.) Many hosts also sell
+daily server snapshots (Hetzner: backups option, 20 % of the server price): a good second
+layer.
 
 **Restore** (tested; ~10 seconds for the database with the catalogue). The database is
 recreated empty, then filled from the dump (`pg_restore --clean` fails on the collector's
@@ -221,7 +242,7 @@ dc start api worker
 ```
 
 A dump from another machine: `dc cp ./job-2026-10-16T0200.dump backup:/backups/` first.
-Uploaded files: `docker run --rm -i -v job_storage:/s alpine tar -xz -C /s < storage.tar.gz`.
+Uploaded files: `docker run --rm -i -v monposte_storage:/s alpine tar -xz -C /s < storage.tar.gz`.
 
 Try a restore every few months, on a copy of the stack if you can: an untested backup may
 not work.
@@ -250,12 +271,7 @@ dc logs --since 1h api | grep '"event":"request"' | grep -v '"status":2'   # fai
 dc run --rm worker npm run collector -- metrics          # collector state (COLLECTOR.md)
 ```
 
-Docker's default log files grow without limit: cap them once in `/etc/docker/daemon.json`,
-then `sudo systemctl restart docker`:
-
-```json
-{ "log-driver": "json-file", "log-opts": { "max-size": "20m", "max-file": "5" } }
-```
+Docker keeps at most 5 × 20 MB of logs per container (`/etc/docker/daemon.json`, §2).
 
 ## 8. Costs to watch
 
@@ -268,7 +284,7 @@ then `sudo systemctl restart docker`:
 ## 9. Updates
 
 ```bash
-cd ~/job
+cd /opt/monposte
 git pull
 dc up -d --build          # rebuilds what changed; the API applies new migrations when it starts
 dc ps && dc logs --tail 30 api worker
