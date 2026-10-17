@@ -42,6 +42,15 @@ export const collectorConfig = {
     timeoutMs: 20000,
   },
 
+  // Bots (COLLECTOR.md §17.2–17.3): pages and snapshots sent to the API by source token.
+  bots: {
+    aiPagesPerDay: 300, // AI extractions per source and day (pages without JobPosting)
+    notSeenDays: { default: 7 } as Record<string, number>, // offers not seen for this long are closed
+    quietAfterHours: 48, // a source sending nothing for this long is alerted
+    maxClosingShare: 0.5, // a complete snapshot closing more than this share of the open offers…
+    closingAlwaysAllowed: 20, // …past this many is held, with an alert
+  },
+
   // Choisir le service public (COLLECTOR.md §17.7): the civil service's job site.
   servicePublic: {
     baseUrl: "https://choisirleservicepublic.gouv.fr",

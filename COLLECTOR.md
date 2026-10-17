@@ -551,3 +551,59 @@ choisirleservicepublic.gouv.fr`); each offer carries its employer as company.
   day: about 5 days); then ~1 000 offer pages and ~50 listing pages a day (~35 MB).
 * **First test (2026-10-17)**: 40 offers, none rejected; 30 placed in a town, 5 in a
   département, 5 only in France.
+
+### 17.8 Step 4 — La bonne alternance: not built (2026-10-17)
+
+The apprenticeship offers service of the Ministry of Labour (DGEFP, beta.gouv.fr). Its API's
+terms (CGU v1.0, 31 March 2025, api.apprentissage.beta.gouv.fr/en/cgu, article 5.2): the user
+"s'engage à ne pas commercialiser les données reçues" and "à ne pas les communiquer à des tiers
+en dehors des cas prévus par la loi". Showing the offers to MonPoste's visitors is passing them
+to third parties, and MonPoste plans paid plans. Moreover, most of its offers are not its own:
+~300 000 offers aggregated in 2025 from partners (France Travail, HelloWork, Le Bon Coin,
+Apec, OPCO…) against ~25 000 collected from recruiters directly; their reuse rights belong to
+those partners. Next step: ask the La bonne alternance team for a distribution partnership
+(they already distribute offers to job sites); build the connector only with a written
+agreement, for the offers it covers.
+
+### 17.9 Step 5 — groundwork for bots (2026-10-17)
+
+Built as proposed in §17.2–17.3; no bot yet (step 6).
+
+* **AI shared**: the AI providers and runner moved from the API to `@job/backend` (`ai/`,
+  `backendConfig.ai`, with `HttpError`); the API re-exports them, so its code is unchanged.
+  The collector's worker uses the same `GEMINI_API_KEY`.
+* **API** (`apps/api/src/collector/ingest.routes.ts`), per-source token as for `/ingest`,
+  120 requests a minute per token, each use recorded (`collector_tokens.last_used_at`):
+  * `POST /api/collector/pages` `{ pages: [{ externalId, url, title?, html | text,
+    publishedAt?, fetchedAt }] }`, at most 20 pages of 300 000 characters: validated, queued
+    (`collector-bot-pages`), 202 with a result per page.
+  * `POST /api/collector/snapshots` `{ scope, externalIds, complete }`: every id must start
+    with `${scope}:`; queued (`collector-bot-snapshot`).
+* **Collector** (`bots/`):
+  * `pages.ts`: a page whose content hash equals its last raw record's is only seen (no
+    work, no AI); else JobPosting markup in France → offer; else AI (`ai-extract.ts`, same
+    rules as O5: nothing invented, description copied) within `bots.aiPagesPerDay` (300) per
+    source, counted from today's raw records; over budget, the page waits for the bot's next
+    sending. Pages set aside (not an offer, abroad) are stored raw with the reason, so they
+    aren't paid for again. A page with no country is taken as French (bots target French
+    sites).
+  * `snapshot.ts`: listed offers are seen; a complete snapshot closes the scope's open
+    offers missing from it, unless more than `bots.maxClosingShare` (half) of them, past
+    `bots.closingAlwaysAllowed` (20), would close: then nothing closes and an alert is sent.
+  * `health.ts`, in the daily maintenance: offers of bot sources (sources with a token) not
+    seen for `bots.notSeenDays` (7, per source) are closed; a source whose token wasn't used for
+    `bots.quietAfterHours` (48) is alerted.
+
+**Writing a bot** (step 6): a small program, outside this repository or in its own folder,
+run on a schedule:
+
+1. Get a token: `npm run collector -- token <source> "<name>"` (production:
+   `dc run --rm worker npm run collector -- token …`); the source key names the bot
+   (`bot-sitename`).
+2. Walk the site's listing politely (robots.txt, a pause between requests, the
+   `MonPosteBot` user agent with the contact page); for each offer page, send
+   `{ externalId: "<scope>:<offer id>", url, html, fetchedAt }` in batches of up to 20 to
+   `/api/collector/pages` (strip scripts and styles).
+3. At the end of a complete run, send `{ scope, externalIds: [every id seen], complete: true }`
+   to `/api/collector/snapshots`; after a partial run, `complete: false`.
+4. Pages that didn't change cost nothing to send again: the collector skips them.

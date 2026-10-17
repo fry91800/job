@@ -159,6 +159,7 @@ Other scripts:
 * `npm run ai:check` — one tiny request to the configured AI provider/model (checks the key, the model and the latency; uses one request of the quota)
 * `npm run collector -- catalogue [--esco data/esco]` — import the ROME + ESCO catalogue (run again after `db:seed`, which empties it; see COLLECTOR.md §8.1)
 * `npm run collector -- boards add careersite <address>` — add a company career site to crawl (schema.org JobPosting; see COLLECTOR.md §15)
+* `npm run collector -- token <source> <name>` — a token for a bot or partner, which then posts to `/api/collector/ingest` (offers), `/pages` (raw pages, extracted by the collector) and `/snapshots` (COLLECTOR.md §17.9)
 * `npm run collector -- census [--crawls N]` — companies per recruiting tool in Common Crawl and how many have French pages, to choose the next sources (COLLECTOR.md §17.5); `discover [--ats …] [--crawls N]` finds new boards over the last N crawls
 * `npm run collector -- reenrich` — recompute the skills, occupations and quality score of stored offers, and resumes' merged skills (after a change of the matching rules or the catalogue)
 * `npm run collector -- boards export` / `boards import <file>` — save the board registry to `data/` / merge it into a database (keep it before `db:seed` or `db:reset`, which empty it)

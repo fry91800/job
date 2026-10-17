@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { toGeminiSchema } from "./gemini";
+import { toGeminiSchema } from "@job/backend/src/ai/gemini";
 import { withoutProperties } from "./run";
 
 describe("AI JSON schemas", () => {

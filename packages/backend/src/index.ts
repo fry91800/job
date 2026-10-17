@@ -1,7 +1,11 @@
 // Server code shared by the API and the job collector (I/O allowed, unlike @job/shared).
+export * from "./ai/fake";
+export * from "./ai/provider";
+export * from "./ai/run";
 export * from "./catalogue/matcher";
 export * from "./catalogue/offer-links";
 export * from "./config";
+export * from "./lib/http-error";
 export * from "./locations/french-departements";
 export * from "./locations/geoapify";
 export * from "./locations/location-match";

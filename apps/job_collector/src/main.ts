@@ -1,6 +1,6 @@
 // The collector worker: schedules the connectors, runs them, and processes the offers
 // sent by the API's ingestion endpoint. `npm run collector:start`.
-import { logEvent, prisma, QUEUES, sendAlert, startQueue, type BoardsJob, type IngestJob, type RunJob } from "@job/backend";
+import { logEvent, prisma, QUEUES, sendAlert, startQueue, type BoardsJob, type BotPagesJob, type BotSnapshotJob, type IngestJob, type RunJob } from "@job/backend";
 import { atsAdapters } from "./ats/registry";
 import { checkBoards } from "./discovery/check-boards";
 import { discoverBoards } from "./discovery/common-crawl";
@@ -8,6 +8,9 @@ import { collectorConfig } from "./config";
 import { connectors, findConnector } from "./connectors/registry";
 import { runMaintenance } from "./pipeline/close";
 import { processRecord } from "./pipeline/process";
+import { checkBotSources } from "./bots/health";
+import { processBotPages } from "./bots/pages";
+import { applySnapshot } from "./bots/snapshot";
 import { runConnector } from "./runs/run-connector";
 
 // Settings a production worker must have (DEPLOYMENT.md); Geoapify places the offers.
@@ -63,8 +66,16 @@ async function main() {
     }),
   );
 
+  // Bots (COLLECTOR.md §17.2–17.3): pages to extract, snapshots to apply.
+  await boss.work<BotPagesJob>(QUEUES.pages, async ([job]) =>
+    alerting("bot pages", async () => logEvent("info", "bot_pages", { source: job.data.source, ...(await processBotPages(job.data.source, job.data.pages)) })),
+  );
+  await boss.work<BotSnapshotJob>(QUEUES.snapshot, async ([job]) =>
+    alerting("bot snapshot", async () => logEvent("info", "bot_snapshot", { source: job.data.source, scope: job.data.snapshot.scope, ...(await applySnapshot(job.data.source, job.data.snapshot)) })),
+  );
+
   await boss.work(QUEUES.maintenance, async () =>
-    alerting("maintenance", async () => logEvent("info", "maintenance", await runMaintenance())),
+    alerting("maintenance", async () => logEvent("info", "maintenance", { ...(await checkBotSources()), ...(await runMaintenance()) })),
   );
 
   for (const connector of connectors) {

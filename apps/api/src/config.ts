@@ -62,12 +62,8 @@ export const config = {
   },
 
   // AI (FEATURE G5). The provider is chosen here; features never depend on a provider.
-  ai: {
-    provider: process.env.AI_PROVIDER ?? "gemini", // gemini | fake (tests)
-    model: process.env.AI_MODEL ?? "gemini-3.8-flash",
-    timeoutMs: 60 * 1000,
-    geminiApiKey: process.env.GEMINI_API_KEY,
-  },
+  // AI provider and model (shared object with @job/backend, see its config).
+  ai: backendConfig.ai,
 
   // Geoapify (shared object with @job/backend, see its config).
   geoapify: backendConfig.geoapify,

@@ -1,5 +1,5 @@
 import { PgBoss } from "pg-boss";
-import type { CollectedOffer } from "@job/shared";
+import type { BotPage, BotSnapshot, CollectedOffer } from "@job/shared";
 
 // Job queues in PostgreSQL (pg-boss, schema "pgboss"), shared by the API (which sends
 // ingested offers) and the job collector (whose worker consumes every queue).
@@ -9,6 +9,8 @@ export const QUEUES = {
   ingest: "collector-ingest", // { offers }
   maintenance: "collector-maintenance",
   boards: "collector-boards", // { action: "discover" | "check" }
+  pages: "collector-bot-pages", // { source, pages } (COLLECTOR.md §17.2)
+  snapshot: "collector-bot-snapshot", // { source, snapshot }
 } as const;
 
 // A connector run or a discovery can take hours (the default expiry, 15 minutes, would
@@ -19,11 +21,16 @@ const QUEUE_OPTIONS: Record<string, { expireInSeconds?: number; retryLimit?: num
   [QUEUES.ingest]: {},
   [QUEUES.maintenance]: { expireInSeconds: 3600 },
   [QUEUES.boards]: LONG,
+  // Pages may wait for the AI: retried twice, then dropped (the bot sends them again).
+  [QUEUES.pages]: { expireInSeconds: 3600, retryLimit: 2 },
+  [QUEUES.snapshot]: { expireInSeconds: 3600 },
 };
 
 export type RunJob = { connector: string };
 export type IngestJob = { offers: CollectedOffer[] };
 export type BoardsJob = { action: "discover" | "check" };
+export type BotPagesJob = { source: string; pages: BotPage[] };
+export type BotSnapshotJob = { source: string; snapshot: BotSnapshot };
 
 // `sendOnly`: for processes that only send jobs (the API): no maintenance or scheduling,
 // which the collector's worker does.

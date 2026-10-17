@@ -604,6 +604,7 @@ model CollectorToken {
   tokenHash String    @unique @map("token_hash") // SHA-256
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz // a source that stops sending is alerted (§17.3)
 
   @@map("collector_tokens")
 }

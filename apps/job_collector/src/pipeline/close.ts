@@ -18,6 +18,16 @@ async function closeOfferIfNoOpenSource(offerId: string, now: Date): Promise<boo
   return count > 0;
 }
 
+// Offers seen again without being fetched (still listed, unchanged page, in a snapshot):
+// seen now, reopened if they were closed.
+export async function markSeen(source: string, externalIds: string[]): Promise<void> {
+  if (externalIds.length === 0) return;
+  const where = { source, externalId: { in: externalIds } };
+  await prisma.offerSource.updateMany({ where, data: { lastSeenAt: new Date(), closedAt: null } });
+  const offerIds = (await prisma.offerSource.findMany({ where, select: { offerId: true } })).map((row) => row.offerId);
+  await prisma.offer.updateMany({ where: { id: { in: offerIds }, closedAt: { not: null } }, data: { closedAt: null } });
+}
+
 // Daily: sources past their expiry date are closed, then offers without open sources.
 // Raw records past their retention (collectorConfig.rawRetention); the latest version of
 // each record that became an offer stays.

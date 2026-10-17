@@ -26,6 +26,7 @@ import { atsCensus } from "./discovery/ats-census";
 import { discoverBoards, recentCrawls } from "./discovery/common-crawl";
 import { exportBoards, importBoards } from "./discovery/registry-file";
 import { collectorMetrics } from "./metrics";
+import { checkBotSources } from "./bots/health";
 import { runMaintenance } from "./pipeline/close";
 import { reenrich } from "./pipeline/reenrich";
 import { runConnector } from "./runs/run-connector";
@@ -99,7 +100,7 @@ async function main() {
       await reenrich();
       break;
     case "maintenance":
-      console.log(await runMaintenance());
+      console.log({ ...(await checkBotSources()), ...(await runMaintenance()) });
       break;
     case "metrics":
       console.dir(await collectorMetrics(), { depth: 4 });

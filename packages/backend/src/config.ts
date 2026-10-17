@@ -3,6 +3,15 @@ import "dotenv/config";
 // Configuration of the server code shared by the API and the job collector. Objects are
 // shared by reference: the API's config exposes them, and tests may change them.
 export const backendConfig = {
+  // AI (FEATURE M1, R1, O5, T1; the collector's bot pages, COLLECTOR.md §17.2). Shared with
+  // the API's config.
+  ai: {
+    provider: process.env.AI_PROVIDER ?? "gemini", // gemini | fake (tests)
+    model: process.env.AI_MODEL ?? "gemini-3.8-flash",
+    timeoutMs: 60 * 1000,
+    geminiApiKey: process.env.GEMINI_API_KEY,
+  },
+
   // Geoapify place autocomplete (D47). Without a key, only the `locations` table is used.
   geoapify: {
     apiKey: process.env.GEOAPIFY_API_KEY,

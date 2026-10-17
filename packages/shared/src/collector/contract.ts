@@ -79,3 +79,32 @@ export type IngestResponse = { results: IngestResult[] };
 export function collectedOfferJsonSchema() {
   return z.toJSONSchema(collectedOfferSchema, { io: "input" });
 }
+
+// Bots (COLLECTOR.md §17.2): they send the offer pages they saw, raw; the collector
+// extracts the offers. A page is HTML (scripts and styles stripped by the bot) or text.
+export const BOT_PAGES_MAX = 20;
+export const BOT_PAGE_MAX_CHARS = 300_000;
+export const botPageSchema = z.strictObject({
+  externalId: z.string().trim().min(1).max(200), // the offer's id at the site, stable
+  url: z.url().max(2000),
+  title: z.string().trim().max(300).nullable().optional(),
+  html: z.string().max(BOT_PAGE_MAX_CHARS).optional(),
+  text: z.string().max(BOT_PAGE_MAX_CHARS).optional(),
+  publishedAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  fetchedAt: z.iso.datetime({ offset: true }),
+}).refine((page) => !!page.html !== !!page.text, { message: "Give the page as html or as text (one of them)" });
+export type BotPage = z.output<typeof botPageSchema>;
+export const botPagesRequestSchema = z.strictObject({ pages: z.array(z.unknown()).min(1).max(BOT_PAGES_MAX) });
+export type BotPagesResponse = { results: ({ index: number; status: "accepted"; externalId: string } | { index: number; status: "rejected"; errors: { path: string; message: string }[] })[] };
+
+// After a run, the list of every offer id the bot sees in a scope (a site, or a part of one;
+// ids of a scope start with `${scope}:`). `complete`: the list is the whole scope, offers
+// missing from it are closed.
+export const BOT_SNAPSHOT_MAX_IDS = 50_000;
+export const botSnapshotSchema = z.strictObject({
+  scope: z.string().trim().min(1).max(200),
+  externalIds: z.array(z.string().trim().min(1).max(200)).max(BOT_SNAPSHOT_MAX_IDS),
+  complete: z.boolean(),
+});
+export type BotSnapshot = z.output<typeof botSnapshotSchema>;
+export type BotSnapshotResponse = { scope: string; received: number; queued: true };

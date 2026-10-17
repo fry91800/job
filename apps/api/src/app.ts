@@ -22,7 +22,8 @@ export function createApp() {
   app.use(requestLog);
   app.use(securityHeaders);
   // The ingestion endpoint takes batches of up to 100 offers.
-  app.use("/api/collector", express.json({ limit: "5mb" }));
+  // Bots send up to 20 pages of 300 000 characters (§17.2).
+  app.use("/api/collector", express.json({ limit: "8mb" }));
   app.use(express.json({ limit: "100kb" }));
   app.use(checkOrigin);
   app.use(loadSession);

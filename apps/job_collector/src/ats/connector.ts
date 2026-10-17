@@ -2,7 +2,7 @@ import { prisma } from "@job/backend";
 import type { Prisma } from "@prisma/client";
 import { collectorConfig } from "../config";
 import type { CollectedRecord, Connector } from "../connectors/types";
-import { closeSource } from "../pipeline/close";
+import { closeSource, markSeen } from "../pipeline/close";
 import type { AtsAdapter, KnownOffers } from "./adapter";
 import { NotFoundError, pause } from "./http";
 import { nameFromSlug } from "./mapping";
@@ -37,15 +37,6 @@ async function knownOffers(source: string, slug: string): Promise<KnownOffers> {
     WHERE r.source = ${source} AND left(r.external_id, ${prefix.length}) = ${prefix}
     ORDER BY r.external_id, r.received_at DESC`;
   return new Map(rows.map((row) => [row.external_id, row.released]));
-}
-
-// Offers still listed but not fetched again: seen now, reopened if they were closed.
-async function markStillListed(source: string, externalIds: string[]): Promise<void> {
-  if (externalIds.length === 0) return;
-  const where = { source, externalId: { in: externalIds } };
-  await prisma.offerSource.updateMany({ where, data: { lastSeenAt: new Date(), closedAt: null } });
-  const offerIds = (await prisma.offerSource.findMany({ where, select: { offerId: true } })).map((row) => row.offerId);
-  await prisma.offer.updateMany({ where: { id: { in: offerIds }, closedAt: { not: null } }, data: { closedAt: null } });
 }
 
 // `where` narrows the boards and `key` renames the runs (tests use their own boards and
@@ -85,7 +76,7 @@ export function atsConnector(adapter: AtsAdapter, options: { where?: Prisma.Comp
             seen.add(record.offer.externalId);
             yield record;
           }
-          await markStillListed(adapter.ats, stillListed);
+          await markSeen(adapter.ats, stillListed);
           skipped += stillListed.length;
           // A partial listing closes nothing and says nothing about the board's size.
           const closed = partial ? 0 : await closeMissingOffers(adapter.ats, board.slug, seen);

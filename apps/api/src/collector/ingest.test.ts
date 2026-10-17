@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { after, before, describe, test } from "node:test";
-import type { CollectedOffer, IngestResponse } from "@job/shared";
+import type { BotPagesResponse, CollectedOffer, IngestResponse } from "@job/shared";
 import { prisma, startTestServer } from "../test/helpers";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -24,6 +24,16 @@ async function createToken(revokedAt: Date | null = null) {
   return value;
 }
 
+const post = (path: string, body: unknown, bearer?: string) =>
+  fetch(new URL(path, server.baseUrl), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(bearer && { Authorization: `Bearer ${bearer}` }) },
+    body: JSON.stringify(body),
+  }).then(async (response) => ({ status: response.status, body: await response.json() }));
+
+const jobsOf = async (queue: string) =>
+  (await prisma.$queryRaw<{ data: { source: string; pages?: unknown[]; snapshot?: { scope: string } } }[]>`SELECT data FROM pgboss.job WHERE name = ${queue} AND data->>'source' = 'test-bot'`).map((row) => row.data);
+
 const ingest = (body: unknown, bearer?: string) =>
   fetch(new URL("/api/collector/ingest", server.baseUrl), {
     method: "POST",
@@ -43,6 +53,7 @@ before(async () => {
 after(async () => {
   await prisma.collectorToken.deleteMany({ where: { name: "[test] ingest" } });
   await prisma.$executeRaw`DELETE FROM pgboss.job WHERE name = 'collector-ingest' AND data::text LIKE '%test-bot%'`.catch(() => {});
+  await prisma.$executeRaw`DELETE FROM pgboss.job WHERE name IN ('collector-bot-pages', 'collector-bot-snapshot') AND data->>'source' = 'test-bot'`.catch(() => {});
   await server.close();
 });
 
@@ -67,5 +78,36 @@ describe("POST /api/collector/ingest", () => {
   test("batches are limited to 100 offers", async () => {
     const { status } = await ingest({ offers: Array.from({ length: 101 }, () => offer()) }, token);
     assert.equal(status, 400);
+  });
+});
+
+describe("POST /api/collector/pages (bots)", () => {
+  const page = (fields: Record<string, unknown> = {}) => ({ externalId: "site-a:1", url: "https://jobs.example.fr/offres/1", html: "<html><body><h1>Développeur</h1></body></html>", fetchedAt: new Date().toISOString(), ...fields });
+
+  test("needs a source token; pages are validated and queued with the token's source", async () => {
+    assert.equal((await post("/api/collector/pages", { pages: [page()] })).status, 401);
+    const { status, body } = await post("/api/collector/pages", { pages: [page(), page({ html: undefined }), page({ text: "Texte", html: "<p>x</p>" }), page({ url: "not a url" })] }, token);
+    assert.equal(status, 202);
+    assert.deepEqual((body as BotPagesResponse).results.map((result) => result.status), ["accepted", "rejected", "rejected", "rejected"]);
+    const jobs = await jobsOf("collector-bot-pages");
+    assert.equal(jobs.length, 1);
+    assert.deepEqual([jobs[0].source, jobs[0].pages?.length], ["test-bot", 1]);
+    const used = await prisma.collectorToken.findFirstOrThrow({ where: { name: "[test] ingest", revokedAt: null } });
+    assert.ok(used.lastUsedAt, "the token's last use is recorded (quiet-source alert)");
+  });
+
+  test("at most 20 pages per request", async () => {
+    assert.equal((await post("/api/collector/pages", { pages: Array.from({ length: 21 }, (_, index) => page({ externalId: `site-a:${index}` })) }, token)).status, 400);
+  });
+});
+
+describe("POST /api/collector/snapshots (bots)", () => {
+  test("ids must belong to the scope; the snapshot is queued", async () => {
+    const bad = await post("/api/collector/snapshots", { scope: "site-a", externalIds: ["site-a:1", "site-b:2"], complete: true }, token);
+    assert.equal(bad.status, 400);
+    const { status, body } = await post("/api/collector/snapshots", { scope: "site-a", externalIds: ["site-a:1", "site-a:2"], complete: true }, token);
+    assert.equal(status, 202);
+    assert.deepEqual(body, { scope: "site-a", received: 2, queued: true });
+    assert.deepEqual((await jobsOf("collector-bot-snapshot")).map((job) => job.snapshot?.scope), ["site-a"]);
   });
 });
