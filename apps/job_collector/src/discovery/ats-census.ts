@@ -27,7 +27,7 @@ export const CENSUS_TOOLS: CensusTool[] = [
   { name: "taleez", prefix: "taleez.com/careers/", matchType: "prefix", company: 2 },
   { name: "jobaffinity", prefix: "jobaffinity.fr", matchType: "domain", company: "host" },
   { name: "talentsoft", prefix: "talent-soft.com", matchType: "domain", company: "host", supported: true },
-  { name: "workday", prefix: "myworkdayjobs.com", matchType: "domain", company: "host" },
+  { name: "workday", prefix: "myworkdayjobs.com", matchType: "domain", company: "host", supported: true },
   { name: "successfactors", prefix: "successfactors.eu", matchType: "domain", company: "host" },
   { name: "breezy", prefix: "breezy.hr", matchType: "domain", company: "host" },
   { name: "bamboohr", prefix: "bamboohr.com", matchType: "domain", company: "host" },

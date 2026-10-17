@@ -607,3 +607,29 @@ run on a schedule:
 3. At the end of a complete run, send `{ scope, externalIds: [every id seen], complete: true }`
    to `/api/collector/snapshots`; after a partial run, `complete: false`.
 4. Pages that didn't change cost nothing to send again: the collector skips them.
+
+### 17.10 Workday (2026-10-17)
+
+`ats/adapters/workday.ts`, source `workday`, kind `ats`, daily at 06:00. Boards
+`{tenant}.wd{N}.myworkdayjobs.com/{Site}` (`workdaySlugFromUrl`, language prefixes such as
+`/en-US/` skipped), found by discovery on `*.myworkdayjobs.com`.
+
+* **What Workday allows**: robots.txt allows the career site and only forbids
+  `/refreshFacet/`; job pages carry JobPosting (Google for Jobs) in plain HTML: no browser
+  needed. The sitemap lists only 100 jobs (Sanofi: 989 open, no paging, no dates), so the
+  career-site crawler would have collected a tenth of the offers and closed the rest.
+* **List**: the JSON feed the career page itself calls, `POST /wday/cxs/{tenant}/{Site}/jobs`
+  (20 per request), filtered with the site's own country filter on France
+  (`franceFilter`, found in the facets by its label): only French jobs are listed and fetched
+  (Sanofi: 150 of 989); the list is complete, so jobs missing from it are closed. Sites
+  without a country filter: everything is listed and the job page decides.
+* **Jobs**: each new job (or changed start date, or weekly refresh) is read from its public
+  page (JobPosting, the career sites' mapping); a job listed under France whose page names
+  another place first (several locations) is placed from the list's location text. Company:
+  the board's (pages name legal entities with codes, "(0122) Sanofi Winthrop Industrie").
+* **Requests** go through the crawler's fetcher (robots.txt, one at a time per host, 2 s
+  apart; `crawlPostJson` for the list). Boards are read one after another, so Workday as a
+  whole sees about one request every 2 seconds. A check is one request (the France count is
+  in the filter).
+* **First test (2026-10-17)**: Sanofi, 10 offers, all placed (Lyon, Paris, Gentilly,
+  Vitry-sur-Seine, Marcy-l'Étoile), internships and apprenticeships recognised.

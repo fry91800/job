@@ -355,6 +355,7 @@ Full plan in `COLLECTOR.md`.
 | D148 | An application link counts for deduplication only when it contains an identifier | Public employers link many offers to the same portal page, which merged unrelated offers |
 | D149 | La bonne alternance not collected: its API terms forbid commercializing the data and passing it to third parties, and most of its offers come from partners (France Travail, HelloWork…); a distribution partnership is to be requested first | MonPoste displays offers to the public and plans paid plans |
 | D150 | Bot groundwork: the AI code moves to @job/backend (shared by the API and the collector); bots post raw pages (`/api/collector/pages`) and snapshots (`/api/collector/snapshots`); the collector extracts (JobPosting, else AI within a daily budget per source), skips unchanged pages by content hash, closes from complete snapshots with a safety limit, closes offers not seen for 7 days and alerts on quiet sources | One place for extraction and AI cost; bots stay small and can't push malformed offers; a broken bot can't wipe a source |
+| D151 | Workday through its career page's own JSON list filtered on France, job details from the public pages' JobPosting; no browser | Its sitemap stops at 100 jobs (Sanofi: 989); the France filter means foreign jobs are never fetched (politer and faster); robots.txt allows it |
 
 ## Assumptions made (change if wrong)
 

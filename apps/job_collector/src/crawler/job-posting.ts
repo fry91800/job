@@ -98,7 +98,8 @@ export function jobPostingOffer(posting: JobPosting, page: { url: string; key: s
   const employment = asArray(posting.employmentType as string | string[]).map(String);
   const explicit = employment.map((value) => CONTRACTS[value.toUpperCase()]).find(Boolean);
   const website = str(organization.sameAs) ?? str(organization.url);
-  const title = str(posting.title) ?? "";
+  // Titles may carry entities ("stage 6 mois&nbsp; …").
+  const title = parse(`<div>${str(posting.title) ?? ""}</div>`).text.replace(/\s+/g, " ").trim();
   const place = page.place;
   return {
     contractVersion: 1,

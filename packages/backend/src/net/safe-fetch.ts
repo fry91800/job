@@ -52,6 +52,8 @@ export type SafeFetchOptions = {
   contentTypes: RegExp; // accepted content types of a successful response
   // Private addresses allowed anyway: tests serving pages from a local server only.
   allowedPrivateAddresses?: string[];
+  // A POST with this body (a site's own JSON feed, Workday): redirects aren't followed.
+  post?: { body: string; contentType: string };
 };
 
 export type SafeFetchFailureReason = "invalid_url" | "blocked_address" | "wrong_type" | "too_large" | "too_slow" | "unknown_host" | "unreachable" | "too_many_redirects";
@@ -104,7 +106,7 @@ function request(url: URL, options: SafeFetchOptions, signal: AbortSignal): Prom
     const req = client.request(
       url,
       {
-        method: "GET",
+        method: options.post ? "POST" : "GET",
         lookup: safeLookupFor(allowedFor(options)),
         signal,
         headers: {
@@ -112,6 +114,7 @@ function request(url: URL, options: SafeFetchOptions, signal: AbortSignal): Prom
           Accept: options.accept,
           "Accept-Encoding": "gzip, deflate, br",
           "Accept-Language": "fr,en;q=0.8",
+          ...(options.post && { "Content-Type": options.post.contentType, "Content-Length": String(Buffer.byteLength(options.post.body)) }),
         },
       },
       (res) => {
@@ -149,7 +152,7 @@ function request(url: URL, options: SafeFetchOptions, signal: AbortSignal): Prom
       },
     );
     req.on("error", reject);
-    req.end();
+    req.end(options.post?.body);
   });
 }
 
@@ -191,7 +194,7 @@ export async function safeFetch(input: string, options: SafeFetchOptions): Promi
       throw new SafeFetchError("unreachable", "site unreachable");
     }
 
-    if (response.status >= 300 && response.status < 400 && response.headers.location) {
+    if (response.status >= 300 && response.status < 400 && response.headers.location && !options.post) {
       if (redirects >= options.maxRedirects) throw new SafeFetchError("too_many_redirects", "too many redirects");
       url = new URL(response.headers.location, url);
       continue;

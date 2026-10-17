@@ -42,6 +42,11 @@ export const collectorConfig = {
     timeoutMs: 20000,
   },
 
+  // Workday career sites (COLLECTOR.md §17.10): jobs listed 20 per request.
+  workday: {
+    maxListPages: 150, // up to 3 000 French jobs per site
+  },
+
   // Bots (COLLECTOR.md §17.2–17.3): pages and snapshots sent to the API by source token.
   bots: {
     aiPagesPerDay: 300, // AI extractions per source and day (pages without JobPosting)

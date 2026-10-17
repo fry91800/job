@@ -105,6 +105,35 @@ export async function crawlGet(input: string): Promise<{ url: string; text: stri
   return { url: response.url, text: response.text, contentType: response.contentType };
 }
 
+// A site's own JSON feed, by POST (Workday's job list), under the same rules as its pages:
+// robots.txt, one request at a time per host, spaced.
+export async function crawlPostJson<T>(input: string, body: unknown): Promise<T> {
+  const url = new URL(input);
+  const robots = await robotsFor(url);
+  if (!allowedByRobots(robots, url)) throw new DisallowedError(`${url}: disallowed by robots.txt`);
+  const response = await onHost(url.host, delayFor(robots), async () => {
+    try {
+      return await safeFetch(url.toString(), {
+        ...options(),
+        accept: "application/json",
+        contentTypes: /json/i,
+        post: { body: JSON.stringify(body), contentType: "application/json" },
+      });
+    } catch (error) {
+      if (error instanceof SafeFetchError && error.reason === "unknown_host") throw new UnknownHostError(`${url}: ${error.message}`);
+      if (error instanceof SafeFetchError) throw new CrawlError(`${url}: ${error.message}`);
+      throw error;
+    }
+  });
+  if (response.status === 404 || response.status === 410) throw new PageGoneError(`${url}: HTTP ${response.status}`);
+  if (response.status < 200 || response.status >= 300) throw new CrawlError(`${url}: HTTP ${response.status}`);
+  try {
+    return JSON.parse(response.text) as T;
+  } catch {
+    throw new CrawlError(`${url}: not JSON`);
+  }
+}
+
 // Tests: forget robots.txt files and pauses.
 export function resetCrawler(): void {
   robotsCache.clear();
