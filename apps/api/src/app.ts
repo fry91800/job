@@ -1,5 +1,6 @@
 import type { PublicConfigResponse } from "@job/shared";
 import express from "express";
+import { alertsRouter } from "./alerts/alerts.routes";
 import { authRouter } from "./auth/auth.routes";
 import { ingestRouter } from "./collector/ingest.routes";
 import { loadSession } from "./auth/session";
@@ -52,6 +53,7 @@ export function createApp() {
   app.use("/api/templates", templatesRouter);
   app.use("/api/settings", settingsRouter);
   app.use("/api/feedback", feedbackRouter);
+  app.use("/api/alerts", alertsRouter);
   // Offer pages, sitemaps and robots.txt for search engines (SEO.md).
   app.use(seoRouter);
 

@@ -60,8 +60,8 @@ The first visitors only come once; the site has to work for them.
 - [ ] **Go through the first visit yourself**, on a phone and a computer, as someone who has
       never seen it: search, open an offer, upload a resume, generate, download. Note every
       hesitation.
-- [ ] **Measure**: Umami, self-hosted and cookie-free, is built (DEPLOYMENT.md §7.1); set
-      it up on the server. Events: `search` (keywords, result count), `resume_upload`,
+- [x] **Measure**: Umami, self-hosted and cookie-free, set up on 2026-10-17
+      (https://stats.monposte.com, DEPLOYMENT.md §7.1). Events: `search` (keywords, result count), `resume_upload`,
       `resume_create`, `resume_generate`, `resume_translate`, `pdf_download`,
       `offer_save`, `offer_add`, `signup`, `feedback`; offers opened are page views
       (`/offers/…`). See §5.
@@ -111,7 +111,7 @@ target for phase 3.
 Job sites live on people who return. People are looking for weeks or months; the site has to
 remind them it exists.
 
-- [ ] **Job alerts by email** **[build]**: "Enregistrer cette recherche" on a search, then a
+- [x] **Job alerts by email** (built 2026-10-17, FEATURE O7): "Enregistrer cette recherche" on a search, then a
       daily or weekly email with the new matching offers (Brevo is already set up). This is
       the most important missing feature; it is listed as out of scope for the MVP and should
       come in now. Needs an account (an email address), which gives a reason to create one.
@@ -183,7 +183,7 @@ From the phases above, the product work for the code:
 | 1 | ~~Cookie-free analytics (Umami) and events~~ built | 0 | Know what works |
 | 2 | ~~Feedback button (form → email)~~ built | 0 | Hear what blocks people |
 | 3 | ~~Global daily AI budget with alert~~ built | 0 | Keep costs under control |
-| 4 | Job alerts by email (saved searches) | 2 | Bring people back |
+| 4 | ~~Job alerts by email (saved searches)~~ built | 2 | Bring people back |
 | 5 | Installable web app (manifest, icon) | 2 | Phone users |
 | 6 | "Nouveau" marks, application reminders | 2 | Bring people back |
 | 7 | Landing pages by contract type (alternance, stage) | 3 | Students' searches |

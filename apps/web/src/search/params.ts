@@ -80,3 +80,16 @@ export function useSearchState() {
   );
   return [state, update] as const;
 }
+
+// A job alert's search (GROWTH.md phase 2): the address without sort and publication date
+// (an alert sends what is new), in a stable order (the API spots duplicates the same way).
+export function alertQuery(state: SearchState): string {
+  const params = writeSearch(state);
+  params.delete("sort");
+  params.delete("publishedWithin");
+  params.sort();
+  return params.toString();
+}
+
+export const hasAlertCriteria = (state: SearchState) =>
+  !!(state.q.trim() || state.locationId !== null || state.contractType.length || state.remoteType.length || state.salaryMin !== null);

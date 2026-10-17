@@ -335,8 +335,11 @@ alerted (`feedback-not-sent`).
 
   Also set a budget with alerts in Google Cloud (Billing → Budgets & alerts) as a second
   safety net, and check the per-user AI limits in `apps/api/src/config.ts`.
-- **Email provider**: free tiers are usually ~300 emails/day; one per signup and per
-  password reset.
+- **Email provider**: free tiers are usually ~300 emails/day (Brevo's too); one per signup
+  and per password reset, and **one per job alert with new offers each morning**: a few
+  hundred users with daily alerts reach it. Watch Brevo's statistics, and move to a paid
+  plan (Brevo Starter: ~20 000 emails/month for a few euros) before the limit: past it,
+  password resets stop too. Alerts sent per run: `dc logs --since 24h api | grep job_alerts_done`.
 - **Geoapify**: the free tier (3 000 requests/day) covers place autocomplete for a start.
 
 ## 9. Updates

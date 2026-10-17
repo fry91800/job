@@ -3,6 +3,7 @@ import { Camera, Loader2, Settings as SettingsIcon } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { MODIFIER_SECTIONS, MODIFIER_STRENGTHS, PASSWORD_MIN_LENGTH, passwordSchema, type Settings, type SettingsResponse } from "@job/shared";
+import { AlertsCard } from "../alerts/AlertsCard";
 import { api } from "../api/client";
 import { keys, queryClient, useMe } from "../api/queries";
 import { chooseLanguage, useAuthDialog } from "../auth/session";
@@ -219,6 +220,8 @@ export default function SettingsView() {
         </div>
         {!current && <p className="text-xs text-fg-subtle">{t("settings.savedOnChange")}</p>}
       </Card>
+
+      <AlertsCard card={(title, children) => <Card title={title}>{children}</Card>} />
 
       <Card title={t("settings.interface")}>
         <div className="flex flex-col gap-1.5">

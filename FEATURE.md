@@ -203,6 +203,13 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Private offers never appear in search. If the collector later finds the same URL, the offer becomes public (same row; users' data unaffected).
 * The creator may edit fields of their private offer; public offers are read-only for users.
 
+### O7. Job alerts *(added after the MVP, GROWTH.md phase 2)*
+* A registered account saves the current search with "Créer une alerte" (bell under the search; guests are asked to sign up). Stored: the search parameters (without sort, page, publication date) and a label (keywords · place · contracts). Same search twice: the existing alert. Up to 10 per account; a search without keyword, place or filter is refused (it would send every new offer).
+* Every morning at 8:00 Paris time (weekly alerts: Mondays), each alert's offers **collected** since its last run are emailed, up to 10 with a link to all of them, only when there are new ones, only to confirmed addresses. In the account's language.
+* Settings → "Alertes e-mail": open the search, frequency (daily / Monday), pause / resume (resuming doesn't send what arrived during the pause), delete.
+* Each email has an unsubscribe link (a page with a button: link scanners must not unsubscribe) and the one-click List-Unsubscribe headers; unsubscribing pauses the alert.
+* Runs inside the API process every 30 minutes (`npm run jobs:alerts` once). Deleted with the account.
+
 ### O6. Open original offer
 * Opens `offers.url` in a new tab (`rel="noopener noreferrer"`). Hidden when `url` is NULL. No click tracking in the MVP.
 
@@ -335,4 +342,4 @@ Suggested build order: i18n setup + auth & guest sessions → resumes (form, the
 
 ## Out of scope for the MVP
 
-Paid plans & billing, OAuth/social login, OCR, cover letters, recommendations/alerts, sorting by match %, application reminders, data export, admin UI (seed via scripts), companies table (C1), multiple locations per offer, searching several locations at once.
+Paid plans & billing, OAuth/social login, OCR, cover letters, recommendations, sorting by match %, application reminders, data export, admin UI (seed via scripts), companies table (C1), multiple locations per offer, searching several locations at once.

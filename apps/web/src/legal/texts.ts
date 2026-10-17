@@ -14,7 +14,7 @@ Cette page explique quelles données ${O.site} traite, pourquoi, combien de temp
 
 ## Données traitées
 - **Compte** : adresse e-mail et mot de passe (stocké uniquement sous forme chiffrée, jamais en clair).
-- **Contenu que vous ajoutez** : CV (texte et fichiers importés), photos, offres enregistrées ou ajoutées, CV générés et réglages.
+- **Contenu que vous ajoutez** : CV (texte et fichiers importés), photos, offres enregistrées ou ajoutées, CV générés, alertes e-mail (recherches enregistrées) et réglages.
 - **Session** : un identifiant de session aléatoire, dans un cookie.
 - **Messages envoyés avec « Un avis ? »** : le message, l'adresse e-mail si vous en indiquez une, la page d'où il est envoyé. Ils nous parviennent par e-mail ; nous les gardons le temps de les traiter, au plus un an.
 - **Mesure d'audience** : pages vues, provenance (site ou moteur de recherche d'où vous venez), type d'appareil, navigateur, pays, et quelques actions (recherche et ses mots-clés, CV importé ou généré, téléchargement). Sans cookie et sans enregistrer votre adresse IP : les visites ne sont pas reliées à vous, ni d'un jour à l'autre. Si votre navigateur demande à ne pas être suivi (« Do Not Track »), rien n'est mesuré.
@@ -24,7 +24,7 @@ MonPoste n'utilise ni publicité ni traceur tiers. La mesure d'audience (Umami) 
 
 ## Pourquoi
 - Fournir le service que vous demandez : recherche d'offres, gestion de vos CV, génération de CV adaptés à une offre (exécution du contrat).
-- Envoyer les e-mails du compte : confirmation d'adresse, réinitialisation du mot de passe (exécution du contrat).
+- Envoyer les e-mails du compte : confirmation d'adresse, réinitialisation du mot de passe, et les alertes que vous avez créées (exécution du contrat). Chaque alerte se désactive par le lien en bas de ses e-mails ou dans les Paramètres.
 - Protéger le site contre les abus (intérêt légitime).
 - Savoir comment le site est utilisé pour l'améliorer, avec des statistiques anonymes (intérêt légitime ; mesure d'audience exemptée de consentement selon les conditions de la CNIL), et répondre à vos messages.
 
@@ -104,7 +104,7 @@ This page explains what data ${O.site} processes, why, how long it keeps it and 
 
 ## Data processed
 - **Account**: email address and password (stored only in hashed form, never in clear).
-- **Content you add**: resumes (text and uploaded files), photos, saved or added offers, generated resumes and settings.
+- **Content you add**: resumes (text and uploaded files), photos, saved or added offers, generated resumes, email alerts (saved searches) and settings.
 - **Session**: a random session identifier, in a cookie.
 - **Messages sent with "Feedback?"**: the message, your email address if you give one, the page it was sent from. They reach us by email; we keep them as long as needed to handle them, one year at most.
 - **Audience measurement**: pages viewed, origin (the site or search engine you came from), device type, browser, country, and a few actions (searches and their keywords, resume uploaded or generated, download). Without cookies and without storing your IP address: visits are not linked to you, nor from one day to the next. If your browser asks not to be tracked ("Do Not Track"), nothing is measured.
@@ -114,7 +114,7 @@ MonPoste uses no advertising and no third-party trackers. Audience measurement (
 
 ## Why
 - To provide the service you ask for: offer search, managing your resumes, generating resumes tailored to an offer (performance of the contract).
-- To send account emails: address confirmation, password reset (performance of the contract).
+- To send account emails: address confirmation, password reset, and the alerts you created (performance of the contract). Each alert can be turned off with the link at the bottom of its emails or in Settings.
 - To protect the site against abuse (legitimate interest).
 - To know how the site is used in order to improve it, with anonymous statistics (legitimate interest; audience measurement exempt from consent under the CNIL's conditions), and to answer your messages.
 

@@ -63,3 +63,49 @@ ${details.map((line) => `<p style="color: #777; font-size: 13px; margin: 4px 0">
 </body></html>`,
   };
 }
+
+// A job alert's new offers (GROWTH.md phase 2), in the account's language.
+export type AlertOffer = { url: string; title: string; facts: string };
+
+export function jobAlertEmail(language: Language, alert: { label: string; offers: AlertOffer[]; total: number; searchUrl: string; unsubscribeUrl: string; settingsUrl: string }) {
+  const t = {
+    fr: {
+      subject: alert.total > 1 ? `${alert.total} nouvelles offres : ${alert.label}` : `Nouvelle offre : ${alert.label}`,
+      intro: alert.total > 1 ? `${alert.total} nouvelles offres pour votre alerte « ${alert.label} » :` : `Une nouvelle offre pour votre alerte « ${alert.label} » :`,
+      all: alert.total > alert.offers.length ? `Voir les ${alert.total} offres` : "Voir dans MonPoste",
+      footer: "Vous recevez cet e-mail parce que vous avez créé cette alerte sur MonPoste.",
+      manage: "Gérer mes alertes",
+      stop: "Ne plus recevoir cette alerte",
+    },
+    en: {
+      subject: alert.total > 1 ? `${alert.total} new offers: ${alert.label}` : `New offer: ${alert.label}`,
+      intro: alert.total > 1 ? `${alert.total} new offers for your alert "${alert.label}":` : `A new offer for your alert "${alert.label}":`,
+      all: alert.total > alert.offers.length ? `See all ${alert.total} offers` : "See in MonPoste",
+      footer: "You receive this email because you created this alert on MonPoste.",
+      manage: "Manage my alerts",
+      stop: "Stop this alert",
+    },
+  }[language];
+  const text = [
+    t.intro,
+    "",
+    ...alert.offers.flatMap((offer) => [`- ${offer.title}`, `  ${offer.facts}`, `  ${offer.url}`]),
+    "",
+    `${t.all} : ${alert.searchUrl}`,
+    "",
+    "--",
+    t.footer,
+    `${t.manage} : ${alert.settingsUrl}`,
+    `${t.stop} : ${alert.unsubscribeUrl}`,
+  ].join("\n");
+  const html = `<!doctype html><html><body style="font-family: Arial, sans-serif; font-size: 15px; color: #222; max-width: 600px">
+<p>${esc(t.intro)}</p>
+${alert.offers
+  .map((offer) => `<p style="margin: 14px 0"><a href="${esc(offer.url)}" style="color: #1f3a5f; font-weight: bold; text-decoration: none">${esc(offer.title)}</a><br><span style="color: #555; font-size: 14px">${esc(offer.facts)}</span></p>`)
+  .join("\n")}
+<p><a href="${esc(alert.searchUrl)}" style="display: inline-block; padding: 10px 16px; background: #1f3a5f; color: #fff; text-decoration: none; border-radius: 4px">${esc(t.all)}</a></p>
+<p style="color: #777; font-size: 12px; margin-top: 28px">${esc(t.footer)}<br><a href="${esc(alert.settingsUrl)}" style="color: #777">${esc(t.manage)}</a> · <a href="${esc(alert.unsubscribeUrl)}" style="color: #777">${esc(t.stop)}</a></p>
+<p style="color: #777; font-size: 12px">${BRAND}</p>
+</body></html>`;
+  return { subject: t.subject, text: `${text}\n`, html };
+}

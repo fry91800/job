@@ -79,6 +79,15 @@ export const config = {
     landing: { minOccupation: 3, minPair: 3, minCity: 5, offersShown: 30, linksShown: 20 },
   },
 
+  // Job alerts (GROWTH.md phase 2): new offers emailed at `sendHour` (Paris time), every day
+  // or on Mondays; checked every `checkMinutes` inside the API process (0 disables it;
+  // `npm run jobs:alerts` runs it once). Up to `offersShown` offers per email.
+  alerts: {
+    checkMinutes: Number(process.env.ALERTS_CHECK_MINUTES ?? 30),
+    sendHour: 8,
+    offersShown: 10,
+  },
+
   // Feedback form (GROWTH.md): messages are emailed to this address.
   feedback: {
     to: process.env.FEEDBACK_EMAIL ?? "contact@monposte.com",

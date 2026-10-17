@@ -120,6 +120,7 @@ model User {
   generatedResumes GeneratedResume[]
   savedOffers      SavedOffer[]
   createdOffers    Offer[]
+  jobAlerts        JobAlert[]
 
   @@index([lastActiveAt]) // guest cleanup job
   @@map("users")
@@ -322,6 +323,7 @@ model Offer {
   @@index([isPublic, closedAt, publishedAt(sort: Desc)])
   @@index([locationId])
   @@index([createdByUserId])
+  @@index([createdAt]) // new offers for the job alerts
   @@index([companyId])
   @@index([fingerprint])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -622,4 +624,24 @@ model AiUsage {
 
   @@id([day, task, model])
   @@map("ai_usage")
+}
+
+// Job alerts (GROWTH.md phase 2): a saved search; its new offers are emailed every morning
+// (or every Monday). Registered accounts with a confirmed address only.
+model JobAlert {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  label            String // e.g. "développeur · Lyon", shown in the list and the email
+  query            String // the search, as in the app's address (q=…&locationId=…), without sort and page
+  frequency        String    @default("daily") // daily | weekly
+  pausedAt         DateTime? @map("paused_at") @db.Timestamptz
+  unsubscribeToken String    @unique @map("unsubscribe_token") // the email's one-click link
+  lastRunAt        DateTime  @map("last_run_at") @db.Timestamptz // offers collected after it are new
+  lastSentAt       DateTime? @map("last_sent_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("job_alerts")
 }

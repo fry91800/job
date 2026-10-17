@@ -174,8 +174,10 @@ function locationFilter(searched: Location, radiusKm: number, includeRemote: boo
   };
 }
 
-export async function searchOffers(params: OfferSearchParams, userId?: string): Promise<OfferSearchResponse> {
+// `collectedAfter`: only offers that arrived after that moment (job alerts).
+export async function searchOffers(params: OfferSearchParams, userId?: string, options: { collectedAfter?: Date } = {}): Promise<OfferSearchResponse> {
   const conditions: Prisma.Sql[] = [sql`o.is_public`, sql`o.closed_at IS NULL`];
+  if (options.collectedAfter) conditions.push(sql`o.created_at > ${options.collectedAfter}`);
 
   if (params.q) conditions.push(...keywordConditions(params.q));
   if (params.company) conditions.push(sql`o.company_name ILIKE ${`%${escapeLike(params.company)}%`}`);

@@ -23,6 +23,7 @@
     "web:build": "vite build apps/web",
     "api:install-browser": "playwright-core install chromium-headless-shell",
     "jobs:cleanup": "tsx apps/api/src/jobs/run-cleanup.ts",
+    "jobs:alerts": "tsx apps/api/src/jobs/run-alerts.ts",
     "ai:check": "tsx apps/api/src/ai/check.ts",
     "ai:compare": "tsx apps/api/src/ai/compare.ts",
     "match:preview": "tsx apps/api/src/jobs/match-preview.ts",
