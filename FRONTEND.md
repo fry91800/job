@@ -70,6 +70,10 @@ Dialogs (not tabs) for short actions: log in, sign up, password reset, confirmat
 
 Below about 768 px: the sidebar is the whole screen (tools, search, results); opening something shows that tab full screen with a back button; open tabs are reachable from a tab switcher button. No resizing or preview tab on phones.
 
+**Installable** (D159): `public/manifest.webmanifest` and icons (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, drawn from `favicon.svg`). Chrome, Edge and Android offer to install; the account menu shows "Installer l'application" when the browser allows it (`lib/install.ts`), and on iPhone explains Safari's "Sur l'écran d'accueil". No service worker: no offline mode.
+
+**"Nouveau" marks** (D159): results collected by MonPoste since the previous visit on this device (`lib/visits.ts`; a visit ends after 30 minutes out of view; none on a first visit).
+
 ## 3. Behaviour shared by all tabs
 
 * **One source of truth for data**: an offer saved in its tab shows its star in the list at once, a resume edited in the Resumes tab updates the match % shown everywhere, and so on.

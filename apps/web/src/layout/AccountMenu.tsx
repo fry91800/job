@@ -1,4 +1,4 @@
-import { ChevronDown, CircleUser, MailWarning } from "lucide-react";
+import { ChevronDown, CircleUser, MailWarning, MonitorDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useFeedbackDialog } from "../feedback/FeedbackDialog";
 import { useWorkspace } from "../tabs/workspace";
@@ -6,6 +6,7 @@ import { useMe } from "../api/queries";
 import { chooseLanguage, useAuthDialog, useLogout, useResendVerification } from "../auth/session";
 import { LANGUAGES, type Language } from "../i18n";
 import { errorMessage } from "../lib/errors";
+import { promptInstall, useInstallMode } from "../lib/install";
 import { toast } from "../lib/toast";
 import { THEMES, useTheme } from "../theme/theme";
 import { MenuChoice, MenuContent, MenuItem, MenuLabel, MenuRoot, MenuSeparator, MenuTrigger } from "./menu";
@@ -22,6 +23,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const resend = useResendVerification();
   const { open } = useWorkspace();
   const openFeedback = useFeedbackDialog((state) => state.open);
+  const install = useInstallMode();
   const registered = user !== null && !user.isGuest;
   const unverified = registered && !user.emailVerified;
 
@@ -80,6 +82,11 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
           onChange={chooseLanguage}
         />
         <MenuSeparator />
+        {install && (
+          <MenuItem onSelect={() => (install === "prompt" ? void promptInstall() : toast(t("install.ios"), "info"))}>
+            <MonitorDown size={14} /> {t("install.action")}
+          </MenuItem>
+        )}
         <MenuItem onSelect={openFeedback}>{t("feedback.open")}</MenuItem>
         <MenuItem onSelect={() => open({ kind: "privacy" })}>{t("tabs.kinds.privacy")}</MenuItem>
         <MenuItem onSelect={() => open({ kind: "terms" })}>{t("tabs.kinds.terms")}</MenuItem>

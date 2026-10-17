@@ -58,6 +58,9 @@ www.{$DOMAIN} {
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 		@page not path /assets/*
 		header @page Cache-Control "no-cache"
+		# Installable app (FRONTEND.md): the manifest's type isn't in Caddy's list.
+		@manifest path /manifest.webmanifest
+		header @manifest Content-Type "application/manifest+json"
 		try_files {path} /index.html
 		file_server
 	}

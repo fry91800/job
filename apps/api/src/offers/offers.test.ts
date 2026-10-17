@@ -58,6 +58,7 @@ describe("GET /api/offers", () => {
     assert.equal(body.total, 198);
     const dates = body.results.map((offer) => offer.publishedAt ?? "");
     assert.deepEqual(dates, [...dates].sort().reverse());
+    assert.ok(body.results.every((offer) => !Number.isNaN(Date.parse(offer.collectedAt))), "when MonPoste found each offer (\"Nouveau\" marks)");
   });
 
   test("keyword searches are sorted by relevance by default", async () => {

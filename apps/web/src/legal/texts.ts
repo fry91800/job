@@ -30,7 +30,7 @@ MonPoste n'utilise ni publicité ni traceur tiers. La mesure d'audience (Umami) 
 
 ## Cookies et stockage du navigateur
 - Un seul cookie, **session**, strictement nécessaire : il vous garde connecté (ou garde votre espace invité) pendant 30 jours, prolongés à chaque visite. Il n'est lisible que par le site.
-- Le navigateur garde aussi vos préférences d'affichage (thème, langue, onglets ouverts). Elles ne quittent pas votre appareil.
+- Le navigateur garde aussi vos préférences d'affichage (thème, langue, onglets ouverts) et l'heure de votre dernière visite (pour signaler les offres nouvelles). Elles ne quittent pas votre appareil.
 
 Aucun de ces éléments ne sert à vous suivre : aucun consentement n'est donc demandé. La mesure d'audience n'utilise ni cookie ni stockage du navigateur.
 
@@ -120,7 +120,7 @@ MonPoste uses no advertising and no third-party trackers. Audience measurement (
 
 ## Cookies and browser storage
 - A single cookie, **session**, strictly necessary: it keeps you logged in (or keeps your guest space) for 30 days, extended at each visit. Only the site can read it.
-- Your browser also keeps your display preferences (theme, language, open tabs). They never leave your device.
+- Your browser also keeps your display preferences (theme, language, open tabs) and the time of your last visit (to mark new offers). They never leave your device.
 
 None of these is used to track you, so no consent is asked. Audience measurement uses no cookies and no browser storage.
 

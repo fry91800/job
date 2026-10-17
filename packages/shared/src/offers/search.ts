@@ -90,6 +90,7 @@ export type OfferSearchResult = {
   contractType: ContractType | null;
   salary: { min: number | null; max: number | null; currency: string; period: SalaryPeriod } | null;
   publishedAt: string | null;
+  collectedAt: string; // when MonPoste found it: "Nouveau" marks since the last visit
   saved: { status: string } | null; // null for anonymous requests or unsaved offers
   skillIds: number[]; // for the match % computed by the web app (FEATURE O4)
   occupationIds: number[];

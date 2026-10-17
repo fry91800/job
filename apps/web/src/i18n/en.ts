@@ -48,6 +48,10 @@ export const en: Shape<typeof fr> = {
     lastSent: "Last sent on {{date}}",
     noneSent: "No new offer yet",
   },
+  install: {
+    action: "Install the app",
+    ios: "In Safari, tap Share (the square with an arrow), then \"Add to Home Screen\".",
+  },
   feedback: {
     open: "Feedback or a problem?",
     title: "Your feedback",
@@ -87,6 +91,8 @@ export const en: Shape<typeof fr> = {
     error: "The search didn't go through.",
     retry: "Try again",
     wholeArea: "Whole area",
+    new: "New",
+    newHint: "Arrived on MonPoste since your last visit",
     remoteMatch: "Remote",
   },
   offer: {

@@ -31,6 +31,7 @@ type OfferRow = {
   salary_currency: string | null;
   salary_period: SalaryPeriod | null;
   published_at: Date | null;
+  created_at: Date;
   location_id: number | null;
   location_type: "city" | "county" | "region" | "country" | null;
   location_name: string | null;
@@ -221,7 +222,7 @@ export async function searchOffers(params: OfferSearchParams, userId?: string, o
         o.id, o.title, o.company_name,
         o.remote_type::text AS remote_type, o.contract_type::text AS contract_type,
         o.salary_min, o.salary_max, o.salary_currency, o.salary_period::text AS salary_period,
-        o.published_at,
+        o.published_at, o.created_at,
         l.id AS location_id, l.type::text AS location_type, l.name AS location_name,
         l.country_code, l.region_name, l.county_name,
         ${location ? location.match : sql`NULL`} AS location_match,
@@ -267,6 +268,7 @@ export async function searchOffers(params: OfferSearchParams, userId?: string, o
       ? { min: row.salary_min, max: row.salary_max, currency: row.salary_currency, period: row.salary_period }
       : null,
     publishedAt: row.published_at?.toISOString() ?? null,
+    collectedAt: row.created_at.toISOString(),
     saved: savedStatus.has(row.id) ? { status: savedStatus.get(row.id)! } : null,
     skillIds: skillIds.get(row.id) ?? [],
     occupationIds: occupationIds.get(row.id) ?? [],

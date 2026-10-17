@@ -44,6 +44,10 @@ export const fr = {
     lastSent: "Dernier envoi le {{date}}",
     noneSent: "Pas encore de nouvelle offre",
   },
+  install: {
+    action: "Installer l'application",
+    ios: "Dans Safari, touchez Partager (le carré avec une flèche), puis « Sur l'écran d'accueil ».",
+  },
   feedback: {
     open: "Un avis ? Un problème ?",
     title: "Votre avis",
@@ -83,6 +87,8 @@ export const fr = {
     error: "La recherche n'a pas abouti.",
     retry: "Réessayer",
     wholeArea: "Toute la zone",
+    new: "Nouveau",
+    newHint: "Arrivée sur MonPoste depuis votre dernière visite",
     remoteMatch: "Télétravail",
   },
   offer: {

@@ -11,7 +11,7 @@ export const offerDetailQuerySchema = z.object({
 
 export type CatalogueItem = { id: number; name: string };
 
-export type OfferDetail = Omit<OfferSearchResult, "locationMatch" | "distanceKm" | "saved" | "skillIds" | "occupationIds"> & {
+export type OfferDetail = Omit<OfferSearchResult, "locationMatch" | "distanceKm" | "collectedAt" | "saved" | "skillIds" | "occupationIds"> & {
   description: string; // simplified Markdown, render with HTML escaped
   language: string | null;
   url: string | null;

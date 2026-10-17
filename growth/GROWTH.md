@@ -115,10 +115,10 @@ remind them it exists.
       daily or weekly email with the new matching offers (Brevo is already set up). This is
       the most important missing feature; it is listed as out of scope for the MVP and should
       come in now. Needs an account (an email address), which gives a reason to create one.
-- [ ] **New offers since the last visit** **[build]**: a "nouveau" mark on results.
+- [x] **New offers since the last visit** (built 2026-10-17): a "nouveau" mark on results.
 - [ ] **Application follow-up** **[build]**: saved offers already track applications (O3); an
       occasional reminder ("3 offres enregistrées sans candidature") brings people back.
-- [ ] **Installable on a phone** **[build]**: a web app manifest so "Ajouter à l'écran
+- [x] **Installable on a phone** (built 2026-10-17; "Installer l'application" in the account menu): a web app manifest so "Ajouter à l'écran
       d'accueil" gives an icon. Small work, and most students search on their phone.
 - [ ] **Account creation at the right moment**: the reminder to guests already exists (G2);
       offer it right after the first successful generation, when the value is obvious.
@@ -184,8 +184,8 @@ From the phases above, the product work for the code:
 | 2 | ~~Feedback button (form → email)~~ built | 0 | Hear what blocks people |
 | 3 | ~~Global daily AI budget with alert~~ built | 0 | Keep costs under control |
 | 4 | ~~Job alerts by email (saved searches)~~ built | 2 | Bring people back |
-| 5 | Installable web app (manifest, icon) | 2 | Phone users |
-| 6 | "Nouveau" marks, application reminders | 2 | Bring people back |
+| 5 | ~~Installable web app (manifest, icon)~~ built | 2 | Phone users |
+| 6 | ~~"Nouveau" marks~~ built; application reminders | 2 | Bring people back |
 | 7 | Landing pages by contract type (alternance, stage) | 3 | Students' searches |
 | 8 | Shareable examples / referral | 3 | Users bring users |
 

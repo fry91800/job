@@ -8,6 +8,7 @@ import { computeMatch } from "@job/shared/src/match";
 import { offerQuery, useMe, useOfferSearch } from "../api/queries";
 import { track } from "../lib/analytics";
 import { formatAge } from "../lib/format";
+import { usePreviousVisit } from "../lib/visits";
 import { MatchBadge } from "../offers/MatchBadge";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
@@ -19,7 +20,7 @@ import { apiQuery, useSearchState } from "./params";
 
 const ROW_HEIGHT = 60;
 
-function ResultRow({ offer, active, score }: { offer: OfferSearchResult; active: boolean; score: number | null }) {
+function ResultRow({ offer, active, score, isNew }: { offer: OfferSearchResult; active: boolean; score: number | null; isNew: boolean }) {
   const { t, i18n } = useTranslation();
   const { open } = useWorkspace();
   const client = useQueryClient();
@@ -46,6 +47,7 @@ function ResultRow({ offer, active, score }: { offer: OfferSearchResult; active:
     >
       <span className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate font-medium">{offer.title}</span>
+        {isNew && <span className="shrink-0 rounded-sm bg-accent-soft px-1 text-[10px] font-semibold uppercase tracking-wide text-accent" title={t("search.newHint")}>{t("search.new")}</span>}
         {score !== null && <MatchBadge score={score} />}
       </span>
       <span className="flex items-center gap-1.5 text-xs text-fg-muted">
@@ -76,6 +78,7 @@ export function ResultList() {
   const query = apiQuery(state);
   const search = useOfferSearch(query);
   const resume = useMe().data?.user?.selectedResume ?? null;
+  const previousVisit = usePreviousVisit();
   const activeKey = useTabsStore((store) => store.activeKey);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -130,7 +133,12 @@ export function ResultList() {
           return (
             <div key={item.key} className="absolute inset-x-0 border-b border-border" style={{ top: item.start, height: item.size }}>
               {offer ? (
-                <ResultRow offer={offer} active={activeKey === `offer:${offer.id}`} score={resume ? computeMatch(offer, resume).score : null} />
+                <ResultRow
+                  offer={offer}
+                  active={activeKey === `offer:${offer.id}`}
+                  score={resume ? computeMatch(offer, resume).score : null}
+                  isNew={previousVisit !== null && Date.parse(offer.collectedAt) > previousVisit}
+                />
               ) : (
                 <div className="flex h-full flex-col justify-center gap-2 px-3" aria-hidden>
                   <div className="h-3.5 w-2/3 animate-pulse rounded-sm bg-hover" />
