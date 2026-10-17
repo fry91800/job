@@ -42,6 +42,7 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * When a limit is reached: HTTP 429 with a machine-readable code; for guests the UI suggests creating an account.
 
 ### G5. AI usage
+* **Daily AI budget**: every AI call's tokens are priced and counted per day (`ai_usage`); once the day's estimate reaches `AI_DAILY_BUDGET_USD`, AI calls are refused until midnight UTC (503 `ai_budget_reached`, "paused until tomorrow"), for every user. The collector's background AI stops at half of it. Alerts at 80 % and 100 % (DEPLOYMENT.md §8).
 * AI is used for: resume parsing (R2), resume generation (M1), resume translation (T1), user-added offer extraction (O5). Everything else (search, match %) is deterministic.
 * Sending resume content to the AI provider is disclosed in the privacy policy.
 * AI calls are synchronous in the MVP (loading state in the UI, server timeout 60 s). Nothing is persisted on failure; the user can retry; failures do not count towards quotas.

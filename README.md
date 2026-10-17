@@ -330,6 +330,7 @@ The project aims to remain simple and modular.
 * `DATABASE.md` — Database design, JSON formats, search rules
 * `COLLECTOR.md` — Job collector plan: sources, ingestion contract, pipeline, phases
 * `FRONTEND.md` — Plan of the real frontend: layout, tabs, style, smoothness, technical choices
+* `SEO.md` — Search engines: server-rendered offer pages, JobPosting, sitemaps, Search Console steps
 * `DEPLOYMENT.md` — Putting the platform on a server: setup, first start, email, backups and restore, monitoring, updates
 * `claude/DECISIONS.md` — Decision log
 * `prisma/schema.prisma` — Draft Prisma schema

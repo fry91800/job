@@ -17,11 +17,14 @@ export type AiJsonRequest = {
   effort?: "low" | "default";
 };
 
+// Tokens a call used, for the daily budget (./budget.ts). Output includes thinking.
+export type AiUsage = { inputTokens: number; outputTokens: number };
+
 export interface AiProvider {
   readonly name: string; // stored as `provider:model` (e.g. generated_resumes.ai_model)
   readonly model: string;
-  // Returns the raw text of the answer (expected to be JSON).
-  generateJson(request: AiJsonRequest): Promise<string>;
+  // Returns the raw text of the answer (expected to be JSON) and the tokens it used.
+  generateJson(request: AiJsonRequest): Promise<{ text: string; usage?: AiUsage }>;
 }
 
 // AI failures as HTTP errors. Nothing is saved and no quota is used when they happen (G5).
@@ -34,6 +37,9 @@ export class AiError extends HttpError {
   }
   static failed(message = "The AI request failed") {
     return new AiError(502, "ai_failed", message);
+  }
+  static budgetReached() {
+    return new AiError(503, "ai_budget_reached", "The AI is paused until tomorrow (daily budget reached)");
   }
   static invalidOutput() {
     return new AiError(502, "ai_invalid_output", "The AI returned an unusable answer, try again");

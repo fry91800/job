@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import type { OfferSearchResult } from "@job/shared";
 import { computeMatch } from "@job/shared/src/match";
 import { offerQuery, useMe, useOfferSearch } from "../api/queries";
+import { track } from "../lib/analytics";
 import { formatAge } from "../lib/format";
 import { MatchBadge } from "../offers/MatchBadge";
 import { useTabsStore } from "../tabs/store";
@@ -86,6 +87,16 @@ export function ResultList() {
     overscan: 10,
   });
   const items = virtualizer.getVirtualItems();
+
+  // Searches people make (GROWTH.md §5): once per search, with its words and result count.
+  const tracked = useRef<string | null>(null);
+  const firstPage = search.isPlaceholderData ? undefined : search.data?.pages[0];
+  useEffect(() => {
+    if (!firstPage || !query || tracked.current === query) return;
+    tracked.current = query;
+    const params = new URLSearchParams(query);
+    track("search", { q: (params.get("q") ?? "").slice(0, 60), location: params.has("locationId"), results: firstPage.total });
+  }, [firstPage, query]);
 
   // A new search starts at the top.
   useEffect(() => {

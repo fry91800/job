@@ -1,10 +1,11 @@
-import { FileText, History, Image, PanelLeftClose, PanelLeftOpen, Settings, Star } from "lucide-react";
+import { FileText, History, Image, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, Settings, Star } from "lucide-react";
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { TabKind } from "../tabs/model";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
 import { GuestReminder } from "../auth/GuestReminder";
+import { useFeedbackDialog } from "../feedback/FeedbackDialog";
 import { ResultList } from "../search/ResultList";
 import { SearchBlock } from "../search/SearchBlock";
 import { AccountMenu } from "./AccountMenu";
@@ -72,6 +73,7 @@ function ResizeHandle() {
 export function Sidebar({ phone = false }: { phone?: boolean }) {
   const { t } = useTranslation();
   const { width, collapsed, toggle } = useSidebarStore();
+  const openFeedback = useFeedbackDialog((state) => state.open);
 
   if (collapsed && !phone) {
     return (
@@ -79,7 +81,8 @@ export function Sidebar({ phone = false }: { phone?: boolean }) {
         <IconButton icon={PanelLeftOpen} label={t("sidebar.expand")} onClick={toggle} />
         <div className="h-px w-6 bg-border" />
         <Tools vertical />
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col items-center gap-1">
+          <IconButton icon={MessageSquarePlus} label={t("feedback.open")} onClick={openFeedback} />
           <AccountMenu compact />
         </div>
       </aside>
@@ -91,6 +94,7 @@ export function Sidebar({ phone = false }: { phone?: boolean }) {
       <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
         <Tools />
         <div className="flex items-center">
+          <IconButton icon={MessageSquarePlus} label={t("feedback.open")} onClick={openFeedback} />
           <AccountMenu />
           {!phone && <IconButton icon={PanelLeftClose} label={t("sidebar.collapse")} onClick={toggle} />}
         </div>

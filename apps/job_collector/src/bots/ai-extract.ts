@@ -64,6 +64,7 @@ export async function aiExtractOffer(page: BotPage, source: string): Promise<{ o
     jsonSchema: z.toJSONSchema(extractedSchema, { io: "output", unrepresentable: "any" }) as Record<string, unknown>,
     temperature: 0,
     effort: "low",
+    background: true,
   });
   if (!data.isJobOffer || !data.title) return { skipped: "not an offer" };
   const country = data.location?.countryCode?.toUpperCase() ?? null;

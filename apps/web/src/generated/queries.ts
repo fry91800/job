@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GeneratedResumeDetail, GeneratedResumeListResponse, ModifierConfig, ModifierStrength, SettingsResponse, TemplateListResponse } from "@job/shared";
 import { api, ApiError } from "../api/client";
 import { keys } from "../api/queries";
+import { track } from "../lib/analytics";
 
 // Generated resumes (FEATURE M1, M3, M4).
 
@@ -50,7 +51,8 @@ export function useGenerate() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: GenerateInput) => api<GeneratedResumeDetail>("POST", "/api/generated-resumes", { body: input }),
-    onSuccess: (detail) => {
+    onSuccess: (detail, input) => {
+      track("resume_generate", { modifier: input.modifierEnabled ?? true });
       client.setQueryData(generatedKeys.one(detail.id), detail);
       void client.invalidateQueries({ queryKey: generatedKeys.list, exact: true });
       void client.invalidateQueries({ queryKey: ["offer", detail.offer.id] });

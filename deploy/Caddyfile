@@ -4,6 +4,12 @@
 	email {$ACME_EMAIL}
 }
 
+# The app's pages only load its own code and fonts and talk to its own API; the resume
+# preview frame is the API's own page.
+(app_csp) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+}
+
 # One address for the site: www goes to the bare domain.
 www.{$DOMAIN} {
 	redir https://{$DOMAIN}{uri} permanent
@@ -24,11 +30,29 @@ www.{$DOMAIN} {
 		reverse_proxy api:3000
 	}
 
+	# Audience measurement (Umami, GROWTH.md): only its script and its collection endpoint,
+	# on the site's own address (first party: the CSP stays 'self'). The dashboard is on
+	# stats.{$DOMAIN}.
+	handle /u/script.js {
+		rewrite * /script.js
+		reverse_proxy umami:3000
+	}
+	handle /u/api/send {
+		rewrite * /api/send
+		reverse_proxy umami:3000
+	}
+
+	# Pages for search engines (SEO.md): offer pages rendered by the API on the app's page,
+	# landing pages by job and town, sitemaps, robots.txt.
+	@seo path /offers/* /emplois /emplois/* /sitemap.xml /sitemaps/* /robots.txt
+	handle @seo {
+		import app_csp
+		reverse_proxy api:3000
+	}
+
 	handle {
 		root * /srv
-		# The app only loads its own code and fonts, and talks to its own API; the resume
-		# preview frame is the API's own page.
-		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		import app_csp
 		# Hashed file names never change: cached for a year. The page itself is always revalidated.
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
@@ -37,4 +61,17 @@ www.{$DOMAIN} {
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# Umami's dashboard (GROWTH.md), behind its own login. Needs the DNS record of
+# DEPLOYMENT.md §3.
+stats.{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy umami:3000
 }

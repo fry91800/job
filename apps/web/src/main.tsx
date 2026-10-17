@@ -7,6 +7,9 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { queryClient } from "./api/queries";
 import { Shell } from "./layout/Shell";
+import { startAnalytics } from "./lib/analytics";
+
+void startAnalytics();
 
 // Every address is handled by the workspace shell: addresses name tabs (FRONTEND.md §2.4).
 createRoot(document.getElementById("root")!).render(

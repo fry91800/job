@@ -2,7 +2,8 @@
 
 How to put the platform on a server and keep it running. Everything runs with Docker
 Compose on one Linux server: the API, the job collector (worker), PostgreSQL, the web
-server (Caddy, with automatic HTTPS) and a daily database backup. The stack steps (first
+server (Caddy, with automatic HTTPS), audience measurement (Umami) and a daily database
+backup. The stack steps (first
 start, catalogue and board import, backup, restore) were rehearsed on a local copy of it
 (D137); the server, DNS and email steps depend on your providers.
 
@@ -20,6 +21,8 @@ Internet ──443──▶ web (Caddy) ──/api──▶ api ──▶ postgr
 | `worker` | `worker` (Node 24) | Job collector: collects, checks boards, closes old offers (COLLECTOR.md) |
 | `postgres` | `postgres:17` | The database; not reachable from outside |
 | `backup` | `postgres:17` + `deploy/backup.sh` | A compressed dump every day, kept 14 days |
+| `umami` | `ghcr.io/umami-software/umami` | Audience measurement (§7.1): dashboard on `stats.monposte.com`, tracker under `/u/` on the site |
+| `umami-db` | `postgres:17` | Creates Umami's database (`umami`, on the same PostgreSQL) if missing, then stops |
 
 Data lives in named volumes: `pgdata` (database), `storage` (uploaded resumes and
 photos), `backups`, `caddy_data` (certificates) and `caddy_config`.
@@ -102,6 +105,7 @@ certificate as soon as it starts, and that needs the domain to point to the serv
 | `A` | `monposte.com` | the server's IPv4 address |
 | `AAAA` | `monposte.com` | the server's IPv6 address (if it has one) |
 | `CNAME` | `www.monposte.com` | `monposte.com` (Caddy redirects it to the bare domain) |
+| `CNAME` | `stats.monposte.com` | `monposte.com` (the audience dashboard, §7.1) |
 
 Plus the email records of §5. Check with `dig +short monposte.com`.
 
@@ -140,7 +144,7 @@ them again. Copy the files from your computer to the server:
 
 ```bash
 # On your computer, from the repository:
-rsync -av data/esco data/boards-2026-10-15.json.gz deploy@monposte.com:/opt/monposte/data/
+rsync -av data/esco data/boards-2026-10-15.json.gz admin@monposte.com:/opt/monposte/data/
 ```
 
 Then on the server (the worker runs as user 1000, which is `deploy` on a fresh server; else
@@ -157,6 +161,10 @@ collector, already running, picks the boards up at its next scheduled pass (COLL
 the first offers appear within hours, the full collection takes about a day.
 
 ### Check that everything works
+
+- [ ] Search engines: follow SEO.md "To do once the site is deployed" (Search Console, sitemap).
+- [ ] Audience measurement set up (§7.1) and a test message sent with "Un avis ?" arrives
+  at `contact@monposte.com`.
 
 - [ ] Create an account on the site: the confirmation email arrives (check spam), its link
   works.
@@ -221,7 +229,7 @@ example, every night on another machine (your computer, a NAS, a second small se
 
 ```bash
 # crontab -e on the other machine (needs SSH access to the server):
-30 3 * * * mkdir -p ~/monposte-backups/db && ssh deploy@monposte.com 'docker run --rm -v monposte_backups:/b:ro alpine tar -c -C /b .' | tar -x -C ~/monposte-backups/db && ssh deploy@monposte.com 'docker run --rm -v monposte_storage:/s:ro alpine tar -cz -C /s .' > ~/monposte-backups/storage.tar.gz
+30 3 * * * mkdir -p ~/monposte-backups/db && ssh admin@monposte.com 'docker run --rm -v monposte_backups:/b:ro alpine tar -c -C /b .' | tar -x -C ~/monposte-backups/db && ssh admin@monposte.com 'docker run --rm -v monposte_storage:/s:ro alpine tar -cz -C /s .' > ~/monposte-backups/storage.tar.gz
 ```
 
 (The volumes are named after the compose project, `monposte`: `docker volume ls`. Going
@@ -273,10 +281,53 @@ dc run --rm worker npm run collector -- metrics          # collector state (COLL
 
 Docker keeps at most 5 × 20 MB of logs per container (`/etc/docker/daemon.json`, §2).
 
+### 7.1 Audience measurement and feedback
+
+**Umami** (GROWTH.md §5) counts visits and the steps that matter (searches, resumes
+uploaded and generated, PDFs downloaded, sign-ups…), without cookies and without storing IP
+addresses; visitors whose browser sends "Do Not Track" are not counted. Its script and
+collection endpoint are served on the site itself (`/u/script.js`, `/u/api/send`), its
+dashboard on `https://stats.monposte.com`. Setting it up, once:
+
+1. The DNS record `stats.monposte.com` (§3), and `UMAMI_APP_SECRET` in `.env.production`
+   (`openssl rand -hex 32`).
+2. `dc up -d` starts it (`umami-db` creates its database first). Open
+   `https://stats.monposte.com` **right away** and log in with Umami's default account
+   (`admin` / `umami`), then change its password (Settings → Profile): the dashboard is
+   public until you do.
+3. Settings → Websites → Add website: name MonPoste, domain `monposte.com`. Copy its
+   *Website ID* into `UMAMI_WEBSITE_ID` in `.env.production`, then `dc up -d api` (no
+   rebuild: the app reads it from `/api/public-config` at start).
+4. Open the site in a private window and click around: the visit shows in the dashboard
+   within a minute ("Realtime"). Events are under *Events*.
+
+Umami's data is not in the daily backup (only the application's database is); losing it
+loses statistics only. The privacy policy says statistics are kept 25 months at most:
+Umami keeps everything, so delete older data once a year when the site is two years old
+(Settings → Websites → Data → Reset, or SQL on the `umami` database).
+
+**Feedback**: the app's "Un avis ? Un problème ?" button (sidebar, account menu) emails the
+message to `FEEDBACK_EMAIL` (`contact@monposte.com` by default), with *Reply-To* set to the
+sender's address when they give one. Nothing is stored. A message that can't be sent is
+alerted (`feedback-not-sent`).
+
 ## 8. Costs to watch
 
-- **Gemini**: set a budget with alerts in Google Cloud (Billing → Budgets & alerts), and
-  check the per-user AI limits in `apps/api/src/config.ts`.
+- **Gemini**: the API and the worker stop calling the AI for the rest of the day (UTC) once
+  the day's estimated spending reaches `AI_DAILY_BUDGET_USD` ($5 by default); users then
+  see "AI features are paused until tomorrow", and the rest of the site works. The
+  collector's bot pages stop at half of it, so they never use the users' part. An alert goes
+  out at 80 % and when it is reached. The estimate uses each call's token counts and
+  Gemini 3.8 Flash's prices from 2027 (double the 2026 ones; change them with
+  `AI_PRICE_INPUT_USD_PER_MILLION` / `AI_PRICE_OUTPUT_USD_PER_MILLION` if the model
+  changes). Spending per day and task:
+
+  ```bash
+  dc exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT day, task, calls, round(cost_usd::numeric, 2) AS usd FROM ai_usage ORDER BY day DESC, usd DESC LIMIT 30"'
+  ```
+
+  Also set a budget with alerts in Google Cloud (Billing → Budgets & alerts) as a second
+  safety net, and check the per-user AI limits in `apps/api/src/config.ts`.
 - **Email provider**: free tiers are usually ~300 emails/day; one per signup and per
   password reset.
 - **Geoapify**: the free tier (3 000 requests/day) covers place autocomplete for a start.
@@ -309,7 +360,7 @@ To save the board registry (to start another server, or as a spare):
 | `Dockerfile` | The images: `api`, `worker`, `web` |
 | `docker-compose.prod.yml` | The production stack (`ENV_FILE` picks another settings file, for rehearsals) |
 | `.env.production.example` | Every production setting, commented |
-| `deploy/Caddyfile` | HTTPS, security headers (CSP, HSTS), caching, `/api` forwarding |
+| `deploy/Caddyfile` | HTTPS, security headers (CSP, HSTS), caching, `/api` forwarding, Umami's tracker (`/u/`) and dashboard (`stats.`) |
 | `deploy/backup.sh` | Daily dump and retention; `sh /backup.sh now` for one dump |
 | `apps/web/public/bot.html` | The page the collector's user agent points to (`CRAWLER_CONTACT_URL`) |
 | `apps/api/src/lib/production-check.ts` | Settings the API checks before starting |

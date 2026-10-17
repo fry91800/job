@@ -58,6 +58,30 @@ services:
     depends_on:
       - api
 
+  # Audience measurement (GROWTH.md): Umami, in its own database ("umami", created on the
+  # same PostgreSQL by umami-db). Its dashboard is https://stats.$DOMAIN; the tracker
+  # script and the collection endpoint are served on the site itself, under /u/ (Caddyfile).
+  umami-db:
+    image: postgres:17
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    command: ["sh", "-c", "psql -tAc \"SELECT 1 FROM pg_database WHERE datname = 'umami'\" | grep -q 1 || createdb umami"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.0
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET (DEPLOYMENT.md)}
+      DISABLE_TELEMETRY: "1"
+    depends_on:
+      umami-db: { condition: service_completed_successfully }
+
   # A compressed dump every day at BACKUP_HOUR (UTC), kept BACKUP_KEEP_DAYS days.
   backup:
     image: postgres:17

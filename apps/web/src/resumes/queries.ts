@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ResumeContent, ResumeDetail, ResumeLanguage, ResumeListResponse, TranslateFieldResponse } from "@job/shared";
 import { api } from "../api/client";
 import { keys } from "../api/queries";
+import { track } from "../lib/analytics";
 
 // Resumes (FEATURE R1–R5, T1). The selected resume drives the match % (O4): anything that
 // changes it refreshes the current user (`me`), which holds its skills.
@@ -39,14 +40,23 @@ function useAfterChange() {
 
 export function useUploadResume() {
   const after = useAfterChange();
-  return useMutation({ mutationFn: (file: File) => api<ResumeDetail>("POST", "/api/resumes/upload", { file }), onSuccess: after });
+  return useMutation({
+    mutationFn: (file: File) => api<ResumeDetail>("POST", "/api/resumes/upload", { file }),
+    onSuccess: () => {
+      track("resume_upload");
+      after();
+    },
+  });
 }
 
 export function useCreateResume() {
   const after = useAfterChange();
   return useMutation({
     mutationFn: (input: { language: ResumeLanguage; content: ResumeContent }) => api<ResumeDetail>("POST", "/api/resumes", { body: input }),
-    onSuccess: after,
+    onSuccess: () => {
+      track("resume_create");
+      after();
+    },
   });
 }
 
@@ -87,7 +97,10 @@ export function useTranslateResume() {
   return useMutation({
     mutationFn: (input: { id: string; language: ResumeLanguage; force?: boolean }) =>
       api<ResumeDetail>("POST", `/api/resumes/${input.id}/translations`, { body: { language: input.language, force: input.force } }),
-    onSuccess: after,
+    onSuccess: (_detail, input) => {
+      track("resume_translate", { language: input.language });
+      after();
+    },
   });
 }
 

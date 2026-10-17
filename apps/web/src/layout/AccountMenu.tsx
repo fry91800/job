@@ -1,5 +1,6 @@
 import { ChevronDown, CircleUser, MailWarning } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useFeedbackDialog } from "../feedback/FeedbackDialog";
 import { useWorkspace } from "../tabs/workspace";
 import { useMe } from "../api/queries";
 import { chooseLanguage, useAuthDialog, useLogout, useResendVerification } from "../auth/session";
@@ -20,6 +21,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const logout = useLogout();
   const resend = useResendVerification();
   const { open } = useWorkspace();
+  const openFeedback = useFeedbackDialog((state) => state.open);
   const registered = user !== null && !user.isGuest;
   const unverified = registered && !user.emailVerified;
 
@@ -78,6 +80,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
           onChange={chooseLanguage}
         />
         <MenuSeparator />
+        <MenuItem onSelect={openFeedback}>{t("feedback.open")}</MenuItem>
         <MenuItem onSelect={() => open({ kind: "privacy" })}>{t("tabs.kinds.privacy")}</MenuItem>
         <MenuItem onSelect={() => open({ kind: "terms" })}>{t("tabs.kinds.terms")}</MenuItem>
       </MenuContent>

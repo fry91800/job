@@ -10,6 +10,19 @@ export const backendConfig = {
     model: process.env.AI_MODEL ?? "gemini-3.8-flash",
     timeoutMs: 60 * 1000,
     geminiApiKey: process.env.GEMINI_API_KEY,
+    // Daily spending cap (estimated from the tokens each call used; GROWTH.md phase 0). When
+    // the day's estimate (UTC) reaches `dailyUsd`, AI calls are refused until midnight UTC;
+    // background tasks (the collector's bot pages) stop at `backgroundShare` of it, so
+    // they never use the users' part. An alert goes out at `warnAt` and when it is reached.
+    // Prices per million tokens: Gemini 3.8 Flash's from 2027-01-01 (until then Google
+    // charges half), so the estimate errs on the high side.
+    budget: {
+      dailyUsd: Number(process.env.AI_DAILY_BUDGET_USD ?? 5),
+      backgroundShare: 0.5,
+      warnAt: 0.8,
+      inputUsdPerMillion: Number(process.env.AI_PRICE_INPUT_USD_PER_MILLION ?? 1.5),
+      outputUsdPerMillion: Number(process.env.AI_PRICE_OUTPUT_USD_PER_MILLION ?? 7.5), // thinking included
+    },
   },
 
   // Geoapify place autocomplete (D47). Without a key, only the `locations` table is used.

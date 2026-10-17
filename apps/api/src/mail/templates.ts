@@ -48,3 +48,18 @@ export function emailVerificationEmail(language: Language, url: string) {
   }[language];
   return { subject: t.subject, text: `${t.lines.join("\n\n")}\n\n${url}\n\n${BRAND}\n`, html: layout(t.lines, { url, label: t.button }) };
 }
+
+// A message from the feedback form (GROWTH.md), to the operator: always in French.
+export function feedbackEmail(feedback: { message: string; email: string | null; page: string | null; sender: string; language: string }) {
+  const firstLine = feedback.message.split("\n")[0].slice(0, 60);
+  const details = [`De : ${feedback.email ?? "(pas d'adresse)"} · ${feedback.sender} · langue ${feedback.language}`, `Page : ${feedback.page ?? "?"}`];
+  return {
+    subject: `[Avis] ${firstLine}`,
+    text: `${feedback.message}\n\n--\n${details.join("\n")}\n`,
+    html: `<!doctype html><html><body style="font-family: Arial, sans-serif; font-size: 15px; color: #222; max-width: 640px">
+<p style="white-space: pre-wrap">${esc(feedback.message)}</p>
+<hr style="border: 0; border-top: 1px solid #ddd">
+${details.map((line) => `<p style="color: #777; font-size: 13px; margin: 4px 0">${esc(line)}</p>`).join("\n")}
+</body></html>`,
+  };
+}

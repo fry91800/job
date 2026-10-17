@@ -1,4 +1,5 @@
 // Server code shared by the API and the job collector (I/O allowed, unlike @job/shared).
+export * from "./ai/budget";
 export * from "./ai/fake";
 export * from "./ai/provider";
 export * from "./ai/run";

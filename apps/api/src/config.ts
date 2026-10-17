@@ -68,6 +68,28 @@ export const config = {
   // Geoapify (shared object with @job/backend, see its config).
   geoapify: backendConfig.geoapify,
 
+  // Pages for search engines (SEO.md): the built web app's folder (its index.html is the
+  // template of the offer pages; unset in development, where Vite serves the app).
+  seo: {
+    webDistDir: process.env.WEB_DIST_DIR,
+    siteName: "MonPoste",
+    sitemapSize: 45_000, // offers per sitemap file (the limit is 50 000)
+    // Landing pages by job and town: a page exists only with this many open public offers
+    // (thin pages hurt the whole site's standing with search engines).
+    landing: { minOccupation: 3, minPair: 3, minCity: 5, offersShown: 30, linksShown: 20 },
+  },
+
+  // Feedback form (GROWTH.md): messages are emailed to this address.
+  feedback: {
+    to: process.env.FEEDBACK_EMAIL ?? "contact@monposte.com",
+  },
+
+  // Audience measurement (Umami, GROWTH.md): the website id from Umami's settings; unset,
+  // nothing is measured. Its script and collection endpoint are served under /u/ (Caddy).
+  analytics: {
+    umamiWebsiteId: process.env.UMAMI_WEBSITE_ID || undefined,
+  },
+
   // Frontend address, for the links in emails.
   webBaseUrl: process.env.WEB_BASE_URL ?? "http://localhost:5173",
 
@@ -124,5 +146,6 @@ export const config = {
     passwordResetsPerEmail: { max: 3, windowMs: 3600 * 1000 }, // A4
     passwordResetsPerIp: { max: 20, windowMs: 3600 * 1000 },
     verificationEmailsPerUser: { max: 3, windowMs: 3600 * 1000 }, // A6 resend
+    feedbackPerIp: { max: 10, windowMs: 3600 * 1000 },
   },
 };

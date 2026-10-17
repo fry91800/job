@@ -1,6 +1,7 @@
 export * from "./auth";
 export * from "./catalogue";
 export * from "./collector/contract";
+export * from "./feedback";
 export * from "./locations";
 export * from "./match";
 export * from "./offers/detail";

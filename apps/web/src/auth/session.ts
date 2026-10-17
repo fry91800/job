@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { api } from "../api/client";
 import { keys, queryClient, useMe } from "../api/queries";
 import i18n, { setLanguage, type Language } from "../i18n";
+import { track } from "../lib/analytics";
 
 // Accounts (FEATURE A1–A6). After a login, sign-up or logout the session changed: every
 // user-dependent answer (saved stars, match %, resumes…) is fetched again.
@@ -25,7 +26,10 @@ export function useSignup() {
   return useMutation({
     mutationFn: (input: { email: string; password: string }) =>
       api<MeResponse>("POST", "/api/auth/signup", { body: { ...input, uiLanguage: i18n.language } }),
-    onSuccess: sessionChanged,
+    onSuccess: (me) => {
+      track("signup");
+      sessionChanged(me);
+    },
   });
 }
 

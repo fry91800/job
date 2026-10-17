@@ -608,3 +608,17 @@ model CollectorToken {
 
   @@map("collector_tokens")
 }
+
+// AI spending per day and task (FEATURE G5): estimated from the tokens each call used, to
+// stop AI calls when the day's budget is spent (backendConfig.ai.budget).
+model AiUsage {
+  day          DateTime @db.Date // UTC
+  task         String // e.g. "generate-resume", "bot-page"
+  calls        Int      @default(0)
+  inputTokens  BigInt   @default(0) @map("input_tokens")
+  outputTokens BigInt   @default(0) @map("output_tokens") // thinking included
+  costUsd      Float    @default(0) @map("cost_usd")
+
+  @@id([day, task])
+  @@map("ai_usage")
+}

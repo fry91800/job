@@ -1,5 +1,6 @@
 import { keepPreviousData, QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type { LocationAutocompleteResponse, MeResponse, OfferDetail, OfferSearchResponse, SavedOfferInfo, SavedOfferStatus } from "@job/shared";
+import { track } from "../lib/analytics";
 import { api } from "./client";
 
 // Data shared by the list and every tab (FRONTEND.md §3): one cache, so a change made in
@@ -96,8 +97,9 @@ export function useSavedOfferMutation(offerId: string) {
       return { previous };
     },
     onError: (_error, _change, context) => setSavedEverywhere(client, offerId, context?.previous ?? null),
-    onSuccess: (saved) => {
+    onSuccess: (saved, change) => {
       if (saved) setSavedEverywhere(client, offerId, saved);
+      if (!("unsave" in change)) track("offer_save", { status: change.status });
       void client.invalidateQueries({ queryKey: ["saved-offers"] });
       // The first save creates the guest (FEATURE G1): the session changed.
       void client.invalidateQueries({ queryKey: keys.me });

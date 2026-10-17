@@ -6,6 +6,7 @@ import type { OfferDetail, OfferDraft, OfferExtractResponse } from "@job/shared"
 import { api, ApiError } from "../api/client";
 import { keys } from "../api/queries";
 import { errorMessage } from "../lib/errors";
+import { track } from "../lib/analytics";
 import { toast } from "../lib/toast";
 import { useWorkspace } from "../tabs/workspace";
 import { OfferForm, type OfferFormValue } from "./OfferForm";
@@ -32,6 +33,7 @@ export default function AddOfferView() {
   const save = useMutation({
     mutationFn: (value: OfferDraft) => api<OfferDetail>("POST", "/api/user-offers", { body: value }),
     onSuccess: () => {
+      track("offer_add");
       void client.invalidateQueries({ queryKey: ["saved-offers"] });
       void client.invalidateQueries({ queryKey: keys.me });
     },

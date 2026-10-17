@@ -1,5 +1,5 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { AiError, type AiJsonRequest, type AiProvider } from "./provider";
+import { AiError, type AiJsonRequest, type AiProvider, type AiUsage } from "./provider";
 
 // Gemini's structured output rejects or chokes on some JSON Schema features (complex
 // schemas get "400 invalid argument", numeric `const` hangs). Only the shape is sent:
@@ -35,7 +35,7 @@ export class GeminiProvider implements AiProvider {
   // Temporary errors (503 "high demand", 429 per-minute rate limit) are retried twice
   // with a short pause, as long as the whole request stays within the timeout. An
   // exhausted quota (429 "exceeded your current quota") is not retried.
-  async generateJson(request: AiJsonRequest): Promise<string> {
+  async generateJson(request: AiJsonRequest): Promise<{ text: string; usage?: AiUsage }> {
     const deadline = Date.now() + this.timeoutMs;
     const pauses = [2000, 5000];
     for (let attempt = 0; ; attempt++) {
@@ -50,7 +50,7 @@ export class GeminiProvider implements AiProvider {
     }
   }
 
-  private async call(request: AiJsonRequest, deadline: number): Promise<string> {
+  private async call(request: AiJsonRequest, deadline: number): Promise<{ text: string; usage?: AiUsage }> {
     const response = await this.client.models.generateContent({
       model: this.model,
       contents: [
@@ -72,7 +72,12 @@ export class GeminiProvider implements AiProvider {
     });
     const text = response.text;
     if (!text) throw AiError.invalidOutput();
-    return text;
+    const metadata = response.usageMetadata;
+    const usage = metadata && {
+      inputTokens: (metadata.promptTokenCount ?? 0) + (metadata.toolUsePromptTokenCount ?? 0),
+      outputTokens: (metadata.candidatesTokenCount ?? 0) + (metadata.thoughtsTokenCount ?? 0),
+    };
+    return { text, usage };
   }
 }
 

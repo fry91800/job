@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { backendConfig } from "../config";
+import { checkAiBudget, recordAiUsage } from "./budget";
 import { FakeProvider } from "./fake";
 import { GeminiProvider } from "./gemini";
 import { AiError, type AiPart, type AiProvider } from "./provider";
@@ -40,6 +41,9 @@ export type AiTask<T extends z.ZodType> = {
   prepare?: (answer: unknown) => unknown;
   temperature?: number;
   effort?: "low" | "default";
+  // Background work (the collector's bot pages): stops at a share of the daily budget, so
+  // users keep the rest.
+  background?: boolean;
 };
 
 // Removes properties from a JSON Schema, at every depth (e.g. the item `id`s the AI must
@@ -64,13 +68,16 @@ export function withoutProperties(schema: unknown, names: string[]): unknown {
 
 // Runs an AI task: asks for JSON, validates it, and retries once if the answer is not
 // valid JSON or doesn't match the schema (FEATURE M4 "one automatic retry").
-// Returns the data and the `provider:model` id to store.
+// Returns the data and the `provider:model` id to store. Refused (503 ai_budget_reached)
+// once the day's AI budget is spent; every call's tokens count towards it.
 export async function runAiJson<T extends z.ZodType>(task: AiTask<T>): Promise<{ data: z.output<T>; model: string }> {
   const ai = getAiProvider();
   const jsonSchema = task.jsonSchema ?? (z.toJSONSchema(task.schema, { io: "output", unrepresentable: "any" }) as Record<string, unknown>);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const text = await ai.generateJson({ task: task.name, system: task.system, parts: task.parts, jsonSchema, temperature: task.temperature, effort: task.effort });
+    await checkAiBudget(task.background ?? false);
+    const { text, usage } = await ai.generateJson({ task: task.name, system: task.system, parts: task.parts, jsonSchema, temperature: task.temperature, effort: task.effort });
+    await recordAiUsage(task.name, usage);
     let json: unknown;
     try {
       json = JSON.parse(text);

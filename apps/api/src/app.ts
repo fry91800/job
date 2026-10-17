@@ -1,8 +1,10 @@
+import type { PublicConfigResponse } from "@job/shared";
 import express from "express";
 import { authRouter } from "./auth/auth.routes";
 import { ingestRouter } from "./collector/ingest.routes";
 import { loadSession } from "./auth/session";
 import { generatedResumesRouter } from "./generated-resumes/generated-resumes.routes";
+import { feedbackRouter } from "./feedback/feedback.routes";
 import { errorHandler, notFound } from "./lib/error-handler";
 import { config } from "./config";
 import { checkOrigin } from "./lib/origin-check";
@@ -13,6 +15,7 @@ import { userOffersRouter } from "./offers/user-offers.routes";
 import { photosRouter } from "./photos/photos.routes";
 import { resumesRouter } from "./resumes/resumes.routes";
 import { savedOffersRouter } from "./saved-offers/saved-offers.routes";
+import { seoRouter } from "./seo/seo.routes";
 import { settingsRouter, templatesRouter } from "./settings/settings.routes";
 
 export function createApp() {
@@ -31,6 +34,12 @@ export function createApp() {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+  // Settings the web app reads at start (analytics).
+  app.get("/api/public-config", (_req, res) => {
+    const websiteId = config.analytics.umamiWebsiteId;
+    res.set("Cache-Control", "public, max-age=300");
+    res.json({ analytics: websiteId ? { websiteId, domain: new URL(config.webBaseUrl).hostname } : null } satisfies PublicConfigResponse);
+  });
   app.use("/api/auth", authRouter);
   app.use("/api/collector", ingestRouter);
   app.use("/api/locations", locationsRouter);
@@ -42,6 +51,9 @@ export function createApp() {
   app.use("/api/generated-resumes", generatedResumesRouter);
   app.use("/api/templates", templatesRouter);
   app.use("/api/settings", settingsRouter);
+  app.use("/api/feedback", feedbackRouter);
+  // Offer pages, sitemaps and robots.txt for search engines (SEO.md).
+  app.use(seoRouter);
 
   app.use(notFound);
   app.use(errorHandler);

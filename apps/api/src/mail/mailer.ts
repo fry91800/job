@@ -5,7 +5,7 @@ import { config } from "../config";
 // Sends emails through SMTP (MailHog in development). With the "memory" transport
 // (tests), messages are kept in `sentMails` instead.
 
-export type Mail = { to: string; subject: string; text: string; html: string };
+export type Mail = { to: string; subject: string; text: string; html: string; replyTo?: string };
 
 export const sentMails: Mail[] = [];
 

@@ -14,6 +14,7 @@ import { toast } from "../lib/toast";
 import { MatchBadge } from "../offers/MatchBadge";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
+import { track } from "../lib/analytics";
 import type { TabViewProps } from "../views/registry";
 import { changeContext, fieldOf, namesInOrder, sectionOf, valueText, type Section } from "./change-labels";
 import { useDecide, useDeleteGenerated, useGenerated, useTemplates, useUpdateGenerated } from "./queries";
@@ -210,6 +211,7 @@ export default function GeneratedView({ tab }: TabViewProps) {
     const link = document.createElement("a");
     link.href = `/api/generated-resumes/${detail.id}/pdf`;
     link.click();
+    track("pdf_download");
   };
 
   return (

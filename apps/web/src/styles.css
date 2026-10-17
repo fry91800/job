@@ -140,6 +140,87 @@ body {
   background-color: var(--scrollbar-hover);
 }
 
+/* The offer as the server sends it (SEO.md), shown until the app starts on top of it. */
+.seo-offer {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  line-height: 1.6;
+}
+.seo-offer h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 8px 0;
+}
+.seo-offer h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 20px 0 6px;
+}
+.seo-offer p,
+.seo-offer ul {
+  margin: 8px 0;
+}
+.seo-offer ul {
+  list-style: disc;
+  padding-left: 20px;
+}
+.seo-offer a {
+  color: var(--accent);
+}
+
+/* Landing pages by job and town (SEO.md), sent by the server without the app. */
+.landing {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  line-height: 1.6;
+}
+.landing h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+.landing h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 28px 0 8px;
+}
+.landing p {
+  margin: 8px 0;
+}
+.landing a {
+  color: var(--accent);
+}
+.landing-top a,
+.landing-foot a {
+  color: var(--fg-muted);
+}
+.landing-top img {
+  display: inline;
+  vertical-align: -4px;
+}
+.landing-foot {
+  margin-top: 40px;
+  font-size: 0.85rem;
+}
+.landing-offers li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.landing-offers a {
+  font-weight: 500;
+}
+.landing-offers span {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.landing-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
 /* Short, purposeful motion (FRONTEND.md §5). */
 @keyframes fade-in {
   from {

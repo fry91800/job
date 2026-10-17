@@ -16,20 +16,23 @@ Cette page explique quelles données ${O.site} traite, pourquoi, combien de temp
 - **Compte** : adresse e-mail et mot de passe (stocké uniquement sous forme chiffrée, jamais en clair).
 - **Contenu que vous ajoutez** : CV (texte et fichiers importés), photos, offres enregistrées ou ajoutées, CV générés et réglages.
 - **Session** : un identifiant de session aléatoire, dans un cookie.
+- **Messages envoyés avec « Un avis ? »** : le message, l'adresse e-mail si vous en indiquez une, la page d'où il est envoyé. Ils nous parviennent par e-mail ; nous les gardons le temps de les traiter, au plus un an.
+- **Mesure d'audience** : pages vues, provenance (site ou moteur de recherche d'où vous venez), type d'appareil, navigateur, pays, et quelques actions (recherche et ses mots-clés, CV importé ou généré, téléchargement). Sans cookie et sans enregistrer votre adresse IP : les visites ne sont pas reliées à vous, ni d'un jour à l'autre. Si votre navigateur demande à ne pas être suivi (« Do Not Track »), rien n'est mesuré.
 - **Technique** : pour la sécurité, l'adresse IP est utilisée quelques minutes, en mémoire, pour limiter les tentatives de connexion et d'inscription ; elle n'est pas enregistrée. Les journaux du serveur notent chaque requête (adresse appelée, résultat, durée) sans adresse IP ni contenu.
 
-MonPoste n'utilise ni publicité, ni outil de mesure d'audience, ni traceur tiers.
+MonPoste n'utilise ni publicité ni traceur tiers. La mesure d'audience (Umami) est installée sur nos propres serveurs : aucune donnée n'est transmise à un tiers.
 
 ## Pourquoi
 - Fournir le service que vous demandez : recherche d'offres, gestion de vos CV, génération de CV adaptés à une offre (exécution du contrat).
 - Envoyer les e-mails du compte : confirmation d'adresse, réinitialisation du mot de passe (exécution du contrat).
 - Protéger le site contre les abus (intérêt légitime).
+- Savoir comment le site est utilisé pour l'améliorer, avec des statistiques anonymes (intérêt légitime ; mesure d'audience exemptée de consentement selon les conditions de la CNIL), et répondre à vos messages.
 
 ## Cookies et stockage du navigateur
 - Un seul cookie, **session**, strictement nécessaire : il vous garde connecté (ou garde votre espace invité) pendant 30 jours, prolongés à chaque visite. Il n'est lisible que par le site.
 - Le navigateur garde aussi vos préférences d'affichage (thème, langue, onglets ouverts). Elles ne quittent pas votre appareil.
 
-Aucun de ces éléments ne sert à vous suivre : aucun consentement n'est donc demandé.
+Aucun de ces éléments ne sert à vous suivre : aucun consentement n'est donc demandé. La mesure d'audience n'utilise ni cookie ni stockage du navigateur.
 
 ## Services utilisés
 - **Google Gemini** (intelligence artificielle) : quand vous importez un CV, le traduisez, ajoutez une offre à partir d'un texte ou générez un CV, le texte concerné (votre CV, l'offre) est envoyé à Google pour être traité. [À vérifier selon votre offre Gemini : avec l'API payante, Google n'utilise pas ces données pour améliorer ses produits.] Google peut traiter ces données hors de l'Union européenne, avec les garanties prévues par le RGPD (clauses contractuelles types).
@@ -45,6 +48,7 @@ Les offres d'emploi affichées proviennent des pages carrières publiques des em
 - CV et photos supprimés : effacés définitivement, fichiers compris, après 30 jours.
 - Liens envoyés par e-mail : valables 1 heure (mot de passe) ou 48 heures (confirmation d'adresse).
 - Sauvegardes de la base de données : 14 jours.
+- Statistiques d'audience : 25 mois au plus.
 
 ## Vos droits
 Vous pouvez accéder à vos données, les corriger, les supprimer, les récupérer dans un format courant, et vous opposer à un traitement ou en demander la limitation. Vous modifiez la plupart d'entre elles directement sur le site, et vous supprimez votre compte depuis les Réglages. Pour toute autre demande, écrivez à ${O.contactEmail} : nous répondons sous un mois.
@@ -102,20 +106,23 @@ This page explains what data ${O.site} processes, why, how long it keeps it and 
 - **Account**: email address and password (stored only in hashed form, never in clear).
 - **Content you add**: resumes (text and uploaded files), photos, saved or added offers, generated resumes and settings.
 - **Session**: a random session identifier, in a cookie.
+- **Messages sent with "Feedback?"**: the message, your email address if you give one, the page it was sent from. They reach us by email; we keep them as long as needed to handle them, one year at most.
+- **Audience measurement**: pages viewed, origin (the site or search engine you came from), device type, browser, country, and a few actions (searches and their keywords, resume uploaded or generated, download). Without cookies and without storing your IP address: visits are not linked to you, nor from one day to the next. If your browser asks not to be tracked ("Do Not Track"), nothing is measured.
 - **Technical**: for security, your IP address is used for a few minutes, in memory, to limit login and signup attempts; it is not stored. Server logs record each request (address called, result, duration) without IP address or content.
 
-MonPoste uses no advertising, no audience measurement and no third-party trackers.
+MonPoste uses no advertising and no third-party trackers. Audience measurement (Umami) runs on our own servers: no data goes to a third party.
 
 ## Why
 - To provide the service you ask for: offer search, managing your resumes, generating resumes tailored to an offer (performance of the contract).
 - To send account emails: address confirmation, password reset (performance of the contract).
 - To protect the site against abuse (legitimate interest).
+- To know how the site is used in order to improve it, with anonymous statistics (legitimate interest; audience measurement exempt from consent under the CNIL's conditions), and to answer your messages.
 
 ## Cookies and browser storage
 - A single cookie, **session**, strictly necessary: it keeps you logged in (or keeps your guest space) for 30 days, extended at each visit. Only the site can read it.
 - Your browser also keeps your display preferences (theme, language, open tabs). They never leave your device.
 
-None of these is used to track you, so no consent is asked.
+None of these is used to track you, so no consent is asked. Audience measurement uses no cookies and no browser storage.
 
 ## Services used
 - **Google Gemini** (artificial intelligence): when you import a resume, translate it, add an offer from a text or generate a resume, the text concerned (your resume, the offer) is sent to Google for processing. [To check against your Gemini plan: with the paid API, Google does not use this data to improve its products.] Google may process this data outside the European Union, with the safeguards required by the GDPR (standard contractual clauses).
@@ -131,6 +138,7 @@ The job offers shown come from employers' public career pages.
 - Deleted resumes and photos: permanently erased, files included, after 30 days.
 - Links sent by email: valid for 1 hour (password) or 48 hours (address confirmation).
 - Database backups: 14 days.
+- Audience statistics: 25 months at most.
 
 ## Your rights
 You can access your data, correct it, delete it, get it in a common format, object to a processing or ask for it to be restricted. You can change most of it directly on the site, and delete your account from the Settings. For any other request, write to ${O.contactEmail}: we answer within one month.

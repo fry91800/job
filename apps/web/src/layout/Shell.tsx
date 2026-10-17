@@ -8,6 +8,7 @@ import { preloadViews, VIEWS } from "../views/registry";
 import { GenerateDialog } from "../generated/GenerateDialog";
 import { useAccountLanguage, useAuthDialog } from "../auth/session";
 import { ConfirmDialog } from "../lib/confirm";
+import { FeedbackDialog } from "../feedback/FeedbackDialog";
 import { Toaster } from "../lib/toast";
 import { ConfirmCloseDialog } from "./close-tabs";
 import { IconButton } from "./IconButton";
@@ -107,6 +108,7 @@ export function Shell() {
         </Suspense>
       )}
       <GenerateDialog />
+      <FeedbackDialog />
       <ConfirmDialog />
       <Toaster />
     </>

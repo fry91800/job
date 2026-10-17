@@ -26,7 +26,16 @@ COPY apps/job_collector apps/job_collector
 RUN DATABASE_URL=postgresql://build@localhost/build npx prisma generate --config prisma7.config.ts
 ENV NODE_ENV=production NPM_CONFIG_UPDATE_NOTIFIER=false
 
+FROM deps AS web-build
+COPY tsconfig.json ./
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+RUN npx vite build apps/web
+
 FROM server AS api
+# The built web app: its page is the template of the offer pages for search engines (SEO.md).
+COPY --from=web-build /app/apps/web/dist /app/web-dist
+ENV WEB_DIST_DIR=/app/web-dist
 # Headless Chromium for PDF resumes, with its system libraries. `prisma migrate deploy`
 # checks that its engine folder is writable (it downloads nothing): owned by the user.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -42,12 +51,6 @@ CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --config prisma7.confi
 FROM server AS worker
 USER node
 CMD ["node", "--import", "tsx", "apps/job_collector/src/main.ts"]
-
-FROM deps AS web-build
-COPY tsconfig.json ./
-COPY packages/shared packages/shared
-COPY apps/web apps/web
-RUN npx vite build apps/web
 
 FROM caddy:2.10-alpine AS web
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
