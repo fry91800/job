@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { backendConfig } from "../config";
 import { checkAiBudget, recordAiUsage } from "./budget";
@@ -6,6 +7,20 @@ import { GeminiProvider } from "./gemini";
 import { AiError, type AiPart, type AiProvider } from "./provider";
 
 let provider: AiProvider | undefined;
+
+// The model a task runs on: its own (backendConfig.ai.taskModels), else the default.
+export function aiModelFor(task: string): string {
+  return backendConfig.ai.taskModels[task] ?? backendConfig.ai.model;
+}
+
+// For `npm run ai:compare`: runs `fn` with every AI call on `model`, and lists the calls
+// (tokens, estimated cost, duration) in `calls`.
+export type AiCall = { task: string; model: string; inputTokens: number; outputTokens: number; costUsd: number; ms: number };
+const runContext = new AsyncLocalStorage<{ model?: string; calls: AiCall[] }>();
+
+export function withAiModel<T>(model: string | undefined, calls: AiCall[], fn: () => Promise<T>): Promise<T> {
+  return runContext.run({ model, calls }, fn);
+}
 
 export function getAiProvider(): AiProvider {
   if (!provider) {
@@ -74,10 +89,17 @@ export async function runAiJson<T extends z.ZodType>(task: AiTask<T>): Promise<{
   const ai = getAiProvider();
   const jsonSchema = task.jsonSchema ?? (z.toJSONSchema(task.schema, { io: "output", unrepresentable: "any" }) as Record<string, unknown>);
 
+  const context = runContext.getStore();
+  const requested = context?.model ?? aiModelFor(task.name);
+  let answeredBy = requested;
+
   for (let attempt = 1; attempt <= 2; attempt++) {
     await checkAiBudget(task.background ?? false);
-    const { text, usage } = await ai.generateJson({ task: task.name, system: task.system, parts: task.parts, jsonSchema, temperature: task.temperature, effort: task.effort });
-    await recordAiUsage(task.name, usage);
+    const started = Date.now();
+    const { text, model, usage } = await ai.generateJson({ task: task.name, model: requested, system: task.system, parts: task.parts, jsonSchema, temperature: task.temperature, effort: task.effort });
+    answeredBy = model;
+    const costUsd = await recordAiUsage(task.name, model, usage);
+    context?.calls.push({ task: task.name, model, inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0, costUsd, ms: Date.now() - started });
     let json: unknown;
     try {
       json = JSON.parse(text);
@@ -86,7 +108,7 @@ export async function runAiJson<T extends z.ZodType>(task: AiTask<T>): Promise<{
       continue;
     }
     const result = task.schema.safeParse(task.prepare ? task.prepare(json) : json);
-    if (result.success) return { data: result.data, model: `${ai.name}:${ai.model}` };
+    if (result.success) return { data: result.data, model: `${ai.name}:${answeredBy}` };
     // Log the validation problems only, never the content (personal data).
     console.warn(`ai ${task.name}: invalid answer (attempt ${attempt})`, result.error.issues.slice(0, 5).map((issue) => `${issue.path.join(".")}: ${issue.message}`));
   }

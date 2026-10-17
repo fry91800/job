@@ -22,7 +22,8 @@ before(() => {
   fake.handlers["test-budget"] = () => ({ ok: true });
   // 100 000 input tokens at $1.50 per million: $0.15 a call.
   fake.usage = { inputTokens: 100_000, outputTokens: 0 };
-  Object.assign(config.ai.budget, { dailyUsd: 0.4, backgroundShare: 0.5, inputUsdPerMillion: 1.5, outputUsdPerMillion: 7.5 });
+  Object.assign(config.ai.budget, { dailyUsd: 0.4, backgroundShare: 0.5 });
+  config.ai.prices["fake-model"] = { input: 1.5, output: 7.5 };
 });
 beforeEach(async () => {
   await prisma.aiUsage.deleteMany({ where: { day: today() } });
@@ -31,6 +32,7 @@ beforeEach(async () => {
 after(async () => {
   Object.assign(config.ai.budget, budget);
   fake.usage = undefined;
+  delete config.ai.prices["fake-model"];
   await prisma.aiUsage.deleteMany({ where: { day: today() } });
 });
 
@@ -38,7 +40,7 @@ describe("daily AI budget", () => {
   test("calls are priced and counted per task, then refused once the budget is spent", async () => {
     await call();
     await call();
-    const row = await prisma.aiUsage.findUniqueOrThrow({ where: { day_task: { day: today(), task: "test-budget" } } });
+    const row = await prisma.aiUsage.findUniqueOrThrow({ where: { day_task_model: { day: today(), task: "test-budget", model: "fake-model" } } });
     assert.equal(row.calls, 2);
     assert.equal(row.inputTokens, 200_000n);
     assert.ok(Math.abs(row.costUsd - 0.3) < 1e-9);
@@ -46,7 +48,7 @@ describe("daily AI budget", () => {
     await call(); // $0.30 spent, under $0.40: allowed
     assert.ok(Math.abs((await aiSpentToday()) - 0.45) < 1e-9);
     await assert.rejects(call(), (error: unknown) => error instanceof AiError && error.status === 503 && error.code === "ai_budget_reached");
-    assert.equal((await prisma.aiUsage.findUniqueOrThrow({ where: { day_task: { day: today(), task: "test-budget" } } })).calls, 3, "a refused call costs nothing");
+    assert.equal((await prisma.aiUsage.findUniqueOrThrow({ where: { day_task_model: { day: today(), task: "test-budget", model: "fake-model" } } })).calls, 3, "a refused call costs nothing");
   });
 
   test("background work stops at its share, leaving the rest to users", async () => {
@@ -56,9 +58,21 @@ describe("daily AI budget", () => {
     await call(); // users still have $0.10 left
   });
 
+  test("each task runs on its own model when one is set", async () => {
+    config.ai.taskModels["test-budget"] = "gemini-2.5-flash-lite";
+    try {
+      await call();
+      assert.equal(fake.requests.at(-1)!.model, "gemini-2.5-flash-lite");
+    } finally {
+      delete config.ai.taskModels["test-budget"];
+    }
+    await call();
+    assert.equal(fake.requests.at(-1)!.model, config.ai.model);
+  });
+
   test("an invalid answer that is retried counts twice", async () => {
     let attempts = 0;
     await fake.with("test-budget", () => (++attempts === 1 ? "not json" : { ok: true }), () => call());
-    assert.equal((await prisma.aiUsage.findUniqueOrThrow({ where: { day_task: { day: today(), task: "test-budget" } } })).calls, 2);
+    assert.equal((await prisma.aiUsage.findUniqueOrThrow({ where: { day_task_model: { day: today(), task: "test-budget", model: "fake-model" } } })).calls, 2);
   });
 });

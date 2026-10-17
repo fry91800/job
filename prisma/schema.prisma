@@ -613,12 +613,13 @@ model CollectorToken {
 // stop AI calls when the day's budget is spent (backendConfig.ai.budget).
 model AiUsage {
   day          DateTime @db.Date // UTC
-  task         String // e.g. "generate-resume", "bot-page"
+  task         String // e.g. "generate-resume", "extract-bot-page"
+  model        String // e.g. "gemini-3.5-flash-lite"
   calls        Int      @default(0)
   inputTokens  BigInt   @default(0) @map("input_tokens")
   outputTokens BigInt   @default(0) @map("output_tokens") // thinking included
   costUsd      Float    @default(0) @map("cost_usd")
 
-  @@id([day, task])
+  @@id([day, task, model])
   @@map("ai_usage")
 }

@@ -1,22 +1,25 @@
-// `npm run ai:check`: one tiny request to the configured AI provider and model, to check
-// the key, the model name and the latency. Costs one request of your quota.
+// `npm run ai:check`: one tiny request to each model the tasks use (D157), to check the key,
+// the model names and the latency. Costs one tiny request per model.
 import "dotenv/config";
 import { z } from "zod";
 import { config } from "../config";
-import { runAiJson } from "./run";
+import { runAiJson, withAiModel } from "./run";
 
 async function main() {
-  console.log(`provider ${config.ai.provider}, model ${config.ai.model}`);
-  for (const effort of ["low"] as const) {
+  const models = [...new Set([config.ai.model, ...Object.values(config.ai.taskModels)])];
+  console.log(`provider ${config.ai.provider}; models by task:`, config.ai.taskModels);
+  for (const model of models) {
     const started = Date.now();
-    const { data, model } = await runAiJson({
-      name: "check",
-      system: "Extract the skills listed in the text.",
-      parts: [{ text: "Skills: React, TypeScript, Node.js" }],
-      schema: z.object({ skills: z.array(z.string()) }),
-      effort,
-    });
-    console.log(`ok (${model}, effort ${effort}) in ${Date.now() - started} ms:`, data.skills.join(", "));
+    const { data } = await withAiModel(model, [], () =>
+      runAiJson({
+        name: "check",
+        system: "Extract the skills listed in the text.",
+        parts: [{ text: "Skills: React, TypeScript, Node.js" }],
+        schema: z.object({ skills: z.array(z.string()) }),
+        effort: "low",
+      }),
+    );
+    console.log(`ok (${model}) in ${Date.now() - started} ms:`, data.skills.join(", "));
   }
 }
 

@@ -8,6 +8,7 @@ export type AiPart = { text: string } | { file: { mimeType: string; data: Buffer
 
 export type AiJsonRequest = {
   task: string; // e.g. "parse-resume", for logs and test doubles
+  model?: string; // the provider's default model when not set
   system: string;
   parts: AiPart[];
   jsonSchema: Record<string, unknown>; // JSON Schema of the expected answer
@@ -19,12 +20,14 @@ export type AiJsonRequest = {
 
 // Tokens a call used, for the daily budget (./budget.ts). Output includes thinking.
 export type AiUsage = { inputTokens: number; outputTokens: number };
+export type AiAnswer = { text: string; model: string; usage?: AiUsage };
 
 export interface AiProvider {
   readonly name: string; // stored as `provider:model` (e.g. generated_resumes.ai_model)
   readonly model: string;
-  // Returns the raw text of the answer (expected to be JSON) and the tokens it used.
-  generateJson(request: AiJsonRequest): Promise<{ text: string; usage?: AiUsage }>;
+  // Returns the raw text of the answer (expected to be JSON), the model that answered and
+  // the tokens it used.
+  generateJson(request: AiJsonRequest): Promise<AiAnswer>;
 }
 
 // AI failures as HTTP errors. Nothing is saved and no quota is used when they happen (G5).

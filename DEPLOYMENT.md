@@ -313,17 +313,24 @@ alerted (`feedback-not-sent`).
 
 ## 8. Costs to watch
 
-- **Gemini**: the API and the worker stop calling the AI for the rest of the day (UTC) once
-  the day's estimated spending reaches `AI_DAILY_BUDGET_USD` ($5 by default); users then
+- **Gemini**: each task has its model (D157): Gemini 3.8 Flash rewrites resumes (~$0.01 a
+  resume at 2027 prices, half that in 2026), Gemini 3.5 Flash-Lite reads resumes, offers and
+  job pages and translates (~$0.001–0.003 a call). Change them with `AI_MODEL_GENERATE`,
+  `AI_MODEL_EXTRACT`, `AI_MODEL_TRANSLATE` after comparing with `npm run ai:compare` (on a
+  development copy: it writes a side-by-side report in `data/ai-compare/`). A new model
+  needs its price in `backendConfig.ai.prices` (else it is counted at the highest price).
+
+  The API and the worker stop calling the AI for the rest of the day (UTC) once
+  the day's estimated spending reaches `AI_DAILY_BUDGET_USD` ($2 by default, ~200 rewritten
+  resumes plus their uploads); users then
   see "AI features are paused until tomorrow", and the rest of the site works. The
   collector's bot pages stop at half of it, so they never use the users' part. An alert goes
-  out at 80 % and when it is reached. The estimate uses each call's token counts and
-  Gemini 3.8 Flash's prices from 2027 (double the 2026 ones; change them with
-  `AI_PRICE_INPUT_USD_PER_MILLION` / `AI_PRICE_OUTPUT_USD_PER_MILLION` if the model
-  changes). Spending per day and task:
+  out at 80 % and when it is reached. The estimate uses each call's token counts and the
+  model's price (Gemini 3.x Flash at its 2027 price, double the 2026 one). Spending per
+  day, task and model:
 
   ```bash
-  dc exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT day, task, calls, round(cost_usd::numeric, 2) AS usd FROM ai_usage ORDER BY day DESC, usd DESC LIMIT 30"'
+  dc exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT day, task, model, calls, round(cost_usd::numeric, 3) AS usd FROM ai_usage ORDER BY day DESC, usd DESC LIMIT 30"'
   ```
 
   Also set a budget with alerts in Google Cloud (Billing → Budgets & alerts) as a second

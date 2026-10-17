@@ -1,5 +1,5 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { AiError, type AiJsonRequest, type AiProvider, type AiUsage } from "./provider";
+import { AiError, type AiAnswer, type AiJsonRequest, type AiProvider } from "./provider";
 
 // Gemini's structured output rejects or chokes on some JSON Schema features (complex
 // schemas get "400 invalid argument", numeric `const` hangs). Only the shape is sent:
@@ -35,7 +35,7 @@ export class GeminiProvider implements AiProvider {
   // Temporary errors (503 "high demand", 429 per-minute rate limit) are retried twice
   // with a short pause, as long as the whole request stays within the timeout. An
   // exhausted quota (429 "exceeded your current quota") is not retried.
-  async generateJson(request: AiJsonRequest): Promise<{ text: string; usage?: AiUsage }> {
+  async generateJson(request: AiJsonRequest): Promise<AiAnswer> {
     const deadline = Date.now() + this.timeoutMs;
     const pauses = [2000, 5000];
     for (let attempt = 0; ; attempt++) {
@@ -50,9 +50,10 @@ export class GeminiProvider implements AiProvider {
     }
   }
 
-  private async call(request: AiJsonRequest, deadline: number): Promise<{ text: string; usage?: AiUsage }> {
+  private async call(request: AiJsonRequest, deadline: number): Promise<AiAnswer> {
+    const model = request.model ?? this.model;
     const response = await this.client.models.generateContent({
-      model: this.model,
+      model,
       contents: [
         {
           role: "user",
@@ -66,7 +67,7 @@ export class GeminiProvider implements AiProvider {
         responseMimeType: "application/json",
         responseJsonSchema: toGeminiSchema(request.jsonSchema),
         temperature: request.temperature,
-        ...(request.effort === "low" && { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+        ...(request.effort === "low" && { thinkingConfig: lowThinking(model) }),
         abortSignal: AbortSignal.timeout(Math.max(deadline - Date.now(), 1000)),
       },
     });
@@ -77,8 +78,14 @@ export class GeminiProvider implements AiProvider {
       inputTokens: (metadata.promptTokenCount ?? 0) + (metadata.toolUsePromptTokenCount ?? 0),
       outputTokens: (metadata.candidatesTokenCount ?? 0) + (metadata.thoughtsTokenCount ?? 0),
     };
-    return { text, usage };
+    return { text, model, usage };
   }
+}
+
+// Less thinking for straightforward tasks: Gemini 2.x models take a token budget (0: none),
+// later ones a level.
+function lowThinking(model: string) {
+  return /^gemini-2\./.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: ThinkingLevel.LOW };
 }
 
 function isQuotaExhausted(error: ApiError): boolean {

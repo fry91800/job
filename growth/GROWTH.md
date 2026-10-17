@@ -69,7 +69,7 @@ The first visitors only come once; the site has to work for them.
       menu): emailed to contact@monposte.com, Reply-To the sender. Check that a test
       message arrives once deployed.
 - [ ] **Watch AI costs**: guests have 3 generations, registered users 30 a day (FEATURE G4).
-      The global daily AI budget is built (`AI_DAILY_BUDGET_USD`, $5 by default, alerts at
+      The global daily AI budget is built (`AI_DAILY_BUDGET_USD`, $2 by default, alerts at
       80 % and 100 %; DEPLOYMENT.md §8): choose the amount, set up the alert webhook, and
       check the Gemini spending page every day during the first weeks.
 - [ ] **Search Console and Bing** set up, sitemap submitted (SEO.md). Indexing takes weeks,
