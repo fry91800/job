@@ -10,6 +10,9 @@ export type BoardCheck = { companyName: string | null; jobCount: number; franceJ
 export type KnownOffers = Map<string, string | null>;
 // An offer still listed whose details weren't fetched again (same release date).
 export type StillListed = { stillListed: string };
+// The run read only part of the board's listing (the newest offers): offers not seen are
+// not closed this time (a later full pass does it).
+export type PartialListing = { partialListing: true };
 
 // Known offers are fetched again once every `detailRefreshDays` (on a day picked from
 // their id, so the refreshes are spread), to catch edits that keep the release date.
@@ -31,7 +34,7 @@ export interface AtsAdapter {
   check(slug: string): Promise<BoardCheck>;
   // The board's offers located in France, mapped to the ingestion contract. Tools that need
   // a request per offer may skip the known ones (`known`) and yield them as still listed.
-  collect(slug: string, companyName: string, known?: KnownOffers): AsyncGenerator<CollectedRecord | StillListed>;
+  collect(slug: string, companyName: string, known?: KnownOffers): AsyncGenerator<CollectedRecord | StillListed | PartialListing>;
 }
 
 // Path segments that are pages of the tool, not company boards.

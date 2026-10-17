@@ -42,6 +42,15 @@ export const collectorConfig = {
     timeoutMs: 20000,
   },
 
+  // Choisir le service public (COLLECTOR.md §17.7): the civil service's job site.
+  servicePublic: {
+    baseUrl: "https://choisirleservicepublic.gouv.fr",
+    schedule: "30 */6 * * *", // every 6 hours (~1 000 new offers a day)
+    fullPassWeekday: 0, // Sunday (UTC): the whole listing is read, offers taken down are closed
+    maxListPages: 3000, // 20 offers per page (~2 800 pages)
+    maxOfferPagesPerRun: 3000, // ~1 h 40 at 2 s; the first runs fill the ~55 000 offers in a few days
+  },
+
   // Company discovery (COLLECTOR.md §5.2): Common Crawl's URL index, read from its files.
   discovery: {
     commonCrawlIndex: "https://index.commoncrawl.org", // list of crawls (collinfo.json)

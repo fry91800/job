@@ -1,4 +1,4 @@
-import type { ContractType, RemoteType, SalaryPeriod } from "@job/shared";
+import type { CollectedOffer, ContractType, RemoteType, SalaryPeriod } from "@job/shared";
 import { stripAccents } from "../pipeline/text";
 
 // Mapping helpers shared by the ATS adapters. Values are only set from explicit signals:
@@ -84,4 +84,26 @@ export function isoDate(value: string | number | null | undefined): string | nul
   if (value === null || value === undefined || value === "") return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+// Amounts of a pay text in euros ("45 000 - 55 000 € brut annuel", "2 100 € par mois",
+// "Forfait journalier brut de 105 euros"). The period comes from the words (hour, day,
+// month) before the amounts: some sites append "brut/an" to every amount. Without a word, a
+// month under 10 000, else a year. No amount: null.
+export function salaryFromText(raw: string | null): CollectedOffer["salary"] {
+  if (!raw) return null;
+  const text = plain(raw);
+  const period: SalaryPeriod | null = /horaire|de l'heure|par heure|\/ ?h\b|\/ ?heure/.test(text)
+    ? "hour"
+    : /journalier|par jour|\/ ?jour|la journee|vacation/.test(text)
+      ? "day"
+      : /mensuel|par mois|\/ ?mois|\bmois\b/.test(text)
+        ? "month"
+        : null;
+  const minimum = period === "hour" ? 5 : period === "day" ? 30 : 100;
+  const amounts = [...raw.replace(/(\d)[\s\u202f.](?=\d{3}\b)/g, "$1").matchAll(/\d+(?:,\d+)?\s*(k)?/gi)]
+    .map((match) => Number(match[0].replace(/[^\d,]/g, "").replace(",", ".")) * (match[1] ? 1000 : 1))
+    .filter((value) => value >= minimum);
+  if (amounts.length === 0) return null;
+  return { min: Math.min(...amounts), max: Math.max(...amounts), currency: "EUR", period: period ?? (Math.max(...amounts) < 10000 ? "month" : "year"), raw: raw.slice(0, 300) };
 }

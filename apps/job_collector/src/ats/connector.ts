@@ -69,9 +69,14 @@ export function atsConnector(adapter: AtsAdapter, options: { where?: Prisma.Comp
         if (context.signal.aborted) break;
         const seen = new Set<string>();
         const stillListed: string[] = [];
+        let partial = false;
         try {
           const known = await knownOffers(adapter.ats, board.slug);
           for await (const record of adapter.collect(board.slug, board.company?.name ?? nameFromSlug(board.slug), known)) {
+            if ("partialListing" in record) {
+              partial = true;
+              continue;
+            }
             if ("stillListed" in record) {
               seen.add(record.stillListed);
               stillListed.push(record.stillListed);
@@ -82,10 +87,13 @@ export function atsConnector(adapter: AtsAdapter, options: { where?: Prisma.Comp
           }
           await markStillListed(adapter.ats, stillListed);
           skipped += stillListed.length;
-          const closed = await closeMissingOffers(adapter.ats, board.slug, seen);
+          // A partial listing closes nothing and says nothing about the board's size.
+          const closed = partial ? 0 : await closeMissingOffers(adapter.ats, board.slug, seen);
           await prisma.companySource.update({
             where: { id: board.id },
-            data: { lastRunAt: new Date(), franceJobCount: seen.size, status: seen.size > 0 ? "active" : "no-france", lastError: null },
+            data: partial
+              ? { lastRunAt: new Date(), lastError: null }
+              : { lastRunAt: new Date(), franceJobCount: seen.size, status: seen.size > 0 ? "active" : "no-france", lastError: null },
           });
           if (closed) context.log(`${board.slug}: ${closed} offer(s) closed`);
         } catch (error) {

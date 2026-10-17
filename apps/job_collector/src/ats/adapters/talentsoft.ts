@@ -7,7 +7,7 @@ import { CrawlError, crawlGet, PageGoneError } from "../../crawler/fetcher";
 import { refreshDue, type AtsAdapter, type StillListed } from "../adapter";
 import { NotFoundError } from "../http";
 import { stripAccents } from "../../pipeline/text";
-import { contractFrom, frenchCity, mentionsFrance, nameFromSlug, remoteFrom } from "../mapping";
+import { contractFrom, frenchCity, mentionsFrance, nameFromSlug, remoteFrom, salaryFromText } from "../mapping";
 
 // Talentsoft (Cegid) career sites, {company}.talent-soft.com, often behind the employer's
 // own domain (efsrecrute.fr). Large French employers (COLLECTOR.md §17.5). No API for job
@@ -140,17 +140,6 @@ export async function placeCountry(city: string): Promise<string | null> {
   return id === null ? null : ((await prisma.location.findUnique({ where: { id }, select: { countryCode: true } }))?.countryCode ?? null);
 }
 
-// Numbers of a pay text ("45 000 - 55 000 € brut annuel", "2 100 € par mois").
-function salaryFrom(raw: string | null): CollectedOffer["salary"] {
-  if (!raw) return null;
-  const amounts = [...raw.replace(/(\d)[\s .](?=\d{3}\b)/g, "$1").matchAll(/\d+(?:,\d+)?\s*(k)?/gi)]
-    .map((match) => Number(match[0].replace(/[^\d,]/g, "").replace(",", ".")) * (match[1] ? 1000 : 1))
-    .filter((value) => value >= 100);
-  if (amounts.length === 0) return null;
-  const monthly = /mois|mensuel/i.test(raw) || Math.max(...amounts) < 10000;
-  return { min: Math.min(...amounts), max: Math.max(...amounts), currency: "EUR", period: monthly ? "month" : "year", raw: raw.slice(0, 300) };
-}
-
 // An offer page → the offer, or null when it isn't in France (or isn't an offer).
 export async function talentsoftOffer(
   html: string,
@@ -200,7 +189,7 @@ export async function talentsoftOffer(
     location: { raw: area ?? placeText, city: place.city, postcode: place.postcode, countyCode: place.countyCode, countryCode: "FR" },
     remote: remoteFrom(title, byLabel(/t[ée]l[ée]travail/i)?.text),
     contractType: CONTRACT_WORDS.find(([pattern]) => pattern.test(contract ?? ""))?.[1] ?? contractFrom(contract, title),
-    salary: salaryFrom(pay.join(" - ") || null),
+    salary: salaryFromText(pay.join(" - ") || null),
     description: { format: "html", content: content.trim() || title },
     publishedAt: frenchDate(root.querySelector(".ts-offer-page__maj-date")?.text) ?? frenchDate(/Date : ([\d/]+)/.exec(meta)?.[1]),
     expiresAt: frenchDate(byLabel(/date limite/i)?.text),
@@ -214,7 +203,11 @@ export function companyFromSlug(slug: string): string {
   return nameFromSlug(sub);
 }
 
-const NOT_SITES = new Set(["www", "app", "api", "help", "support", "blog", "status", "demo", "cegid"]);
+// Not employers' sites: Talentsoft's own hosts, test and demo copies ("testministereinterieur-
+// career": a test copy of a real site), and Choisir le service public's back office
+// ("place-ep-recrute": collected from the public site instead, adapters/service-public.ts).
+const NOT_SITES = new Set(["www", "app", "api", "help", "support", "blog", "status", "demo", "cegid", "place-ep-recrute"]);
+const NOT_SITE_PATTERN = /^(test|demo|recette|preprod|staging|qa)|-(test|demo|recette|preprod)$/;
 
 export const talentsoft: AtsAdapter = {
   ats: SOURCE,
@@ -226,7 +219,7 @@ export const talentsoft: AtsAdapter = {
       const host = url.hostname.toLowerCase();
       if (!host.endsWith(".talent-soft.com")) return null;
       const sub = host.slice(0, -".talent-soft.com".length);
-      return /^[a-z0-9][a-z0-9-]{0,62}$/.test(sub) && !NOT_SITES.has(sub) ? host : null;
+      return /^[a-z0-9][a-z0-9-]{0,62}$/.test(sub) && !NOT_SITES.has(sub) && !NOT_SITE_PATTERN.test(sub) ? host : null;
     },
   },
 

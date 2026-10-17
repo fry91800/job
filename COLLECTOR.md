@@ -511,3 +511,43 @@ with the career sites' politeness (robots.txt, per-site delay, `crawler.maxOffer
   "Ile-de-France, Paris (75)", "Occitanie", "Bagneux": a field without a country means
   France when it names a région, département, known city or postcode, else the town is
   looked up; only a field starting with another country means abroad.
+
+### 17.7 Step 4 — Choisir le service public (2026-10-17)
+
+`ats/adapters/service-public.ts`, source `choisirleservicepublic`, kind `aggregator` (an
+employer's own page wins when the same offer is found twice), every 6 hours. One board in
+the registry, `choisirleservicepublic.gouv.fr` (`boards add choisirleservicepublic
+choisirleservicepublic.gouv.fr`); each offer carries its employer as company.
+
+* **Why the website and not the open-data file**: the file on data.gouv.fr ("Les offres
+  diffusées sur Choisir le Service Public", Licence Ouverte 2.0) has no description and no
+  link (3 % have expected skills), accumulates the whole year (268 787 rows, ~10 800 still
+  open) and lagged 4 weeks behind. The site has ~55 000 open offers with full texts, the
+  application deadline and the employer's application link. Its texts are under Etalab 2.0
+  ("Sauf mention contraire, tous les textes de ce site sont sous licence etalab-2.0"),
+  robots.txt allows the offer pages; offers link back to the site (attribution). Its legal
+  notice also says the site is meant "to consult the offers and apply": to keep in mind if
+  the DGAFP asks; a courtesy message to them is a good idea.
+* **Listing**: `/nos-offres/page/N/`, 20 offers per page, newest first (~2 800 pages,
+  ~190 KB compressed each). A run reads pages until one has only known offers (~1 000 new
+  offers a day, ~50 pages) and reports a partial listing (`PartialListing`): the connector
+  closes nothing. On Sundays (UTC, `servicePublic.fullPassWeekday`) the whole listing is read
+  and offers taken down are closed. Offers also close at their application deadline
+  (`expiresAt`, daily maintenance). The sitemaps are stale (2023) and the WordPress API
+  doesn't expose offers.
+* **Offer pages** `/offre-emploi/{words}-reference-{REF}/`: facts "<span class=sr-only>
+  Label : </span> value" (first line only: names are repeated after a line break),
+  "<strong>Label</strong>" cells, texts in `.col-left.rte` and the accordions, the
+  JSON-LD for the publication date (written `17\/10\/2026`) and the département
+  ("Gironde (33)") when the address has no postcode. Unpublished offers redirect to
+  `/offre-depubliee/` and are skipped (remembered). Pay: the site appends "€ brut/an" to every
+  amount, so the period comes from the words (journalier, horaire, mensuel).
+* **Deduplication**: an application link now identifies an offer only when it contains an
+  identifier (`looksOfferSpecific`): public employers often link every offer to the same
+  recruitment portal, which merged unrelated offers.
+* **Back office**: the site runs on a Talentsoft instance (`place-ep-recrute.talent-soft.com`),
+  excluded from Talentsoft discovery with test copies (`testministereinterieur-career`).
+* **Volume**: the first runs fill the ~55 000 offers at 3 000 offer pages per run (4 runs a
+  day: about 5 days); then ~1 000 offer pages and ~50 listing pages a day (~35 MB).
+* **First test (2026-10-17)**: 40 offers, none rejected; 30 placed in a town, 5 in a
+  département, 5 only in France.

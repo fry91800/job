@@ -164,7 +164,7 @@ const collectAll = async (ats: string, slug: string, known?: KnownOffers) => {
   const stillListed: string[] = [];
   for await (const record of findAdapter(ats)!.collect(slug, "Test Acme", known)) {
     if ("stillListed" in record) stillListed.push(record.stillListed);
-    else records.push(record);
+    else if (!("partialListing" in record)) records.push(record);
   }
   return Object.assign(records, { stillListed });
 };

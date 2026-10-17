@@ -6,6 +6,7 @@ import { registerConnector } from "../connectors/registry";
 import type { CollectedRecord, Connector } from "../connectors/types";
 import { runConnector } from "../runs/run-connector";
 import { closeSource, runMaintenance } from "./close";
+import { looksOfferSpecific } from "./dedupe";
 import { processRecord } from "./process";
 
 // Runs against the seeded test database (`npm test`).
@@ -121,6 +122,11 @@ describe("pipeline", () => {
     assert.equal(saved.source, "test-ats");
     assert.deepEqual([saved.salaryMin, saved.salaryMax], [50000, 60000], "salary taken as a whole group");
     assert.deepEqual(saved.sources.map((source) => source.source).sort(), ["test-aggregator", "test-api", "test-ats"]);
+  });
+
+  test("apply links identify an offer only when they point to one", () => {
+    for (const url of ["https://recrutement.education.gouv.fr/recrutement/offreemploi/a1DIV00000DPUeX", "https://boards.greenhouse.io/acme/jobs/4567890", "https://x.fr/postuler?offre=2026-1551"]) assert.ok(looksOfferSpecific(url), url);
+    for (const url of ["https://www.nantes.fr/emploi", "https://recrutement.example.gouv.fr/offre/123", "https://jobs.example.com/apply", "not a url"]) assert.ok(!looksOfferSpecific(url), url);
   });
 
   test("same company, title and département with a similar description is merged; a different description is not", async () => {

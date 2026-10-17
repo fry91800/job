@@ -7,6 +7,19 @@ import { textSimilarity } from "./text";
 
 export type Duplicate = { offerId: string; rule: "same-source" | "same-url" | "fingerprint" };
 
+// An address that points to one offer: an identifier in it (4 digits or more, or a token of
+// 8+ characters mixing letters and digits). A portal page ("https://ville.fr/emploi"), which
+// public employers often give as their application link, is shared by many offers: it
+// doesn't identify one.
+export function looksOfferSpecific(url: string): boolean {
+  try {
+    const { pathname, search } = new URL(url);
+    return /\d{4,}/.test(pathname + search) || /(?=[\w-]*\d)(?=[\w-]*[a-z])[a-z\d_-]{8,}/i.test(pathname + search);
+  } catch {
+    return false;
+  }
+}
+
 export async function findDuplicate(offer: NormalizedOffer, fingerprint: string | null): Promise<Duplicate | null> {
   // 1. The same record of the same source.
   const sameSource = await prisma.offerSource.findUnique({
@@ -15,8 +28,9 @@ export async function findDuplicate(offer: NormalizedOffer, fingerprint: string 
   });
   if (sameSource) return { offerId: sameSource.offerId, rule: "same-source" };
 
-  // 2. The same page (offer URL or apply URL), whatever the source.
-  const urls = [offer.url, offer.applyUrl].filter((url): url is string => url !== null);
+  // 2. The same page (offer URL or apply URL), whatever the source; an apply link only when
+  //    it points to one offer.
+  const urls = [offer.url, offer.applyUrl && looksOfferSpecific(offer.applyUrl) ? offer.applyUrl : null].filter((url): url is string => url !== null);
   if (urls.length) {
     const byUrl =
       (await prisma.offer.findFirst({ where: { url: { in: urls } }, select: { id: true } }))?.id ??
