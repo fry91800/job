@@ -121,32 +121,35 @@ body {
 
 /* Discreet scrollbars in the theme's colours: a thin rounded thumb on a transparent track.
    The standard properties (Firefox, Chrome and Edge 121+) override the -webkit- rules
-   wherever both are supported; Safari uses the latter. */
-@supports (scrollbar-color: auto) {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar) transparent;
+   wherever both are supported; Safari uses the latter. In the base layer, so a utility
+   class can still hide a scrollbar (unlayered rules would win over every utility). */
+@layer base {
+  @supports (scrollbar-color: auto) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar) transparent;
+    }
+    *:hover {
+      scrollbar-color: var(--scrollbar-hover) transparent;
+    }
   }
-  *:hover {
-    scrollbar-color: var(--scrollbar-hover) transparent;
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
   }
-}
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar);
-  border: 3px solid transparent;
-  border-radius: 999px;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scrollbar-hover);
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-hover);
+  }
 }
 
 /* The offer as the server sends it (SEO.md), shown until the app starts on top of it. */

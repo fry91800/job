@@ -96,7 +96,7 @@ export function TabBar() {
   const onTabKeys = useTabKeys();
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-border bg-sidebar">
-      <div role="tablist" onKeyDown={onTabKeys} className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
+      <div role="tablist" onKeyDown={onTabKeys} className="flex min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((tab) => (
           <TabButton key={tab.key} tab={tab} active={tab.key === activeKey} />
         ))}
