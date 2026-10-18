@@ -71,7 +71,15 @@ export const careerSite: AtsAdapter = {
     let postings = 0;
     let french = 0;
     let companyName: string | null = null;
-    for (const page of pages.slice(0, collectorConfig.crawler.checkSamplePages)) {
+    // A few pages; more (up to checkMaxPages) while none is in France, spread over the whole
+    // list: an international site may list its offers by place, abroad first (Société
+    // Générale: Montréal).
+    const { checkSamplePages, checkMaxPages } = collectorConfig.crawler;
+    const spread = pages.length > checkMaxPages ? Array.from({ length: checkMaxPages - checkSamplePages }, (_, index) => pages[checkSamplePages + Math.floor(((index + 1) * (pages.length - checkSamplePages)) / (checkMaxPages - checkSamplePages + 1))]) : pages.slice(checkSamplePages);
+    let read = 0;
+    for (const page of [...pages.slice(0, checkSamplePages), ...spread]) {
+      if (read >= checkMaxPages || (read >= checkSamplePages && french > 0)) break;
+      read++;
       try {
         const found = extractJobPostings((await crawlGet(page.url)).text);
         postings += found.length;
@@ -83,7 +91,7 @@ export const careerSite: AtsAdapter = {
     }
     // Without JobPosting markup the site can't be collected: "empty".
     if (postings === 0) return { companyName, jobCount: 0, franceJobCount: 0 };
-    return { companyName, jobCount: pages.length, franceJobCount: Math.round((pages.length * french) / postings) };
+    return { companyName, jobCount: pages.length, franceJobCount: french ? Math.max(french, Math.round((pages.length * french) / postings)) : 0 };
   },
 
   async *collect(slug, companyName, known): AsyncGenerator<CollectedRecord | StillListed> {

@@ -55,10 +55,30 @@ function addPage(pages: Map<string, OfferPage>, url: URL, lastmod: string | null
   if (!existing || french) pages.set(key, { url: url.toString(), key, lastmod });
 }
 
+// The sitemaps to read. A start with a path ("orange.jobs/fr/fr", one country of a site
+// with a sitemap per country and language, like Phenom's) reads only those under it; else
+// French ones first ("/fr/fr/sitemap_index.xml" before "/gb/en/…").
+function startSitemaps(start: URL, listed: string[]): string[] {
+  const section = start.pathname.replace(/\/?$/, "/");
+  if (section !== "/") {
+    const inside = listed.filter((loc) => {
+      try {
+        return new URL(loc).pathname.startsWith(section);
+      } catch {
+        return false;
+      }
+    });
+    return inside.length ? inside : [new URL("sitemap_index.xml", `${start.origin}${section}`).toString(), new URL("sitemap.xml", `${start.origin}${section}`).toString()];
+  }
+  if (!listed.length) return [new URL("/sitemap.xml", start).toString()];
+  const french = (loc: string) => /\/fr([-_][a-z]{2})?\//i.test(loc);
+  return [...listed.filter(french), ...listed.filter((loc) => !french(loc))];
+}
+
 async function fromSitemaps(start: URL): Promise<Map<string, OfferPage> | null> {
   const { maxSitemaps, maxSitemapUrls } = collectorConfig.crawler;
   const robots = await robotsFor(start);
-  const queue = robots.sitemaps.length ? [...robots.sitemaps] : [new URL("/sitemap.xml", start).toString()];
+  const queue = startSitemaps(start, robots.sitemaps);
   const pages = new Map<string, OfferPage>();
   let read = 0;
   let urlCount = 0;
@@ -72,7 +92,16 @@ async function fromSitemaps(start: URL): Promise<Map<string, OfferPage> | null> 
       throw error;
     }
     read++;
-    const { sitemaps, urls } = parseSitemap(xml);
+    const parsed = parseSitemap(xml);
+    // Child sitemaps may be relative to their index ("sitemap-jobs.xml": Lidl).
+    const sitemaps = parsed.sitemaps.flatMap((loc) => {
+      try {
+        return [new URL(loc, next).toString()];
+      } catch {
+        return [];
+      }
+    });
+    const { urls } = parsed;
     // Job sitemaps first ("sitemap-jobs.xml").
     queue.push(...sitemaps.filter((loc) => /job|offre|emploi|career|carriere|poste|vacanc/i.test(loc)), ...sitemaps.filter((loc) => !/job|offre|emploi|career|carriere|poste|vacanc/i.test(loc)));
     for (const { loc, lastmod } of urls) {
@@ -137,8 +166,31 @@ export async function findOfferPages(startUrl: string, options: { section?: bool
   // Pages robots.txt forbids aren't offers we can read (sitemaps may still list them),
   // unless robots.txt rules are ignored by configuration.
   const robots = await robotsFor(start);
-  return [...pages.values()].filter((page) => {
+  const allowed = [...pages.values()].filter((page) => {
     const url = new URL(page.url);
     return url.host !== start.host || allowedByRobots(robots, url);
   });
+  // Single offers first: a check samples the first pages, and a run's page budget goes to
+  // offers before listings and advice pages that also have "job" in their address.
+  return allowed.map((page, index) => ({ page, index, score: offerScore(new URL(page.url)) })).sort((a, b) => b.score - a.score || a.index - b.index).map((item) => item.page);
+}
+
+// How much an address looks like one offer (and a French one): an id (a run of digits, or a reference like
+// "260002H8") and a segment naming offers ("/job/", "/offres-d-emploi/") count for it;
+// listing and editorial segments ("/category/", "/location/", "/tips-candidates/",
+// "-jobs/") against it.
+const OFFER_SEGMENT = /^(jobs?|job-?offers?|offres?(-d-emploi)?|emplois?|joboffers?|postes?|vacanc\w*|positions?|annonces?|stellen)$/i;
+const LISTING_SEGMENT = /^(category|categories|location|locations|employment|business|tips?(-\w+)?|conseils?(-\w+)?|metiers?|blog|news|actualites?|events?|evenements?|search(-\w+)?|recherche(-\w+)?|teams?|equipes?)$|-jobs$|-emplois$/i;
+
+export function offerScore(url: URL): number {
+  const segments = url.pathname.replace(LOCALE, "").split("/").filter(Boolean).map((segment) => decodeURIComponent(segment));
+  let score = 0;
+  if (segments.some((segment) => OFFER_SEGMENT.test(segment))) score += 2;
+  const last = segments.at(-1) ?? "";
+  if (/\d{5,}/.test(last) || /(^|[-_])[A-Z0-9]*\d[A-Z0-9]{5,}([-_]|$)/i.test(last) || /\d{4,}/.test(segments.at(-2) ?? "")) score += 2;
+  if (segments.some((segment) => LISTING_SEGMENT.test(segment))) score -= 4;
+  // French-looking addresses first: on international sites, French offers.
+  const path = url.pathname.toLowerCase();
+  if (/^\/fr([-_][a-z]{2})?\//.test(path) || /[-_]fr\/?$/.test(path) || /offres?-d-emploi|emplois?|alternance|stage|\bcdi\b|\bcdd\b|[-_]h-f\b|[-_]f-h\b/.test(path)) score += 1;
+  return score;
 }

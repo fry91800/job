@@ -20,6 +20,7 @@ const UNSUPPORTED: { name: string; pattern: RegExp }[] = [
   { name: "successfactors", pattern: /successfactors\.(com|eu)|jobs\.sap\.com|career\d*\.sapsf|rmk-map|sfcareer|j2w\./i },
   { name: "taleo", pattern: /taleo\.net/i },
   { name: "oracle-cloud", pattern: /oraclecloud\.com\/hcmUI\/CandidateExperience|fa-[a-z0-9]+-saasfaprod/i },
+  // Phenom sites with their data in the page (phApp.ddo) are supported; others aren't.
   { name: "phenom", pattern: /cdn\.phenompeople\.com|phenompeople|"phApp"|ph-page-|phenom-/i },
   { name: "avature", pattern: /avature\.net|avature\.com/i },
   { name: "icims", pattern: /icims\.com/i },
@@ -105,6 +106,8 @@ export async function inspectSite(input: string): Promise<Inspection> {
   const seen = new Set<string>();
   const unsupported = new Set<string>();
   const successFactorsHosts = new Set<string>();
+  const phenomBoards = new Set<string>();
+  const jibeHosts = new Set<string>();
   const urls: URL[] = [];
   let offerPage: string | null = null;
 
@@ -140,6 +143,14 @@ export async function inspectSite(input: string): Promise<Inspection> {
     result.url ??= page.url;
     // SuccessFactors career sites (Career Site Builder): its script on the employer's host.
     if (/j2w\.init\(/.test(page.text)) successFactorsHosts.add(here.host);
+    // Phenom: its data in the page; the board is the host and the French section
+    // ("/fr/fr"), else the section the page is in.
+    // iCIMS career sites built with Jibe: their scripts on the employer's host.
+    if (/jibecdn\.com/.test(page.text)) jibeHosts.add(here.host);
+    if (/phApp\.ddo/.test(page.text)) {
+      const section = /^\/([a-z]{2,8})\/([a-z]{2})(\/|$)/i.exec(here.pathname);
+      phenomBoards.add(`${here.host}/${section ? `${section[1]}/${section[2]}` : "fr/fr"}`);
+    }
     for (const tool of UNSUPPORTED) if (tool.pattern.test(page.text)) unsupported.add(tool.name);
     if (extractJobPostings(page.text).length > 0) result.jobPosting = true;
     const found = addresses(page.text, page.url);
@@ -157,8 +168,10 @@ export async function inspectSite(input: string): Promise<Inspection> {
   }
 
   if (offerPage && seen.has(offerPage) && result.jobPosting === null) result.jobPosting = false;
-  const boards = [...supportedBoards(urls), ...[...successFactorsHosts].map((slug) => ({ ats: "successfactors", slug }))];
+  const boards = [...supportedBoards(urls), ...[...successFactorsHosts].map((slug) => ({ ats: "successfactors", slug })), ...[...phenomBoards].map((slug) => ({ ats: "phenom", slug })), ...[...jibeHosts].map((slug) => ({ ats: "jibe", slug }))];
+  if (jibeHosts.size) unsupported.delete("icims");
   if (successFactorsHosts.size) unsupported.delete("successfactors");
+  if (phenomBoards.size) unsupported.delete("phenom");
   const known = boards.length
     ? await prisma.companySource.findMany({ where: { OR: boards.map((board) => ({ ats: board.ats, slug: board.slug })) }, select: { ats: true, slug: true, status: true } })
     : [];

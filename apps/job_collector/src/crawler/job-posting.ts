@@ -91,7 +91,7 @@ function salary(posting: JobPosting): CollectedOffer["salary"] {
 }
 
 // Some sites send the description as HTML written with entities ("&lt;p&gt;").
-const decodeEntities = (html: string) => (/&lt;\/?[a-z]/i.test(html) ? parse(`<div>${html}</div>`).text : html);
+export const decodeEntities = (html: string) => (/&lt;\/?[a-z]/i.test(html) ? parse(`<div>${html}</div>`).text : html);
 
 export function jobPostingOffer(posting: JobPosting, page: { url: string; key: string; source: string; siteSlug: string; place: Place | "remote" }): CollectedOffer {
   const organization = (posting.hiringOrganization ?? {}) as Json;

@@ -709,3 +709,64 @@ Site Builder sites, the most frequent tool among large French employers not yet 
 Added: Capgemini (1 120 French offers), Alstom (671), Engie (623), Atos (452), La Poste
 (`recrutement.lapostegroupe.com`, 210) — 3 076. Not this kind of site: Lidl and OVHcloud
 (their own front-end over SuccessFactors), Allianz (Phenom).
+
+### 17.13 Phenom career sites (2026-10-18)
+
+`ats/adapters/phenom.ts`, source `phenom`, board = host and the site's French section
+(`careers.allianz.com/fr/fr`), daily at 05:15. Phenom sites publish one sitemap per country
+and language, and list every country's offers in each: reading them as career sites found
+DHL's 9 500 European offers for 81 in France. Instead:
+
+* the search page (`/search-results`) carries its results as JSON in the page
+  (`phApp.ddo` → `eagerLoadRefineSearch`: `totalHits`, jobs with `jobId`, title, city,
+  country, `postedDate`, `employmentType`/`contractType`, `remote`/`workModel`), with the
+  site's filters: `qcountry=` the site's own France value read from its country filter
+  ("France", Orange's "FRANCE"), `sortBy=Most recent` (without it the order changes between
+  pages), `from=N`, `size=50` (DHL keeps 10);
+* a new or changed offer's page (`/job/{jobId}`) is read once for its JobPosting
+  description, within the page budget; offers over it wait for the next run, and the run
+  then closes nothing (partial listing).
+
+Added: Orange (`orange.jobs/fr/fr`, 361 French offers), Allianz (340), DHL
+(`careers.dhl.com/eu/fr`, 81). Thales (Phenom too) stays collected as a career site and on
+Workday. `inspect` proposes `phenom/<host>/<section>` when a page carries `phApp.ddo`.
+
+### 17.14 iCIMS career sites built with Jibe (2026-10-18)
+
+`ats/adapters/jibe.ts`, source `jibe`, board = host, daily at 05:45. iCIMS's "Attract"
+sites (Jibe front-end; `jibecdn.com` on the page): AXA (`jobs.axa.com`, 626 French offers),
+Publicis (`careers.publicisgroupe.com`, 123). robots.txt allows everything.
+
+* The site's own JSON list: `/api/jobs?country=France&page=N&limit=100` → `totalCount`,
+  `jobs[].data` (req_id/slug, title, city — or a département "35-ILLE-ET-VILAINE" —,
+  postal_code, country_code, posted_date, update_date, contract tags, apply_url); its
+  description is flattened to one paragraph.
+* Offer pages (`/jobs/{slug}`) carry JobPosting with the HTML description: read once per
+  new or updated offer (`update_date`), within the page budget.
+* The crawler's fetcher now accepts JSON answers.
+* Danone (also iCIMS) isn't a Jibe site: not covered.
+
+### 17.15 Career sites fixed by hand (2026-10-18)
+
+L'Oréal, VINCI and Société Générale publish JobPosting and complete sitemaps, but their
+checks found nothing: the sitemaps list advice, category and location pages ("/category/
+retail-jobs/", "/tips-candidates/before-job-interview/…") before the offers, and the check
+read the first three pages. Changes for every career site:
+
+* found pages are ranked (`offerScore`): an id in the address and an offer segment ("/job/",
+  "/offres-d-emploi/") first, listing and editorial segments last, French-looking addresses
+  ("/fr/", "-fr", "emploi", "stage", "h-f") first;
+* the check reads more pages (`checkMaxPages`, 15) while none is in France, spread over the
+  whole list (Société Générale's first French-language offers are all in Montréal);
+* a start with a path (`orange.jobs/fr/fr`) reads only the sitemaps under it; otherwise
+  French sitemaps first;
+* child sitemaps given as relative addresses are resolved (Lidl's index).
+
+Added: VINCI (`jobs.vinci.com`, 9 942 offer pages, most in France), L'Oréal
+(`careers.loreal.com`, 3 113 offer pages worldwide), Société Générale
+(`careers.societegenerale.com`, ~280 in France). Their first runs read 1 000 pages a night
+each; the estimates of the check are rough (French offers are sampled first) and are
+replaced by the real count after the first full run.
+
+Not done: **Lidl** — its sitemap's offer addresses are broken (the id is missing: every one
+answers 404) and its list is built in the browser from an endpoint to find in its scripts.

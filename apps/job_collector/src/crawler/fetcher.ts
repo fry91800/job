@@ -28,8 +28,9 @@ const options = () => {
     maxBytes: crawler.maxBytes,
     maxRedirects: crawler.maxRedirects,
     allowedPrivateAddresses: crawler.allowedPrivateAddresses,
-    accept: "text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,text/plain;q=0.8",
-    contentTypes: /text\/html|application\/xhtml\+xml|xml|text\/plain|application\/(x-)?gzip|application\/octet-stream/i,
+    accept: "text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,application/json;q=0.9,text/plain;q=0.8",
+    // JSON: a site's own job list (Jibe's /api/jobs).
+    contentTypes: /text\/html|application\/xhtml\+xml|xml|json|text\/plain|application\/(x-)?gzip|application\/octet-stream/i,
   };
 };
 

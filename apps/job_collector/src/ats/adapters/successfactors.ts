@@ -126,11 +126,13 @@ export function descriptionContract(html: string): ContractType | null {
   return null;
 }
 
-// "jobs.engie.com" → "Engie", "jobsearch.alstom.com" → "Alstom".
+// "jobs.engie.com" → "Engie", "jobsearch.alstom.com" → "Alstom", "careers.dhl.com" → "DHL"
+// (short names are acronyms).
 export function companyFromHost(host: string): string {
   const labels = host.toLowerCase().replace(/^www\./, "").split(".");
-  const name = labels.length > 2 ? labels[labels.length - 2] : labels[0];
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  // "careers.publicisgroupe.com" → "Publicis".
+  const name = (labels.length > 2 ? labels[labels.length - 2] : labels[0]).replace(/(.{3,})(groupe|group)$/, "$1");
+  return name.length <= 3 ? name.toUpperCase() : name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 async function feed(slug: string): Promise<FeedItem[]> {

@@ -47,6 +47,16 @@ export const collectorConfig = {
     maxListPages: 150, // up to 3 000 French jobs per site
   },
 
+  // iCIMS / Jibe career sites (COLLECTOR.md §17.14): pages of the job list read per run.
+  jibe: {
+    maxListPages: 100, // 100 offers a page
+  },
+
+  // Phenom career sites (COLLECTOR.md §17.13): pages of the filtered search read per run.
+  phenom: {
+    maxListPages: 200, // 50 offers a page on most sites, 10 on some
+  },
+
   // SuccessFactors career sites (COLLECTOR.md §17.12): the whole job feed in one request
   // (Capgemini's: 57 MB for 6 500 offers worldwide).
   successFactors: {
@@ -108,6 +118,7 @@ export const collectorConfig = {
     maxListingPages: 20, // pages followed to find offers when a site has no sitemap
     maxOfferPagesPerRun: 1000, // new or changed offer pages fetched per site and run (~35 min at 2 s)
     checkSamplePages: 3, // offer pages read to check a site
+    checkMaxPages: 15, // … more while none of them is in France
     talentsoftMaxListPages: 100, // Talentsoft lists 12 offers per page
     scheme: "https", // tests serve sites over http
     allowedPrivateAddresses: [] as string[], // tests only

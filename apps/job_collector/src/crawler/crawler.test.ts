@@ -7,7 +7,7 @@ import { atsConnector } from "../ats/connector";
 import { collectorConfig } from "../config";
 import { runConnector } from "../runs/run-connector";
 import { careerSite, careerSiteFromUrl, resetCareerSiteMemory } from "./career-site";
-import { findOfferPages, looksLikeOfferPage, pageKey, parseSitemap } from "./discover-pages";
+import { findOfferPages, looksLikeOfferPage, offerScore, pageKey, parseSitemap } from "./discover-pages";
 import { resetCrawler } from "./fetcher";
 import { extractJobPostings, frenchPlace, jobPostingOffer } from "./job-posting";
 import { parseRobots } from "./robots";
@@ -209,5 +209,15 @@ describe("career-site runs", () => {
       collectorConfig.crawler.respectRobotsTxt = true;
       delete jobs["/jobs/private-1"];
     }
+  });
+});
+
+describe("offer pages first", () => {
+  test("single offers before listings and advice pages, French ones first", () => {
+    const score = (url: string) => offerScore(new URL(url));
+    const offer = score("https://careers.loreal.com/en/job/paris/stage-supply-chain/3456/46095759424");
+    assert.ok(offer > score("https://careers.loreal.com/en/category/retail-jobs/3456/32362496/1"), "a category listing");
+    assert.ok(offer > score("https://careers.societegenerale.com/en/tips-candidates/before-job-interview/cover-letter"), "an advice page");
+    assert.ok(score("https://careers.societegenerale.com/offres-d-emploi/analyste-trading-2600032A-fr") > score("https://careers.societegenerale.com/en/job-offers/algo-developer-260002H8-en"), "the French offer first");
   });
 });
