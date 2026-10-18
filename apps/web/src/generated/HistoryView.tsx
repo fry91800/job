@@ -1,4 +1,4 @@
-import { History, Sparkles } from "lucide-react";
+import { Sparkles, SquareSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatDate } from "../lib/format";
 import { MatchBadge } from "../offers/MatchBadge";
@@ -14,7 +14,7 @@ export default function HistoryView() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6 sm:px-8 sm:py-8">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-        <History size={20} className="text-accent" /> {t("tools.history")}
+        <SquareSparkles size={20} className="text-accent" /> {t("tools.history")}
       </h1>
       {list.isPending && Array.from({ length: 3 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-box bg-hover" />)}
       {list.data && items.length === 0 && <p className="text-fg-muted">{t("review.historyEmpty")}</p>}

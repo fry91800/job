@@ -35,7 +35,7 @@ MonPoste n'utilise ni publicité ni traceur tiers. La mesure d'audience (Umami) 
 Aucun de ces éléments ne sert à vous suivre : aucun consentement n'est donc demandé. La mesure d'audience n'utilise ni cookie ni stockage du navigateur.
 
 ## Services utilisés
-- **Google Gemini** (intelligence artificielle) : quand vous importez un CV, le traduisez, ajoutez une offre à partir d'un texte ou générez un CV, le texte concerné (votre CV, l'offre) est envoyé à Google pour être traité. [À vérifier selon votre offre Gemini : avec l'API payante, Google n'utilise pas ces données pour améliorer ses produits.] Google peut traiter ces données hors de l'Union européenne, avec les garanties prévues par le RGPD (clauses contractuelles types).
+- **Google Gemini** (intelligence artificielle) : quand vous importez un CV, le traduisez, ajoutez une offre à partir d'un texte ou générez un CV, le texte concerné (votre CV, l'offre) est envoyé à Google pour être traité. Google peut traiter ces données hors de l'Union européenne, avec les garanties prévues par le RGPD (clauses contractuelles types).
 - **Geoapify** (lieux) : le texte tapé dans le champ « lieu » de la recherche, sans aucune donnée vous concernant.
 - **${O.emailProvider}** : envoi des e-mails du compte.
 - **Hébergement** : ${O.host}.
@@ -88,7 +88,7 @@ Le service est fourni tel quel, sans garantie de disponibilité permanente. Dans
 Ces conditions peuvent évoluer ; les titulaires d'un compte sont prévenus des changements importants par e-mail. Continuer à utiliser le site vaut acceptation de la nouvelle version.
 
 ## Droit applicable
-Ces conditions sont soumises au droit français. En cas de litige, une solution amiable est recherchée en priorité ; vous pouvez aussi recourir gratuitement à un médiateur de la consommation [nom et site du médiateur].
+Ces conditions sont soumises au droit français. En cas de litige, une solution amiable est recherchée en priorité ; vous pouvez aussi recourir gratuitement à un médiateur de la consommation.
 
 ## Mentions légales
 - Éditeur : ${O.name}, ${O.legalForm}, ${O.registration}, ${O.address}
@@ -125,7 +125,7 @@ MonPoste uses no advertising and no third-party trackers. Audience measurement (
 None of these is used to track you, so no consent is asked. Audience measurement uses no cookies and no browser storage.
 
 ## Services used
-- **Google Gemini** (artificial intelligence): when you import a resume, translate it, add an offer from a text or generate a resume, the text concerned (your resume, the offer) is sent to Google for processing. [To check against your Gemini plan: with the paid API, Google does not use this data to improve its products.] Google may process this data outside the European Union, with the safeguards required by the GDPR (standard contractual clauses).
+- **Google Gemini** (artificial intelligence): when you import a resume, translate it, add an offer from a text or generate a resume, the text concerned (your resume, the offer) is sent to Google for processing. Google may process this data outside the European Union, with the safeguards required by the GDPR (standard contractual clauses).
 - **Geoapify** (places): the text typed in the search's "place" field, without any data about you.
 - **${O.emailProvider}**: sending account emails.
 - **Hosting**: ${O.host}.
@@ -178,7 +178,7 @@ The service is provided as is, with no guarantee of permanent availability. To t
 These terms may change; account holders are told of significant changes by email. Continuing to use the site means accepting the new version.
 
 ## Governing law
-These terms are governed by French law. In case of dispute, an amicable solution is sought first; you may also turn, free of charge, to a consumer mediator [mediator's name and website].
+These terms are governed by French law. In case of dispute, an amicable solution is sought first; you may also turn, free of charge, to a consumer mediator.
 
 ## Legal notice
 - Publisher: ${O.name}, ${O.legalForm}, ${O.registration}, ${O.address}

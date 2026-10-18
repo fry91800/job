@@ -65,8 +65,7 @@ The first visitors only come once; the site has to work for them.
       `resume_create`, `resume_generate`, `resume_translate`, `pdf_download`,
       `offer_save`, `offer_add`, `signup`, `feedback`; offers opened are page views
       (`/offers/…`). See §5.
-- [x] **A feedback button** in the app ("Un avis ? Un problème ?", sidebar and account
-      menu): emailed to contact@monposte.com, Reply-To the sender. Check that a test
+- [x] **A feedback button** in the app ("Un avis ? Un problème ?", account menu): emailed to contact@monposte.com, Reply-To the sender. Check that a test
       message arrives once deployed.
 - [ ] **Watch AI costs**: guests have 3 generations, registered users 30 a day (FEATURE G4).
       The global daily AI budget is built (`AI_DAILY_BUDGET_USD`, $2 by default, alerts at

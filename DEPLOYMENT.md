@@ -306,7 +306,7 @@ loses statistics only. The privacy policy says statistics are kept 25 months at 
 Umami keeps everything, so delete older data once a year when the site is two years old
 (Settings → Websites → Data → Reset, or SQL on the `umami` database).
 
-**Feedback**: the app's "Un avis ? Un problème ?" button (sidebar, account menu) emails the
+**Feedback**: the app's "Un avis ? Un problème ?" item (account menu) emails the
 message to `FEEDBACK_EMAIL` (`contact@monposte.com` by default), with *Reply-To* set to the
 sender's address when they give one. Nothing is stored. A message that can't be sent is
 alerted (`feedback-not-sent`).

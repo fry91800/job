@@ -84,7 +84,7 @@ export const config = {
   // `npm run jobs:alerts` runs it once). Up to `offersShown` offers per email.
   alerts: {
     checkMinutes: Number(process.env.ALERTS_CHECK_MINUTES ?? 30),
-    sendHour: 8,
+    sendHour: Number(process.env.ALERTS_SEND_HOUR ?? 8),
     offersShown: 10,
   },
 
