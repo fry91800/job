@@ -661,3 +661,51 @@ rows, then inspect again; (2) a SuccessFactors adapter (the most frequent unsupp
 tool), then Phenom and iCIMS; (3) Société Générale, L'Oréal, Kering, Stellantis by hand;
 (4) for the sites that refuse crawlers, their career pages on another host, else a request
 for their feed.
+
+**Second pass (same day): corrected addresses.** The board registry already held many of
+these employers under their tool's name: Intermarché (SmartRecruiters
+`GroupementMousquetaires`, 9 332 French offers), Thales (career site, 1 448), Alten (725),
+Eurofins (563), Inetum (333), Devoteam (330), Talan (323), Free (299), Dassault Aviation
+(Talentsoft, 109), Doctolib (Greenhouse + Ashby). Boards found there or with corrected
+addresses (`data/career-sites-2026-10-18-b.txt`, `data/inspect-2026-10-18-b.json`) and added:
+Thales on Workday (1 766; overlaps its career site, merged by deduplication), Airbus (909),
+Chanel (417), Renault (339), Air Liquide (260), Michelin (206), ArianeGroup (119).
+
+* More tools not supported: Alstom, Atos (SuccessFactors), Publicis (iCIMS), Orange
+  Business (Phenom), Aldi (TalentLink), Auchan (SuccessFactors / Cornerstone marks).
+* Refused: Crédit Agricole / Amundi (`casa-recrute.talent-soft.com`, robots.txt);
+  Schneider Electric (blocks user agents that say "bot"); EDF (Akamai), AP-HP, bioMérieux,
+  Safran, BNP Paribas, Hermès, Stellantis, BlaBlaCar, Ramsay Santé (HTTP 403 to any script):
+  candidates for a feed request, not for disguised crawling.
+* Kering's brands (Gucci, Boucheron, AMQ) and Sanofi's student board answered 403 to
+  Workday's list during the session: left as candidates, retried by the nightly checks.
+* JobPosting found but no offer pages reached yet: VINCI (`jobs.vinci.com`), Société
+  Générale, L'Oréal.
+
+### 17.12 SuccessFactors career sites (2026-10-18)
+
+`ats/adapters/successfactors.ts`, source `successfactors`, board = the career site's host
+(`jobs.engie.com`), a "crawler" adapter run daily at 04:30. For SAP SuccessFactors' Career
+Site Builder sites, the most frequent tool among large French employers not yet supported
+(§17.11). Checked on Engie, Alstom, Capgemini, Atos, La Poste:
+
+* robots.txt closes `/services/` (the RSS feed), `/applybutton/`, `/talentcommunity/`…, not
+  the rest. Search and category pages are built in the browser.
+* **`/googlefeed.xml`**: every offer of the site in one RSS file meant for Google — `g:id`,
+  `g:location` ("Paris, FR, 75001", "Semeac, 65, FR": France when one part is "FR"),
+  `g:employer` (the legal entity: the board's company is used instead), the full
+  description. Large (Capgemini: 57 MB for 6 500 offers worldwide; limit
+  `successFactors.feedMaxBytes`). No publication date (`g:expiration_date` is always 30 days
+  ahead). The feed is the list: offers missing from it are closed.
+* **A new French offer's page is read once**, for its publication date and contract, within
+  `crawler.maxOfferPagesPerRun`; offers over the budget are saved without a date and dated
+  at a later run (`raw.releasedDate` null). Two page layouts: "joblayouttoken" blocks with
+  the employer's labels ("Publié le:", "Date:", "Type de contrat:"), or schema.org fields
+  (`<meta itemprop="datePosted" content="Mon Sep 21 00:00:00 UTC 2026">`, Alstom). Contract
+  from the page, the title, else unambiguous words of the description (CDI, CDD, alternance).
+* Boards: `inspect` proposes `successfactors/<host>` when a page runs `j2w.init(`; no common
+  address for discovery.
+
+Added: Capgemini (1 120 French offers), Alstom (671), Engie (623), Atos (452), La Poste
+(`recrutement.lapostegroupe.com`, 210) — 3 076. Not this kind of site: Lidl and OVHcloud
+(their own front-end over SuccessFactors), Allianz (Phenom).

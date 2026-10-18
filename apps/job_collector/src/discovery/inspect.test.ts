@@ -59,6 +59,13 @@ describe("inspect", () => {
     assert.match(result.verdict, /^JobPosting on its pages → careersite 127\.0\.0\.1/);
   });
 
+  test("a SuccessFactors career site (its script on the employer's host)", async () => {
+    site({ "/": `<script>j2w.init({ "locale": "fr_FR" });</script>` });
+    const result = await inspectSite(`http://${host}/`);
+    assert.deepEqual(result.supported, [{ ats: "successfactors", slug: host, registry: null }]);
+    assert.deepEqual(result.unsupported, []);
+  });
+
   test("a tool we don't support yet, named by its code", async () => {
     site({ "/": `<script src="https://cdn.phenompeople.com/CareerConnectResources/app.js"></script>` });
     const result = await inspectSite(`http://${host}/`);

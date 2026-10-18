@@ -47,6 +47,13 @@ export const collectorConfig = {
     maxListPages: 150, // up to 3 000 French jobs per site
   },
 
+  // SuccessFactors career sites (COLLECTOR.md §17.12): the whole job feed in one request
+  // (Capgemini's: 57 MB for 6 500 offers worldwide).
+  successFactors: {
+    feedMaxBytes: 200 * 1024 * 1024,
+    feedTimeoutMs: 5 * 60 * 1000,
+  },
+
   // Bots (COLLECTOR.md §17.2–17.3): pages and snapshots sent to the API by source token.
   bots: {
     aiPagesPerDay: 300, // AI extractions per source and day (pages without JobPosting)

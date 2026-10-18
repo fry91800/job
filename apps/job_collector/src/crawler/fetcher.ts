@@ -49,10 +49,13 @@ function onHost<T>(host: string, delayMs: number, task: () => Promise<T>): Promi
   return run;
 }
 
-async function rawGet(url: URL, delayMs: number): Promise<SafeFetchResponse> {
+// `limits`: a larger size or time for one request (a site's whole job feed).
+type Limits = { maxBytes?: number; timeoutMs?: number };
+
+async function rawGet(url: URL, delayMs: number, limits: Limits = {}): Promise<SafeFetchResponse> {
   return onHost(url.host, delayMs, async () => {
     try {
-      return await safeFetch(url.toString(), options());
+      return await safeFetch(url.toString(), { ...options(), ...limits });
     } catch (error) {
       if (error instanceof SafeFetchError && error.reason === "unknown_host") throw new UnknownHostError(`${url}: ${error.message}`);
       if (error instanceof SafeFetchError) throw new CrawlError(`${url}: ${error.message}`);
@@ -95,11 +98,11 @@ export function delayFor(robots: Robots): number {
 
 // A page of a career site, if robots.txt allows it. 404/410 → PageGoneError; other
 // failures → CrawlError.
-export async function crawlGet(input: string): Promise<{ url: string; text: string; contentType: string }> {
+export async function crawlGet(input: string, limits: Limits = {}): Promise<{ url: string; text: string; contentType: string }> {
   const url = new URL(input);
   const robots = await robotsFor(url);
   if (!allowedByRobots(robots, url)) throw new DisallowedError(`${url}: disallowed by robots.txt`);
-  const response = await rawGet(url, delayFor(robots));
+  const response = await rawGet(url, delayFor(robots), limits);
   if (response.status === 404 || response.status === 410) throw new PageGoneError(`${url}: HTTP ${response.status}`);
   if (response.status < 200 || response.status >= 300) throw new CrawlError(`${url}: HTTP ${response.status}`);
   return { url: response.url, text: response.text, contentType: response.contentType };
