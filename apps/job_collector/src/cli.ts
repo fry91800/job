@@ -6,6 +6,7 @@
 //   metrics                                   coverage and quality numbers
 //   discover [--ats greenhouse,ashby] [--crawls N | --crawl CC-MAIN-…,…]   find boards in Common Crawl
 //   census [--crawls N]                       companies per recruiting tool in Common Crawl, with French pages
+//   inspect <address…> [--file F] [--json F]  what a career site runs on (supported tool, JobPosting, other tool)
 //   boards check [--ats X] [--limit N]        check candidate / due boards
 //   boards add <ats> <slug>                   add a board by hand (checked right away); careersite <address>
 //   boards list [--status S]                  boards by tool and status
@@ -23,6 +24,7 @@ import { importCatalogue } from "./catalogue/import";
 import { connectors, findConnector } from "./connectors/registry";
 import { checkBoard, checkBoards } from "./discovery/check-boards";
 import { atsCensus } from "./discovery/ats-census";
+import { inspectSites, readSiteList } from "./discovery/inspect";
 import { discoverBoards, recentCrawls } from "./discovery/common-crawl";
 import { exportBoards, importBoards } from "./discovery/registry-file";
 import { collectorMetrics } from "./metrics";
@@ -62,6 +64,16 @@ async function main() {
         if (!adapter) throw new Error(`Unknown ATS "${name}". Known: ${atsAdapters.map((item) => item.ats).join(", ")}`);
         await discoverBoards(adapter, { crawls: crawl ? crawl.split(",") : crawlCount ? await recentCrawls(Number(crawlCount)) : undefined });
       }
+      break;
+    }
+    case "inspect": {
+      // inspect <address…> [--file list.txt] [--json out.json]
+      const file = option(args, "--file");
+      const json = option(args, "--json");
+      const addresses = args.filter((arg, index) => !arg.startsWith("--") && !["--file", "--json"].includes(args[index - 1] ?? ""));
+      const sites = [...(file ? await readSiteList(file) : []), ...addresses.map((address) => ({ name: address, address }))];
+      if (!sites.length) throw new Error("Usage: inspect <address…> [--file list.txt] [--json out.json]");
+      await inspectSites(sites, { json });
       break;
     }
     case "boards": {

@@ -633,3 +633,31 @@ run on a schedule:
   in the filter).
 * **First test (2026-10-17)**: Sanofi, 10 offers, all placed (Lyon, Paris, Gentilly,
   Vitry-sur-Seine, Marcy-l'Étoile), internships and apprenticeships recognised.
+
+### 17.11 Large French employers — triage with `inspect` (2026-10-18)
+
+A list of 100 large French employers (`data/career-sites-2026-10-18.txt`, from the user),
+sorted by what their career site runs on: `npm run collector -- inspect --file <list>
+[--json out.json]` (`discovery/inspect.ts`). From the address given (a home page is
+enough) it follows up to 6 pages towards the job pages through the polite fetcher, and
+reports the boards of the tools we support (each adapter's own `discovery` address rules),
+the tools we don't support yet (marks in addresses and code: SuccessFactors, Phenom, iCIMS,
+Taleo, Avature, Cornerstone…), and whether an offer page carries JobPosting. Crawling
+rules unchanged: honest user agent, robots.txt obeyed, a few pages per site, spaced.
+
+Results (`data/inspect-2026-10-18.json`):
+
+| Result | Employers |
+|---|---|
+| Supported tool, added | Eiffage (2 020 French offers), Onepoint (231), Accenture (194), Enedis (170), Pernod Ricard (159), Pierre Fabre (138), Valeo (119), Ipsen (83) — Workday / Talentsoft; already collected: Sopra Steria, Wavestone, Veolia, CNP |
+| JobPosting, added as career sites | SNCF (631), Leroy Merlin (128), Aubay (121); Société Générale and L'Oréal: markup found but no offer pages reached yet |
+| Tools not supported yet | SuccessFactors ×6 (La Poste, Lidl, Capgemini, Engie, Allianz, OVHcloud), Phenom ×4 (DHL, Thales, Allianz, Orange), iCIMS ×3 (AXA, Danone, Orange), DigitalRecruiters (Decathlon), Avature (TotalEnergies), Cornerstone (Suez) |
+| Refuse the crawler (HTTP 403 on the address given) | RATP, Carrefour, Système U, Alten, Safran, Bouygues, BNP Paribas, Hermès, Chanel, Leboncoin |
+| Address in the list doesn't exist | Air France, Airbus, Sanofi, Renault, Michelin, Auchan, IKEA, AP-HP, Amundi, Devoteam, Cegid, BlaBlaCar, ArianeGroup, bioMérieux |
+| Nothing found from the home page | ~28 (LVMH, EDF, VINCI, Schneider Electric, Crédit Agricole…): pages built in the browser, or the careers link deeper |
+
+Next pieces: (1) the right career addresses for the "doesn't exist" and "nothing found"
+rows, then inspect again; (2) a SuccessFactors adapter (the most frequent unsupported
+tool), then Phenom and iCIMS; (3) Société Générale, L'Oréal, Kering, Stellantis by hand;
+(4) for the sites that refuse crawlers, their career pages on another host, else a request
+for their feed.
