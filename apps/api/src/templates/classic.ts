@@ -1,4 +1,5 @@
 import { dateRange, esc, formatDate, joinNonEmpty, labelsFor, page, safeUrl, type TemplateInput } from "./common";
+import { FONT_FAMILY } from "./fonts";
 
 // "classic": one column, serif headings, optional photo top right.
 export function renderClassic({ content, language, photoDataUrl }: TemplateInput): string {
@@ -78,16 +79,16 @@ export function renderClassic({ content, language, photoDataUrl }: TemplateInput
     ${section(t.interests, esc(content.interests.join(" · ")))}
   </div>`;
 
-  return page(language, basics.fullName, STYLE, body);
+  return page(language, basics.fullName, STYLE, body, ["source-serif-4", "inter"]);
 }
 
 const STYLE = `
-body { font-family: "DejaVu Serif", Georgia, serif; font-size: 10.5pt; color: #222; line-height: 1.35; }
+body { font-family: ${FONT_FAMILY["source-serif-4"]}, Georgia, serif; font-size: 10.5pt; color: #222; line-height: 1.35; }
 .sheet { padding: 16mm 18mm; }
 header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 10px; }
 h1 { margin: 0; font-size: 22pt; letter-spacing: 0.5px; }
 .title { font-size: 12pt; margin-top: 2px; }
-.contact { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9pt; color: #555; margin-top: 6px; }
+.contact { font-family: ${FONT_FAMILY.inter}, Arial, sans-serif; font-size: 9pt; color: #555; margin-top: 6px; }
 .photo { width: 30mm; height: 30mm; object-fit: cover; border-radius: 4px; }
 h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #bbb; margin: 12px 0 6px; padding-bottom: 2px; }
 p { margin: 4px 0; }

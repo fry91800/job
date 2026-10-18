@@ -18,6 +18,7 @@ import { track } from "../lib/analytics";
 import type { TabViewProps } from "../views/registry";
 import { changeContext, fieldOf, namesInOrder, sectionOf, valueText, type Section } from "./change-labels";
 import { useDecide, useDeleteGenerated, useGenerated, useTemplates, useUpdateGenerated } from "./queries";
+import { useTemplateName } from "./TemplatePicker";
 
 // A generated resume (FEATURE M3, M4): the AI's changes to review, one by one or all at
 // once (pending counts as accepted until reviewed), beside the rendered preview; template
@@ -184,6 +185,7 @@ export default function GeneratedView({ tab }: TabViewProps) {
   const closeTabs = useCloseTabs();
   const generated = useGenerated(tab.id!);
   const templates = useTemplates();
+  const templateName = useTemplateName();
   const photos = useQuery({ queryKey: ["photos"], queryFn: ({ signal }) => api<PhotoListResponse>("GET", "/api/photos", { signal }) });
   const update = useUpdateGenerated(tab.id!);
   const remove = useDeleteGenerated();
@@ -232,7 +234,7 @@ export default function GeneratedView({ tab }: TabViewProps) {
         <select aria-label={t("generate.template")} className={select} value={detail.template.id} onChange={(event) => update.mutate({ templateId: Number(event.target.value) })}>
           {templates.data?.results.map((item) => (
             <option key={item.id} value={item.id}>
-              {item.name}
+              {templateName(item)}
             </option>
           ))}
         </select>

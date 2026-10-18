@@ -173,7 +173,7 @@ describe("view, edit, download (M3)", () => {
 describe("settings and templates (S1, S2)", () => {
   test("templates are public and ordered", async () => {
     const { body } = await server.client().get<TemplateListResponse>("/api/templates");
-    assert.deepEqual(body.results.map((template) => template.rendererKey), ["classic", "modern"]);
+    assert.deepEqual(body.results.map((template) => template.rendererKey), ["classic", "modern", "contemporary", "minimal", "elegant", "executive", "creative", "compact"]);
   });
 
   test("update settings; unknown templates and config keys are rejected", async () => {

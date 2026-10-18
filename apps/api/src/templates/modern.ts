@@ -1,4 +1,5 @@
 import { dateRange, esc, formatDate, joinNonEmpty, labelsFor, page, safeUrl, type TemplateInput } from "./common";
+import { FONT_FAMILY } from "./fonts";
 
 // "modern": coloured sidebar (contact, skills, languages) and main column. No photo.
 export function renderModern({ content, language }: TemplateInput): string {
@@ -70,11 +71,11 @@ export function renderModern({ content, language }: TemplateInput): string {
     </main>
   </div>`;
 
-  return page(language, basics.fullName, STYLE, body);
+  return page(language, basics.fullName, STYLE, body, ["inter"]);
 }
 
 const STYLE = `
-body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9.5pt; color: #1f2933; line-height: 1.4; }
+body { font-family: ${FONT_FAMILY.inter}, Arial, sans-serif; font-size: 9.5pt; color: #1f2933; line-height: 1.4; }
 .sheet { display: grid; grid-template-columns: 62mm 1fr; min-height: 297mm; }
 aside { background: #1f3a5f; color: #fff; padding: 14mm 7mm; }
 aside h1 { font-size: 17pt; margin: 0; line-height: 1.15; }

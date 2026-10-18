@@ -52,6 +52,7 @@ export const en: Shape<typeof fr> = {
     action: "Install the app",
     ios: "In Safari, tap Share (the square with an arrow), then \"Add to Home Screen\".",
   },
+  templateNames: { classic: "Classic", modern: "Modern", contemporary: "Contemporary", minimal: "Minimal", elegant: "Elegant", executive: "Executive", creative: "Creative", compact: "Compact" },
   feedback: {
     open: "Feedback or a problem?",
     title: "Your feedback",

@@ -73,8 +73,15 @@ async function main() {
   // Templates: id 1 is the default referenced by users.template_id.
   await prisma.template.createMany({
     data: [
-      { name: "Classic", rendererKey: "classic", previewStorageKey: "templates/classic.png", supportsPhoto: true, sortOrder: 1 },
-      { name: "Modern", rendererKey: "modern", previewStorageKey: "templates/modern.png", supportsPhoto: false, sortOrder: 2 },
+      { name: "Classic", rendererKey: "classic", previewStorageKey: "templates/classic.jpg", supportsPhoto: true, sortOrder: 1 },
+      { name: "Modern", rendererKey: "modern", previewStorageKey: "templates/modern.jpg", supportsPhoto: false, sortOrder: 2 },
+      // Same rows as the migration 20261018170000_more_templates.
+      { name: "Contemporary", rendererKey: "contemporary", previewStorageKey: "templates/contemporary.jpg", supportsPhoto: true, sortOrder: 3 },
+      { name: "Minimal", rendererKey: "minimal", previewStorageKey: "templates/minimal.jpg", supportsPhoto: false, sortOrder: 4 },
+      { name: "Elegant", rendererKey: "elegant", previewStorageKey: "templates/elegant.jpg", supportsPhoto: true, sortOrder: 5 },
+      { name: "Executive", rendererKey: "executive", previewStorageKey: "templates/executive.jpg", supportsPhoto: true, sortOrder: 6 },
+      { name: "Creative", rendererKey: "creative", previewStorageKey: "templates/creative.jpg", supportsPhoto: true, sortOrder: 7 },
+      { name: "Compact", rendererKey: "compact", previewStorageKey: "templates/compact.jpg", supportsPhoto: false, sortOrder: 8 },
     ],
   });
 

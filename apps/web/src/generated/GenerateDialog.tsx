@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Camera, Languages, Loader2, Sparkles, X } from "lucide-react";
+import { Languages, Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { LanguageMismatchDetails } from "@job/shared";
@@ -11,6 +11,7 @@ import { useResumes, useTranslateResume } from "../resumes/queries";
 import { useTabsStore } from "../tabs/store";
 import { useWorkspace } from "../tabs/workspace";
 import { useGenerate, useSettings, useTemplates, type GenerateInput } from "./queries";
+import { TemplatePicker } from "./TemplatePicker";
 
 // Generating a resume for an offer (FEATURE M1): source resume, AI modifier and its
 // strength (with the sections it modifies, S1), template. When the offer and the resume
@@ -195,15 +196,7 @@ function Form({ offerId, onDone }: { offerId: string; onDone: (generatedId: stri
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-fg-muted">{t("generate.template")}</span>
-        <div role="radiogroup" className="grid grid-cols-2 gap-2">
-          {templates.data?.results.map((template) => (
-            <Choice key={template.id} selected={templateId === template.id} onClick={() => setTemplateId(template.id)}>
-              <span className="flex items-center gap-1.5 font-medium">
-                {template.name} {template.supportsPhoto && <Camera size={13} className="text-fg-subtle" aria-label={t("generate.withPhoto")} />}
-              </span>
-            </Choice>
-          ))}
-        </div>
+        <TemplatePicker templates={templates.data?.results ?? []} value={templateId} onChange={setTemplateId} />
       </div>
 
       <label className="flex items-center gap-2 text-sm text-fg-muted">

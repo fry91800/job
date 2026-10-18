@@ -110,6 +110,8 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Select a template → saved in `users.template_id`. It is the default for new generations and can be changed per generated resume without regenerating (M3).
 * `is_free` is ignored in the MVP (all templates available).
 * Retired template (soft-deleted) → disappears from the list; users who had it fall back to the default template; existing generated resumes keep rendering with it as long as its code exists.
+* **The eight templates** (all free; code in `apps/api/src/templates/`, D160): Classique, Moderne, Contemporain (sidebar, photo), Épuré (one column, the safest for recruiters' software), Élégant (serif, centred, photo), Exécutif (navy band, photo), Créatif (timeline, photo), Compact (dense, fits a long career on one page). The six newer ones share their markup (`parts.ts`); fonts are embedded in each PDF (`fonts.ts`: Inter, Source Serif 4, Manrope), so a PDF looks the same everywhere.
+* Chosen from pictures of their first page (`apps/web/public/templates/<key>.jpg`) in the generate dialog and Settings. After changing a template, run `npm run templates:previews` (add `--pdf <folder>` to get the full PDFs and check page breaks) and commit the pictures. A new template needs its renderer (`render.ts`, `PHOTO_TEMPLATES`), a migration adding its row, the same row in the seed, and its name in the app's texts (`templateNames`).
 
 ---
 

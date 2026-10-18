@@ -1,4 +1,5 @@
 import type { ResumeContent } from "@job/shared";
+import { fontCss, type FontKey } from "./fonts";
 
 // Shared helpers for the resume templates. Templates print their headings in the
 // RESUME's language, not the UI language (FEATURE L1).
@@ -62,13 +63,15 @@ export function joinNonEmpty(values: (string | null | undefined)[], separator: s
   return values.filter((value): value is string => !!value).join(separator);
 }
 
-export function page(language: string, title: string, style: string, body: string): string {
+// `fonts`: embedded in the page (fonts.ts); without them the server's fonts are used.
+export function page(language: string, title: string, style: string, body: string, fonts: FontKey[] = []): string {
   return `<!doctype html>
 <html lang="${esc(language)}">
 <head>
 <meta charset="utf-8">
 <title>${esc(title)}</title>
 <style>
+${fontCss(fonts)}
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -82,3 +85,40 @@ ${style}
 <body>${body}</body>
 </html>`;
 }
+
+// Shared rules of the templates built from parts.ts: the markup's defaults (layout of an
+// entry, lists, tags, contact icons). Templates add their typography and colours.
+// Multi-page resumes: elements that continue on the next page repeat their padding there
+// (box-decoration-break), and entries and headings don't split across pages.
+export const PARTS_BASE = `
+body { font-size: 9.5pt; line-height: 1.45; text-rendering: geometricPrecision; font-kerning: normal; }
+a { text-decoration: none; }
+p { margin: 0; }
+.section { margin-top: 5mm; }
+.section:first-child { margin-top: 0; }
+.section-title { margin: 0 0 2.5mm; break-after: avoid; }
+.entry { break-inside: avoid; }
+.entry + .entry { margin-top: 3.2mm; }
+.entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4mm; }
+.entry-main { min-width: 0; }
+.entry-title { font-weight: 650; }
+.entry-place::before { content: " · "; }
+.entry-dates { white-space: nowrap; flex-shrink: 0; }
+.entry-text { margin-top: 1mm; }
+.bullets { margin: 1.2mm 0 0; padding-left: 4mm; }
+.bullets li { margin: 0.6mm 0; padding-left: 0.5mm; }
+.tech { margin-top: 1.2mm; }
+.tags { display: flex; flex-wrap: wrap; gap: 1.2mm; }
+.tag { display: inline-block; white-space: nowrap; }
+.contact { list-style: none; margin: 0; padding: 0; }
+.contact li { display: flex; align-items: center; gap: 1.6mm; }
+.contact a { color: inherit; }
+.icon { width: 3.2mm; height: 3.2mm; flex-shrink: 0; }
+.plain { list-style: none; margin: 0; padding: 0; }
+.languages { list-style: none; margin: 0; padding: 0; }
+.languages li { display: flex; justify-content: space-between; gap: 3mm; }
+.subhead { margin-top: 2.5mm; break-after: avoid; }
+.summary { text-align: left; }
+.photo { display: block; object-fit: cover; }
+.clone { box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+`;

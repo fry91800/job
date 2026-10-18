@@ -48,6 +48,7 @@ export const fr = {
     action: "Installer l'application",
     ios: "Dans Safari, touchez Partager (le carré avec une flèche), puis « Sur l'écran d'accueil ».",
   },
+  templateNames: { classic: "Classique", modern: "Moderne", contemporary: "Contemporain", minimal: "Épuré", elegant: "Élégant", executive: "Exécutif", creative: "Créatif", compact: "Compact" },
   feedback: {
     open: "Un avis ? Un problème ?",
     title: "Votre avis",

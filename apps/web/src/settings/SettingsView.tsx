@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Camera, Loader2, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, Settings as SettingsIcon } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { MODIFIER_SECTIONS, MODIFIER_STRENGTHS, PASSWORD_MIN_LENGTH, passwordSchema, type Settings, type SettingsResponse } from "@job/shared";
@@ -8,6 +8,7 @@ import { api } from "../api/client";
 import { keys, queryClient, useMe } from "../api/queries";
 import { chooseLanguage, useAuthDialog } from "../auth/session";
 import { useSettings, useTemplates } from "../generated/queries";
+import { TemplatePicker } from "../generated/TemplatePicker";
 import { LANGUAGES, type Language } from "../i18n";
 import { confirm } from "../lib/confirm";
 import { errorMessage } from "../lib/errors";
@@ -204,19 +205,7 @@ export default function SettingsView() {
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-fg-muted">{t("generate.template")}</span>
-          <Segmented
-            label={t("generate.template")}
-            value={current?.templateId ?? templates.data?.results[0]?.id ?? 0}
-            options={(templates.data?.results ?? []).map((template) => ({
-              value: template.id,
-              label: (
-                <>
-                  {template.name} {template.supportsPhoto && <Camera size={13} className="text-fg-subtle" aria-label={t("generate.withPhoto")} />}
-                </>
-              ),
-            }))}
-            onChange={(templateId) => update.mutate({ templateId })}
-          />
+          <TemplatePicker templates={templates.data?.results ?? []} value={current?.templateId ?? templates.data?.results[0]?.id ?? null} onChange={(templateId) => update.mutate({ templateId })} />
         </div>
         {!current && <p className="text-xs text-fg-subtle">{t("settings.savedOnChange")}</p>}
       </Card>
