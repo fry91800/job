@@ -6,7 +6,8 @@ import { api } from "../api/client";
 // history), without the query string (searches are events instead); visitors asking not to
 // be tracked (Do Not Track) are not. Off when the API has no website id (development).
 
-type Umami = { track(event: string, data?: Record<string, string | number | boolean>): void };
+type EventData = Record<string, string | number | boolean>;
+type Umami = { track(event: string, data?: EventData): void };
 
 declare global {
   interface Window {
@@ -25,15 +26,33 @@ export async function startAnalytics(): Promise<void> {
     script.dataset.domains = analytics.domain; // not on rehearsal or local copies
     script.dataset.excludeSearch = "true";
     script.dataset.doNotTrack = "true";
+    // Events from before the script was there (e.g. the arrival from an alert email).
+    script.addEventListener("load", () => pending.splice(0).forEach(([event, data]) => track(event, data)));
     document.head.append(script);
   } catch {
     // Measurement is never worth an error.
   }
 }
 
+const pending: [string, EventData | undefined][] = [];
+
+// Arrival from a job alert email (`?alert=<send hour>`, apps/api/src/alerts/send.ts): an
+// "alert_click" event with the hour the email was sent and what was clicked, to compare
+// send hours (GROWTH.md §5). The parameter leaves the address before the app reads it.
+export function trackAlertArrival(): void {
+  const url = new URL(location.href);
+  const hour = url.searchParams.get("alert");
+  if (hour === null) return;
+  url.searchParams.delete("alert");
+  history.replaceState(history.state, "", url);
+  const data: EventData = { link: url.pathname.startsWith("/offers/") ? "offer" : "search", sendHour: Number(hour) || 0 };
+  if (window.umami) track("alert_click", data);
+  else pending.push(["alert_click", data]);
+}
+
 // A step that matters (GROWTH.md §5): resume uploaded, resume generated, PDF downloaded…
 // Data: small facts only, never personal content.
-export function track(event: string, data?: Record<string, string | number | boolean>): void {
+export function track(event: string, data?: EventData): void {
   try {
     window.umami?.track(event, data);
   } catch {

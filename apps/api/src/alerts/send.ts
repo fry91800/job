@@ -40,10 +40,14 @@ const CONTRACTS: Record<string, Record<string, string>> = {
   en: { permanent: "Permanent", fixed_term: "Fixed-term", temporary: "Temporary", freelance: "Freelance", internship: "Internship", apprenticeship: "Apprenticeship" },
 };
 
+// Links from the emails carry `alert=<send hour>`: the app records an "alert_click" event
+// (Umami), to compare send hours (GROWTH.md §5), and removes it from the address.
+const fromAlert = () => `alert=${config.alerts.sendHour}`;
+
 function offerLine(offer: OfferSearchResult, language: "fr" | "en"): AlertOffer {
   const place = offer.location ? offer.location.name : offer.remoteType === "remote" ? (language === "fr" ? "Télétravail" : "Remote") : null;
   const facts = [offer.companyName, place, offer.contractType && CONTRACTS[language][offer.contractType]].filter(Boolean).join(" · ");
-  return { url: `${config.webBaseUrl}/offers/${offer.id}`, title: offer.title, facts };
+  return { url: `${config.webBaseUrl}/offers/${offer.id}?${fromAlert()}`, title: offer.title, facts };
 }
 
 export type AlertsRunResult = { checked: number; sent: number; failed: number };
@@ -83,7 +87,7 @@ export async function runAlerts(now = new Date()): Promise<AlertsRunResult> {
             label: alert.label,
             offers: search.results.slice(0, config.alerts.offersShown).map((offer) => offerLine(offer, language)),
             total: search.total,
-            searchUrl: `${config.webBaseUrl}/?${alert.query}&sort=recent`,
+            searchUrl: `${config.webBaseUrl}/?${alert.query}&sort=recent&${fromAlert()}`,
             unsubscribeUrl,
             settingsUrl: `${config.webBaseUrl}/settings`,
           });

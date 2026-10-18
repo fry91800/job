@@ -301,6 +301,9 @@ dashboard on `https://stats.monposte.com`. Setting it up, once:
 4. Open the site in a private window and click around: the visit shows in the dashboard
    within a minute ("Realtime"). Events are under *Events*.
 
+Links in job alert emails carry `?alert=<send hour>`; the app records them as an
+`alert_click` event and removes the parameter (GROWTH.md §5, choosing the send hour).
+
 Umami's data is not in the daily backup (only the application's database is); losing it
 loses statistics only. The privacy policy says statistics are kept 25 months at most:
 Umami keeps everything, so delete older data once a year when the site is two years old

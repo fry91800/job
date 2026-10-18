@@ -200,6 +200,11 @@ Weekly, in a table below (§6):
   it's the moment MonPoste proves useful.
 - **Retention:** people active in a week who were also active in an earlier week.
 - **Accounts created.**
+- **Alert clicks**: in Umami, Events → `alert_click`, with `sendHour` (the hour the email
+  went out) and `link` (an offer or "see all"). To choose the send hour: two weeks at one
+  hour (`ALERTS_SEND_HOUR` in `.env.production`, then `dc up -d api`), two weeks at
+  another, and compare clicks per alert email sent (`dc logs --since 14d api | grep
+  job_alerts_done` gives the emails sent).
 - **AI cost** for the week (Gemini console).
 - **Feedback received**, and what it was about.
 

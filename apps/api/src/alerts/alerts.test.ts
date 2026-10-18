@@ -97,8 +97,8 @@ describe("sending", () => {
     assert.equal(mails.filter((mail) => mail.to === unverified.email).length, 0, "not to unconfirmed addresses");
     const mail = mails.find((mail) => mail.to === verified.email)!;
     assert.equal(mail.subject, `Nouvelle offre : ${KEYWORD}`);
-    assert.match(mail.text, new RegExp(`Développeur ${KEYWORD} H/F\\n  Alertes SAS · CDI\\n  ${config.webBaseUrl}/offers/`));
-    assert.match(mail.text, new RegExp(`${config.webBaseUrl}/\\?q=${KEYWORD}&sort=recent`));
+    assert.match(mail.text, new RegExp(`Développeur ${KEYWORD} H/F\\n  Alertes SAS · CDI\\n  ${config.webBaseUrl}/offers/[0-9a-f-]{36}\\?alert=${config.alerts.sendHour}\\n`));
+    assert.match(mail.text, new RegExp(`${config.webBaseUrl}/\\?q=${KEYWORD}&sort=recent&alert=${config.alerts.sendHour}\\n`), "links say they come from an alert, and its send hour");
     const unsubscribe = /<(.+)>/.exec(mail.headers!["List-Unsubscribe"])![1];
     assert.equal(mail.headers!["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
 

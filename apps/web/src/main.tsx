@@ -7,9 +7,10 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { queryClient } from "./api/queries";
 import { Shell } from "./layout/Shell";
-import { startAnalytics } from "./lib/analytics";
+import { startAnalytics, trackAlertArrival } from "./lib/analytics";
 import "./lib/install"; // catches the browser's install prompt early
 
+trackAlertArrival();
 void startAnalytics();
 
 // Every address is handled by the workspace shell: addresses name tabs (FRONTEND.md §2.4).
