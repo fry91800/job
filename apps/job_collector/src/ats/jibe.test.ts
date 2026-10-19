@@ -20,7 +20,7 @@ let server: http.Server;
 let slug: string;
 const TEST_BOARD = () => ({ ats: "jibe", slug });
 
-function route(path: string, params: URLSearchParams): [number, string, string] {
+function route(path: string, params: URLSearchParams, accept: string): [number, string, string] {
   if (path === "/robots.txt") return [200, "text/plain", "User-agent: *\nAllow: /\n"];
   if (path === "/api/jobs") {
     const listed = jobs.filter((job) => params.get("country") !== "France" || job.country_code === "FR");
@@ -29,6 +29,8 @@ function route(path: string, params: URLSearchParams): [number, string, string] 
     return [200, "application/json; charset=utf-8", JSON.stringify(body)];
   }
   const job = jobs.find((item) => path === `/jobs/${item.slug}`);
+  // Like Workday: a page's address answered with JSON when the request accepts it.
+  if (job && /json/.test(accept)) return [200, "application/json", '{"error":"use the page"}'];
   if (job) {
     const posting = { "@context": "http://schema.org", "@type": "JobPosting", title: job.title, description: `<h2>Vos missions</h2><p>${LONG}</p>`, employmentType: "FULL_TIME" };
     return [200, "text/html", `<html><head><script type="application/ld+json">${JSON.stringify(posting)}</script></head></html>`];
@@ -40,7 +42,7 @@ before(async () => {
   server = http.createServer((req, res) => {
     const url = new URL(req.url!, "http://localhost");
     requests.push(url.pathname + url.search);
-    const [status, type, text] = route(url.pathname, url.searchParams);
+    const [status, type, text] = route(url.pathname, url.searchParams, req.headers.accept ?? "");
     res.writeHead(status, { "Content-Type": type }).end(text);
   });
   server.listen(0, "127.0.0.1");

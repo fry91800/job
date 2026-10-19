@@ -770,3 +770,85 @@ replaced by the real count after the first full run.
 
 Not done: **Lidl** — its sitemap's offer addresses are broken (the id is missing: every one
 answers 404) and its list is built in the browser from an endpoint to find in its scripts.
+
+### 17.16 Remaining platforms of the list (2026-10-19)
+
+* **DigitalRecruiters** (French; Decathlon): career sites on the employer's own domain
+  (`joinus.decathlon.fr`), built from DR's public careers API, with **complete sitemaps and
+  JobPosting on every offer**: the career-site crawler reads them as they are. Decathlon:
+  770 French offers. DR hosts aren't under a common domain, so Common Crawl can't list them;
+  `inspect` proposes `careersite/<host>` when a page calls `api.digitalrecruiters.com`.
+* **Aldi France** (`ats/adapters/aldi.ts`, source `aldi`, board `www.aldi.fr`): TalentLink
+  offers shown by Aldi's own Next.js site. The search page carries all 590 offers in its data
+  (`__NEXT_DATA__` → `JOB_HR_GET_ALL`: title, dates, contract, address); each new offer's
+  page (`/carriere/detail/{slugTitle}-{postingId}.html`, `JOB_HR_GET`) gives its texts
+  (tasks, requirements, what Aldi offers, about), read once within the page budget.
+* **Avature** (`ats/adapters/avature.ts`, source `avature`, board `<host>/<lang>`:
+  `jobs.totalenergies.com/fr_FR`): the language sitemap lists every offer with a date
+  (future ones ignored); pages have no JobPosting but Avature's field classes
+  (`.article__content__view__field`, labels "Pays"/"Country", "Ville", "Type de contrat"…;
+  texts as unlabelled fields under `<h2>`). Every page is read once (the sitemap doesn't
+  say the country), within the page budget; offers abroad are remembered while the worker
+  runs. TotalEnergies: 1 038 offers, ~350 in France.
+* Not worth an adapter (small companies, few offers each, no JobPosting): Flatchr (its
+  robots.txt also refuses most crawlers), Taleez, Jobaffinity, Beetween.
+* Later, employer-specific: Danone (`careers.danone.com`: 138 French-language offers, the
+  offer in a page component's attributes), Lidl (§17.15), Suez (Cornerstone).
+* Out: Forvia / Faurecia (`jobs.faurecia.com`: robots.txt forbids everything).
+
+### 17.17 More large employers — second inspection (2026-10-19)
+
+`inspect` on 229 more large French employers (`data/career-sites-2026-10-19-more.txt`,
+`data/inspect-2026-10-19-more.json`): 30 on supported tools, 1 with JobPosting, 19 on other
+tools (Cornerstone ×5, Oracle ×4), 54 refusing crawlers, 102 with nothing found from the home
+page. Added: NGE (Talentsoft, 1 047 French offers), Idex (Workday, 610), LNA Santé (career
+site, 289), Banque de France (Workday, 125), Europcar (97), Limagrain (SuccessFactors, 92),
+Fleury Michon (Recruitee, 61), Coty (53), Icade (32), Ayvens, Natran, Institut Pasteur,
+Criteo, Gecina, Bouygues Immobilier.
+
+**Fixed on the way**: the fetcher had started sending `Accept: …application/json` (for
+Jibe's list, §17.14), and Workday answers its offer pages with a JSON stub when JSON is
+accepted: every Workday page would have lost its JobPosting. Pages are asked for as pages
+again; a JSON list asks for JSON itself (`crawlGet(url, { accept })`). The Jibe test site
+answers like Workday to keep it that way.
+
+### 17.18 Oracle Recruiting Cloud (2026-10-19)
+
+`ats/adapters/oracle.ts`, source `oracle`, board = `<host>/<site number>`
+(`eoct.fa.em2.oraclecloud.com/careers`), daily at 07:00. No robots.txt; the site's own
+public REST API (`/hcmRestApi/resources/latest/`):
+
+* `recruitingCEJobRequisitions` (finder `findReqs`): with `facetsList=LOCATIONS` the
+  location filter's values and counts (France has an Id: a check is one request), with
+  `selectedLocationsFacet=<Id>` only offers placed in France, 25 a page, newest first;
+* `recruitingCEJobRequisitionDetails` (finder `ById`): the texts in HTML, read once per new
+  offer within the page budget.
+* The company's name isn't in the API: taken from the career site's `<title>` without its
+  boilerplate ("Site Carrière Savencia" → Savencia); generic titles ("Site d'expérience
+  candidat") give none — then `boards add … --name X`. A tenant may publish the same offers
+  under two site numbers: one is kept (the other marked `duplicate`).
+* **Discovery**: every site is an `*.oraclecloud.com` host, so Common Crawl's index lists
+  them (1 928 sites in 3 crawls, 59 with French pages); the monthly discovery now includes
+  them. Added: Hermès (519 French offers), Soprema (235), ArcelorMittal (206), Sodiaal
+  (167), Savencia (161), Hutchinson (121), Legrand (62), AC Environnement, SCOR, Klépierre,
+  Marriott, IHG, Technip Energies, Natixis… — about 1 750.
+
+### 17.19 Cornerstone OnDemand (2026-10-19)
+
+`ats/adapters/cornerstone.ts`, source `cornerstone`, board = `<tenant>.csod.com/<career site
+number>`, daily at 07:30. robots.txt allows (crawl-delay 10, obeyed). The career site's page
+gives its scripts a public token and the API's address; the site's own search (`POST
+{api}rec-job-search/external/jobs` with that token) lists every offer (id, title, date
+"16/10/2026", places with their country, a shortened plain-text description); each new
+French offer's page carries JobPosting with the full description, read once within the page
+budget. `crawlPostJson` and `safeFetch` accept extra headers for the token.
+
+**Discovery**: tenants are `*.csod.com` hosts: Common Crawl lists 748 career sites, 36 with
+French pages; the monthly discovery includes them. Added: Suez (575 French offers), Transdev
+(436), Agrial (348), Avril (136), Groupe Roullier (139), Tereos (66), Heppner, HEC Paris,
+Ceva, Apprentis d'Auteuil, Henkel… — about 1 930. (Avature's `*.avature.net` sites are
+discovered the same way, French sections only; besides TotalEnergies, only Xerox Canada.)
+
+**Moving this to production**: `data/boards-2026-10-19.json.gz` is the whole registry after
+this work (45 394 boards, with statuses and company names): `boards import` on the server
+(DEPLOYMENT.md "Catalogue and boards") — a board's newer check on the server wins.

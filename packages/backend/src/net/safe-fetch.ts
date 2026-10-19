@@ -54,6 +54,8 @@ export type SafeFetchOptions = {
   allowedPrivateAddresses?: string[];
   // A POST with this body (a site's own JSON feed, Workday): redirects aren't followed.
   post?: { body: string; contentType: string };
+  // Other headers: the public token a career site gives its own pages (Cornerstone).
+  headers?: Record<string, string>;
 };
 
 export type SafeFetchFailureReason = "invalid_url" | "blocked_address" | "wrong_type" | "too_large" | "too_slow" | "unknown_host" | "unreachable" | "too_many_redirects";
@@ -115,6 +117,7 @@ function request(url: URL, options: SafeFetchOptions, signal: AbortSignal): Prom
           "Accept-Encoding": "gzip, deflate, br",
           "Accept-Language": "fr,en;q=0.8",
           ...(options.post && { "Content-Type": options.post.contentType, "Content-Length": String(Buffer.byteLength(options.post.body)) }),
+          ...options.headers,
         },
       },
       (res) => {

@@ -28,8 +28,10 @@ const options = () => {
     maxBytes: crawler.maxBytes,
     maxRedirects: crawler.maxRedirects,
     allowedPrivateAddresses: crawler.allowedPrivateAddresses,
-    accept: "text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,application/json;q=0.9,text/plain;q=0.8",
-    // JSON: a site's own job list (Jibe's /api/jobs).
+    // Pages, not JSON: some sites answer a page's address with JSON when the request accepts
+    // it (Workday's offer pages). A JSON list asks for it itself (`accept` in crawlGet).
+    accept: "text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,text/plain;q=0.8",
+    // JSON accepted when asked for: a site's own job list (Jibe's /api/jobs).
     contentTypes: /text\/html|application\/xhtml\+xml|xml|json|text\/plain|application\/(x-)?gzip|application\/octet-stream/i,
   };
 };
@@ -50,8 +52,9 @@ function onHost<T>(host: string, delayMs: number, task: () => Promise<T>): Promi
   return run;
 }
 
-// `limits`: a larger size or time for one request (a site's whole job feed).
-type Limits = { maxBytes?: number; timeoutMs?: number };
+// `limits`: a larger size or time for one request (a site's whole job feed), or another
+// Accept header (a JSON list).
+type Limits = { maxBytes?: number; timeoutMs?: number; accept?: string };
 
 async function rawGet(url: URL, delayMs: number, limits: Limits = {}): Promise<SafeFetchResponse> {
   return onHost(url.host, delayMs, async () => {
@@ -111,7 +114,7 @@ export async function crawlGet(input: string, limits: Limits = {}): Promise<{ ur
 
 // A site's own JSON feed, by POST (Workday's job list), under the same rules as its pages:
 // robots.txt, one request at a time per host, spaced.
-export async function crawlPostJson<T>(input: string, body: unknown): Promise<T> {
+export async function crawlPostJson<T>(input: string, body: unknown, headers?: Record<string, string>): Promise<T> {
   const url = new URL(input);
   const robots = await robotsFor(url);
   if (!allowedByRobots(robots, url)) throw new DisallowedError(`${url}: disallowed by robots.txt`);
@@ -122,6 +125,7 @@ export async function crawlPostJson<T>(input: string, body: unknown): Promise<T>
         accept: "application/json",
         contentTypes: /json/i,
         post: { body: JSON.stringify(body), contentType: "application/json" },
+        headers,
       });
     } catch (error) {
       if (error instanceof SafeFetchError && error.reason === "unknown_host") throw new UnknownHostError(`${url}: ${error.message}`);

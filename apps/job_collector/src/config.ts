@@ -47,6 +47,16 @@ export const collectorConfig = {
     maxListPages: 150, // up to 3 000 French jobs per site
   },
 
+  // Cornerstone career sites (COLLECTOR.md §17.19): pages of 50 offers read per run.
+  cornerstone: {
+    maxListPages: 100,
+  },
+
+  // Oracle Recruiting Cloud sites (COLLECTOR.md §17.18): pages of 25 offers read per run.
+  oracle: {
+    maxListPages: 200,
+  },
+
   // iCIMS / Jibe career sites (COLLECTOR.md §17.14): pages of the job list read per run.
   jibe: {
     maxListPages: 100, // 100 offers a page

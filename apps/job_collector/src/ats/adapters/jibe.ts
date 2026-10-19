@@ -50,7 +50,7 @@ async function listPage(slug: string, page: number, limit = PAGE_SIZE): Promise<
   const url = `${collectorConfig.crawler.scheme}://${slug}/api/jobs?${new URLSearchParams({ country: "France", page: String(page), limit: String(limit) })}`;
   let text: string;
   try {
-    text = (await crawlGet(url)).text;
+    text = (await crawlGet(url, { accept: "application/json" })).text;
   } catch (error) {
     if (error instanceof PageGoneError) throw new NotFoundError(error.message);
     throw error;

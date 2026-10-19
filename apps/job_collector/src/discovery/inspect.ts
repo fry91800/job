@@ -108,6 +108,9 @@ export async function inspectSite(input: string): Promise<Inspection> {
   const successFactorsHosts = new Set<string>();
   const phenomBoards = new Set<string>();
   const jibeHosts = new Set<string>();
+  const careerSiteHosts = new Set<string>();
+  const oracleBoards = new Set<string>();
+  const cornerstoneBoards = new Set<string>();
   const urls: URL[] = [];
   let offerPage: string | null = null;
 
@@ -145,6 +148,13 @@ export async function inspectSite(input: string): Promise<Inspection> {
     if (/j2w\.init\(/.test(page.text)) successFactorsHosts.add(here.host);
     // Phenom: its data in the page; the board is the host and the French section
     // ("/fr/fr"), else the section the page is in.
+    // DigitalRecruiters career sites (on the employer's own domain): complete sitemaps and
+    // JobPosting on each offer, read by the career-site crawler.
+    if (/api\.digitalrecruiters\.com/.test(page.text)) careerSiteHosts.add(here.host);
+    // Oracle Recruiting Cloud: the career site's address (host and site number) on the page.
+    for (const match of page.text.matchAll(/https?:\/\/([a-z0-9.-]+\.oraclecloud\.com)\/hcmUI\/CandidateExperience\/[a-zA-Z_-]+\/sites\/([A-Za-z0-9_-]+)/g)) oracleBoards.add(`${match[1]}/${match[2]}`);
+    // Cornerstone: a career site's address (tenant and number) on the page.
+    for (const match of page.text.matchAll(/https?:\/\/([a-z0-9-]+\.csod\.com)\/ux\/ats\/careersite\/(\d+)\//g)) cornerstoneBoards.add(`${match[1]}/${match[2]}`);
     // iCIMS career sites built with Jibe: their scripts on the employer's host.
     if (/jibecdn\.com/.test(page.text)) jibeHosts.add(here.host);
     if (/phApp\.ddo/.test(page.text)) {
@@ -168,7 +178,10 @@ export async function inspectSite(input: string): Promise<Inspection> {
   }
 
   if (offerPage && seen.has(offerPage) && result.jobPosting === null) result.jobPosting = false;
-  const boards = [...supportedBoards(urls), ...[...successFactorsHosts].map((slug) => ({ ats: "successfactors", slug })), ...[...phenomBoards].map((slug) => ({ ats: "phenom", slug })), ...[...jibeHosts].map((slug) => ({ ats: "jibe", slug }))];
+  const boards = [...supportedBoards(urls), ...[...successFactorsHosts].map((slug) => ({ ats: "successfactors", slug })), ...[...phenomBoards].map((slug) => ({ ats: "phenom", slug })), ...[...jibeHosts].map((slug) => ({ ats: "jibe", slug })), ...[...careerSiteHosts].map((slug) => ({ ats: "careersite", slug })), ...[...oracleBoards].map((slug) => ({ ats: "oracle", slug })), ...[...cornerstoneBoards].map((slug) => ({ ats: "cornerstone", slug }))];
+  if (cornerstoneBoards.size) unsupported.delete("cornerstone");
+  if (oracleBoards.size) unsupported.delete("oracle-cloud");
+  if (careerSiteHosts.size) unsupported.delete("digitalrecruiters");
   if (jibeHosts.size) unsupported.delete("icims");
   if (successFactorsHosts.size) unsupported.delete("successfactors");
   if (phenomBoards.size) unsupported.delete("phenom");

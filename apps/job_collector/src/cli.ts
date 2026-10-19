@@ -8,7 +8,7 @@
 //   census [--crawls N]                       companies per recruiting tool in Common Crawl, with French pages
 //   inspect <address…> [--file F] [--json F]  what a career site runs on (supported tool, JobPosting, other tool)
 //   boards check [--ats X] [--limit N]        check candidate / due boards
-//   boards add <ats> <slug>                   add a board by hand (checked right away); careersite <address>
+//   boards add <ats> <slug> [--name N]        add a board by hand (checked right away); careersite <address>
 //   boards list [--status S]                  boards by tool and status
 //   boards export [file]                      save the board registry (default data/boards-<date>.json.gz)
 //   boards import <file>                      merge a saved registry (newer checks win)
@@ -31,6 +31,7 @@ import { collectorMetrics } from "./metrics";
 import { checkBotSources } from "./bots/health";
 import { runMaintenance } from "./pipeline/close";
 import { reenrich } from "./pipeline/reenrich";
+import { normalizeCompanyName } from "./pipeline/text";
 import { runConnector } from "./runs/run-connector";
 
 function option(args: string[], name: string): string | undefined {
@@ -91,7 +92,12 @@ async function main() {
           create: { ats, slug, status: "candidate", discoveredFrom: "manual" },
           update: {},
         });
-        console.log(`${ats}/${slug}:`, await checkBoard(board));
+        const result = await checkBoard(board);
+        // --name "Savencia": the company's name, when the site doesn't give it (Oracle).
+        const name = option(rest, "--name");
+        const checked = await prisma.companySource.findUniqueOrThrow({ where: { id: board.id } });
+        if (name && checked.companyId) await prisma.company.update({ where: { id: checked.companyId }, data: { name, normalizedName: normalizeCompanyName(name) } });
+        console.log(`${ats}/${slug}:`, result);
       } else if (action === "list") {
         const status = option(rest, "--status");
         const rows = await prisma.companySource.groupBy({ by: ["ats", "status"], _count: true, where: status ? { status } : {}, orderBy: [{ ats: "asc" }, { status: "asc" }] });
