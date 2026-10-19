@@ -44,7 +44,7 @@ export const collectorConfig = {
 
   // Workday career sites (COLLECTOR.md §17.10): jobs listed 20 per request.
   workday: {
-    maxListPages: 150, // up to 3 000 French jobs per site
+    maxListPages: 250, // up to 5 000 French jobs per site (Babilou: 3 350)
   },
 
   // Cornerstone career sites (COLLECTOR.md §17.19): pages of 50 offers read per run.
@@ -60,6 +60,16 @@ export const collectorConfig = {
   // iCIMS / Jibe career sites (COLLECTOR.md §17.14): pages of the job list read per run.
   jibe: {
     maxListPages: 100, // 100 offers a page
+  },
+
+  // Amazon's careers site (§17.20).
+  amazon: {
+    maxListPages: 50, // 100 offers a page
+  },
+
+  // Gestmax career sites (§17.21).
+  gestmax: {
+    maxListPages: 100, // about 20 offers a page
   },
 
   // Phenom career sites (COLLECTOR.md §17.13): pages of the filtered search read per run.

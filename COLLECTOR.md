@@ -852,3 +852,92 @@ discovered the same way, French sections only; besides TotalEnergies, only Xerox
 **Moving this to production**: `data/boards-2026-10-19.json.gz` is the whole registry after
 this work (45 394 boards, with statuses and company names): `boards import` on the server
 (DEPLOYMENT.md "Catalogue and boards") — a board's newer check on the server wins.
+
+### 17.20 More employers, Amazon, and Workday's paging (2026-10-19)
+
+* **Workday lists were cut at 40 offers per site.** Workday gives the list's total on the
+  first page only (later pages answer `total: 0`) and caps it at 2 000, while later offsets
+  still answer. The list stopped once it had read "the total": after the second page.
+  Past the end, Workday answers full pages again, repeating jobs, and a search never gives
+  more than 2 000 jobs. The list now stops at the France filter's count (exact, not capped),
+  else at the total when under 2 000, at a short page, or at a page without new jobs; the
+  test's fake site answers like Workday on these points. A French list of 2 000 or more is
+  read in parts, by a second filter whose values each stay under 2 000 and together cover
+  it (`splitFilter`: Babilou's 3 351 French jobs by its 35 job profiles). Thales, Eiffage, Airbus,
+  Babilou… now give all their French offers (within the page budget per run, so over a few
+  days).
+* **Workday candidates**: the registry's ~6 000 Workday candidates (Common Crawl) are
+  checked European data centres first (wd3, wd103): 2 800 checked, 274 active with about
+  10 400 French offers — Babilou (3 351), Galileo Global Education (1 412), Deloitte (386),
+  Arabelle Solutions (376), Mango (359), Richemont (251), JD Sports (220), Cultura (174),
+  Kone, Swiss Life, KION, RATP, Rothschild & Co, LFB, Mondelez, Diptyque, Euronext… The
+  remaining ~3 300 candidates (mostly American tenants) are left to the nightly checks.
+  Names come from the tenant ("fina" → Deloitte): the large ones were renamed with
+  `boards add … --name`.
+* **Third inspection** (`data/career-sites-2026-10-19-c.txt`: the recruitment addresses of
+  the employers whose home page led nowhere): Century 21 (669), Monoprix (603), Foncia
+  (547), Buffalo Grill (357), Bureau Veritas (336), EssilorLuxottica, Groupe Casino, Groupe
+  Rocher, Harmonie Mutuelle, AG2R La Mondiale, Mars, Worldline, Bonduelle, Kuehne+Nagel,
+  Pluxee, Saur, P&G… — about 3 400. MAIF runs Talentsoft on its own domain
+  (`recrutement.maif.fr`): `inspect` now recognises Talentsoft and Gestmax sites on
+  employers' domains by their assets. Refusing crawlers: Schneider Electric, EDF,
+  bioMérieux, AP-HP, BNP Paribas, Heineken, Korian, Mobivia, Nexity (403); Crédit Agricole,
+  Groupama, MGEN, Elis, ID Logistics (their Talentsoft robots.txt).
+* **Amazon** (`ats/adapters/amazon.ts`, source `amazon`, board `www.amazon.jobs`, daily):
+  robots.txt only forbids `/internal`; the site's own search
+  (`/fr/search.json?normalized_country_code[]=FRA`, 100 a page) lists the French offers
+  with their full texts (description, required and preferred qualifications), city, posted
+  date in French ("octobre 19, 2026"): one request per 100 offers, nothing else to read.
+
+### 17.21 Gestmax (2026-10-19)
+
+`ats/adapters/gestmax.ts`, source `gestmax`, board = the site's host
+(`kiloutou.gestmax.fr`), daily at 06:45. A French tool used by employers (MBDA, Kiloutou,
+Groupe Beaumanoir, Editis, Stago, Groupe Alpha) and above all by local authorities
+(regions, départements, cities, hospitals). No robots.txt.
+
+* `/search` leads (sometimes through a redirect) to the list of every offer, ~20 a page,
+  as cards (title, contract, place, date) or as a table (MBDA: a row per offer, a cell per
+  column); page links in three forms (`/page/N`, `?page=N`, `/frontsearchtab_id/1/page/N`).
+  A date ahead in a list is a closing date: ignored.
+* Offer pages (`/{id}/{n}/{words}`) have no JobPosting: `<h1>`, `.title-city`, labelled
+  fields (`p.field-vac_…` with a `<span>` label) and texts under headings
+  (`h3.field` + `.field-value-…`). An offer whose country field isn't France is skipped.
+  Each new offer's page is read once, within the page budget.
+* **Discovery**: `*.gestmax.fr` in Common Crawl (58 sites over 6 crawls, 53 with French
+  pages; monthly). 43 active, ~2 900 offers: MBDA (693), Groupe Beaumanoir (246), Région
+  Île-de-France (210), Département du Nord (150), Kiloutou (147), AHBFC (116), Aubervilliers
+  (101), Moselle (97), Le Vinatier (86), Nanterre (77)… Expertise France is set aside
+  (`paused`): its missions are mostly abroad and its pages name no country. Courbevoie and
+  Metz moved to another tool (empty). Some regions' pages give no place (offers shown in
+  "France").
+
+### 17.22 Recruitment subdomains and temp agencies (2026-10-19)
+
+* **Probing recruitment subdomains.** Many employers run their tool on their own domain,
+  where Common Crawl's per-tool prefixes can't find them. For ~430 large French employers,
+  the usual subdomains (`recrutement.`, `emploi.`, `carrieres.`, `careers.`, `jobs.`) were
+  requested once each: the Talentsoft offer list (`/offre-de-emploi/liste-toutes-offres.aspx`)
+  and the home page's tool marks (`j2w.init`, `phApp.ddo`, `jibecdn`,
+  `api.digitalrecruiters.com`, Gestmax's template, Workday or SmartRecruiters links).
+  Added: Talentsoft — CEA (804), Crédit Mutuel Arkéa (135), Air France (91), Amundi,
+  Malakoff Humanis, MAIF; SuccessFactors — Keolis (492), Bouygues Construction (248),
+  Generali, BIC, Mersen, OPmobility, Eutelsat, Verallia, Eramet; DigitalRecruiters (career
+  sites) — Citya (248), JCDecaux (125), Cooperl (122), RATP Dev, FM Logistic, Franprix,
+  Transavia, CNES, Klesia; Teamtailor (career sites) — Normal, Sergent Major, Lagardère
+  Travel Retail, Crédit Agricole d'Île-de-France; Covéa (SmartRecruiters), Maisons du
+  Monde, Tarkett (Workday). About 2 800 offers. Refusing (robots.txt): Safran, AP-HP.
+* **Temp agencies and recruitment firms** publish many French offers with JobPosting:
+  Crit (16 600 offers, sitemaps complete), Interaction Intérim (368), Actual (310),
+  Partnaire, Temporis — about 17 400, read by the career-site crawler within its page
+  budget per run (Crit fills over ~2–3 weeks at 1 000 pages a day). Domino RH is set aside
+  (`paused`): its sitemaps list 10 600 pages, mostly expired offers without markup.
+  Randstad, Adecco, Manpower, Synergie, Proman, Expectra, Michael Page have no JobPosting
+  on their pages; Hays and Walters People forbid crawling; Robert Walters and Cadremploi
+  refuse it.
+* **Branches shown as the company**: on a career site, an offer whose page names a branch
+  of the board's company ("CRIT LUNEL" on Crit's site) is shown under the board's company
+  ("Crit"); other names (sites shared by several employers) are kept.
+
+**Moving this to production**: `data/boards-2026-10-20.json.gz` (45 536 boards) replaces
+the 2026-10-19 file: `boards import` on the server, as before.

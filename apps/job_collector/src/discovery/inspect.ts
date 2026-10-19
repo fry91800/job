@@ -33,7 +33,6 @@ const UNSUPPORTED: { name: string; pattern: RegExp }[] = [
   { name: "flatchr", pattern: /flatchr\.io/i },
   { name: "taleez", pattern: /taleez\.com/i },
   { name: "softy", pattern: /softy\.pro/i },
-  { name: "gestmax", pattern: /gestmax\.fr/i },
   { name: "talentlink", pattern: /talentlink\.com|lumessetalentlink/i },
   { name: "jobteaser", pattern: /jobteaser\.com/i },
   { name: "breezy", pattern: /breezy\.hr/i },
@@ -108,6 +107,7 @@ export async function inspectSite(input: string): Promise<Inspection> {
   const successFactorsHosts = new Set<string>();
   const phenomBoards = new Set<string>();
   const jibeHosts = new Set<string>();
+  const ownDomainBoards = new Map<string, { ats: string; slug: string }>();
   const careerSiteHosts = new Set<string>();
   const oracleBoards = new Set<string>();
   const cornerstoneBoards = new Set<string>();
@@ -157,6 +157,10 @@ export async function inspectSite(input: string): Promise<Inspection> {
     for (const match of page.text.matchAll(/https?:\/\/([a-z0-9-]+\.csod\.com)\/ux\/ats\/careersite\/(\d+)\//g)) cornerstoneBoards.add(`${match[1]}/${match[2]}`);
     // iCIMS career sites built with Jibe: their scripts on the employer's host.
     if (/jibecdn\.com/.test(page.text)) jibeHosts.add(here.host);
+    // Talentsoft and Gestmax sites on the employer's domain ("recrutement.maif.fr"): their
+    // own assets on the page. Their sites on the tools' domains are found by address.
+    if (!/talent-soft\.com$/.test(here.host) && /talentsoft-font-icons|talentsoft-cookies|liste-toutes-offres\.aspx/i.test(page.text)) ownDomainBoards.set(`talentsoft/${here.host}`, { ats: "talentsoft", slug: here.host });
+    if (!/gestmax\.fr$/.test(here.host) && /_generic_bootstrap_rgaa|gestmax-template/.test(page.text)) ownDomainBoards.set(`gestmax/${here.host}`, { ats: "gestmax", slug: here.host });
     if (/phApp\.ddo/.test(page.text)) {
       const section = /^\/([a-z]{2,8})\/([a-z]{2})(\/|$)/i.exec(here.pathname);
       phenomBoards.add(`${here.host}/${section ? `${section[1]}/${section[2]}` : "fr/fr"}`);
@@ -178,7 +182,7 @@ export async function inspectSite(input: string): Promise<Inspection> {
   }
 
   if (offerPage && seen.has(offerPage) && result.jobPosting === null) result.jobPosting = false;
-  const boards = [...supportedBoards(urls), ...[...successFactorsHosts].map((slug) => ({ ats: "successfactors", slug })), ...[...phenomBoards].map((slug) => ({ ats: "phenom", slug })), ...[...jibeHosts].map((slug) => ({ ats: "jibe", slug })), ...[...careerSiteHosts].map((slug) => ({ ats: "careersite", slug })), ...[...oracleBoards].map((slug) => ({ ats: "oracle", slug })), ...[...cornerstoneBoards].map((slug) => ({ ats: "cornerstone", slug }))];
+  const boards = [...supportedBoards(urls), ...[...successFactorsHosts].map((slug) => ({ ats: "successfactors", slug })), ...[...phenomBoards].map((slug) => ({ ats: "phenom", slug })), ...[...jibeHosts].map((slug) => ({ ats: "jibe", slug })), ...[...careerSiteHosts].map((slug) => ({ ats: "careersite", slug })), ...[...oracleBoards].map((slug) => ({ ats: "oracle", slug })), ...[...cornerstoneBoards].map((slug) => ({ ats: "cornerstone", slug })), ...ownDomainBoards.values()];
   if (cornerstoneBoards.size) unsupported.delete("cornerstone");
   if (oracleBoards.size) unsupported.delete("oracle-cloud");
   if (careerSiteHosts.size) unsupported.delete("digitalrecruiters");

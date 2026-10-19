@@ -6,7 +6,7 @@ import { backendConfig, prisma } from "@job/backend";
 import { collectorConfig } from "../config";
 import { resetCrawler } from "../crawler/fetcher";
 import { runConnector } from "../runs/run-connector";
-import { franceFilter, resetWorkdayMemory, workday, workdaySlugFromUrl } from "./adapters/workday";
+import { franceFilter, resetWorkdayMemory, splitFilter, workday, workdaySlugFromUrl } from "./adapters/workday";
 import { atsConnector } from "./connector";
 
 // A local Workday career site: robots.txt, the JSON job list (POST, with a country filter
@@ -40,9 +40,11 @@ function route(method: string, path: string, body: string): [number, string, str
   if (method === "POST" && /^\/wday\/cxs\/[^/]+\/TestSite\/jobs$/.test(path)) {
     const request = JSON.parse(body) as { appliedFacets: Record<string, string[]>; offset: number; limit: number };
     const filtered = request.appliedFacets.locationCountry?.includes(FRANCE) ? jobs.filter((job) => job.country === "FR") : jobs;
-    const page = filtered.slice(request.offset, request.offset + request.limit);
+    // Like Workday: past the end, offsets answer the last jobs again.
+    const page = filtered.slice(Math.min(request.offset, Math.max(0, filtered.length - request.limit)), Math.min(request.offset, Math.max(0, filtered.length - request.limit)) + request.limit);
     return [200, "application/json", JSON.stringify({
-      total: filtered.length,
+      // Like Workday: the total on the first page only, capped at 2 000.
+      total: request.offset === 0 ? Math.min(filtered.length, 2000) : 0,
       jobPostings: page.map((job) => ({ title: job.title, externalPath: jobPath(job), locationsText: job.city, startDate: job.date, bulletFields: [job.id] })),
       facets: [{ facetParameter: "locationMainGroup", values: [{ facetParameter: "locationCountry", descriptor: "Country", values: [
         { descriptor: "France", id: FRANCE, count: jobs.filter((job) => job.country === "FR").length },
@@ -94,6 +96,17 @@ describe("Workday addresses and filters", () => {
     for (const url of ["https://sanofi.wd3.myworkdayjobs.com/", "https://sanofi.wd3.myworkdayjobs.com/wday/cxs/x", "https://www.myworkdayjobs.com/SanofiCareers"]) assert.equal(workdaySlugFromUrl(new URL(url)), null, url);
   });
 
+  test("a second filter splitting a list over the 2 000 cap: values under it, fewest first", () => {
+    const facets = [
+      { facetParameter: "jobFamilyGroup", values: [{ id: "a", count: 3337 }, { id: "b", count: 14 }] },
+      { facetParameter: "Job_Profiles", values: Array.from({ length: 35 }, (_, index) => ({ id: `p${index}`, count: index === 0 ? 1865 : 44 })) },
+      { facetParameter: "locationMainGroup", values: [{ facetParameter: "locations", values: [{ id: "lyon", count: 165 }] }] },
+      { facetParameter: "workerSubType", values: Array.from({ length: 40 }, (_, index) => ({ id: `w${index}`, count: 100 })) },
+    ];
+    assert.deepEqual(splitFilter(facets, 3351, "locationCountry")?.parameter, "Job_Profiles", "under the cap, covering the list, fewest values");
+    assert.equal(splitFilter(facets.slice(0, 1), 3351, "locationCountry"), null);
+  });
+
   test("the France value of the country filter, nested or not", () => {
     assert.deepEqual(franceFilter([{ facetParameter: "locationMainGroup", values: [{ facetParameter: "locationCountry", values: [{ descriptor: "France", id: "fr", count: 150 }] }] }]), { parameter: "locationCountry", id: "fr", count: 150 });
     assert.equal(franceFilter([{ facetParameter: "locations", values: [{ descriptor: "Paris", id: "p" }] }]), null);
@@ -133,5 +146,14 @@ describe("Workday runs", () => {
     await runConnector(connector, { log: () => {} });
     const closed = await prisma.offerSource.findUniqueOrThrow({ where: { source_externalId: { source: "workday", externalId: `${slug}:R1002` } } });
     assert.ok(closed.closedAt);
+  });
+
+  test("every page of the list, though Workday only gives the total on the first", async () => {
+    resetCrawler();
+    jobs = Array.from({ length: 45 }, (_, index) => ({ id: `R${3000 + index}`, title: `Technicien ${index}`, country: "FR", city: "Lyon", date: "2026-10-15" }));
+    const known = new Map(jobs.map((job) => [`${slug}:${job.id}`, job.date]));
+    let listed = 0;
+    for await (const item of workday.collect(slug, "Test Workday", known)) if ("stillListed" in item) listed++;
+    assert.equal(listed, 45);
   });
 });

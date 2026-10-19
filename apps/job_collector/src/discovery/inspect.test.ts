@@ -66,6 +66,13 @@ describe("inspect", () => {
     assert.deepEqual(result.unsupported, []);
   });
 
+  test("Talentsoft and Gestmax sites on the employer's domain, by their assets", async () => {
+    site({ "/": `<link href="/DynamicContent/Fonts/talentsoft-font-icons/fonts/talentsoft.woff">` });
+    assert.deepEqual((await inspectSite(`http://${host}/`)).supported, [{ ats: "talentsoft", slug: host, registry: null }]);
+    site({ "/": `<body class="gestmax-template"><img src="/_generic_bootstrap_rgaa/public/img/print.svg"></body>` });
+    assert.deepEqual((await inspectSite(`http://${host}/`)).supported, [{ ats: "gestmax", slug: host, registry: null }]);
+  });
+
   test("a tool we don't support yet, named by its code", async () => {
     site({ "/": `<script src="https://cdn.phenompeople.com/CareerConnectResources/app.js"></script>` });
     const result = await inspectSite(`http://${host}/`);

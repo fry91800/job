@@ -4,6 +4,7 @@ import { collectorConfig } from "../config";
 import type { CollectedRecord } from "../connectors/types";
 import { findOfferPages } from "./discover-pages";
 import { CrawlError, crawlGet, PageGoneError } from "./fetcher";
+import { normalizeCompanyName } from "../pipeline/text";
 import { extractJobPostings, frenchPlace, jobPostingOffer } from "./job-posting";
 
 // Career sites publishing schema.org JobPosting (COLLECTOR.md §5.3), as boards of the
@@ -139,7 +140,9 @@ export const careerSite: AtsAdapter = {
       for (const [index, { posting, place }] of postings.entries()) {
         const key = postings.length > 1 ? `${page.key}#${index + 1}` : page.key;
         const offer = jobPostingOffer(posting, { url, key, source: SOURCE, siteSlug: slug, place: place! });
-        offer.company ??= { name: companyName };
+        // A branch of the board's company ("CRIT LUNEL" on Crit's site) is shown as the company.
+        const branch = offer.company && normalizeCompanyName(offer.company.name).startsWith(`${normalizeCompanyName(companyName)} `);
+        offer.company = branch || !offer.company ? { ...offer.company, name: companyName } : offer.company;
         yield { raw: { url, releasedDate: page.lastmod, jobPosting: posting }, offer };
       }
     }

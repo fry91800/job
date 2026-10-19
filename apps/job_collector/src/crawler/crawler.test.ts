@@ -162,7 +162,7 @@ describe("career-site runs", () => {
     resetCareerSiteMemory();
     jobs = {
       "/jobs/1-developpeur": page(posting()),
-      "/jobs/2-data-engineer": page(posting({ title: "Data Engineer", jobLocation: { address: { addressLocality: "Lyon", addressCountry: "France" } } })),
+      "/jobs/2-data-engineer": page(posting({ title: "Data Engineer", hiringOrganization: { "@type": "Organization", name: "TEST CRAWL Lyon" }, jobLocation: { address: { addressLocality: "Lyon", addressCountry: "France" } } })),
       "/jobs/3-london": page(posting({ title: "Sales London", jobLocation: { address: { addressLocality: "London", addressCountry: "GB" } } })),
       "/jobs/4-no-markup": "<html><body>Pas de JobPosting</body></html>",
     };
@@ -171,7 +171,7 @@ describe("career-site runs", () => {
     const check = await careerSite.check(slug);
     assert.equal(check.companyName, "Test Crawl SAS");
     assert.equal(check.jobCount, 4);
-    await prisma.companySource.update({ where: { ats_slug: TEST_SITE() }, data: { status: "active" } });
+    await prisma.companySource.update({ where: { ats_slug: TEST_SITE() }, data: { status: "active", company: { create: { name: "Test Crawl", normalizedName: "test crawl" } } } });
 
     const connector = atsConnector(careerSite, { where: TEST_SITE(), key: "test-careersite" });
     requests = [];
@@ -181,6 +181,8 @@ describe("career-site runs", () => {
     assert.ok(!requests.includes("/about"), "not an offer page");
     const saved = await prisma.offerSource.findUniqueOrThrow({ where: { source_externalId: { source: "careersite", externalId: `${slug}:/jobs/1-developpeur` } }, include: { offer: true } });
     assert.deepEqual([saved.offer.title, saved.offer.salaryMin, saved.offer.source], ["Développeur TypeScript (H/F)", 45000, "careersite"]);
+    const branch = await prisma.offerSource.findUniqueOrThrow({ where: { source_externalId: { source: "careersite", externalId: `${slug}:/jobs/2-data-engineer` } }, include: { offer: { include: { company: true } } } });
+    assert.equal(branch.offer.company?.name, "Test Crawl", "a branch of the board's company is shown as the company");
 
     // Same sitemap dates: no offer page is fetched again.
     requests = [];
