@@ -941,3 +941,43 @@ Groupe Beaumanoir, Editis, Stago, Groupe Alpha) and above all by local authoriti
 
 **Moving this to production**: `data/boards-2026-10-20.json.gz` (45 536 boards) replaces
 the 2026-10-19 file: `boards import` on the server, as before.
+
+### 17.23 Common Crawl's host graph, iCIMS, the probe command (2026-10-23)
+
+* **The host graph** (Common Crawl's web graph, `cc-main-2026-jul-aug-sep`, host vertices:
+  48 files, 1.8 GB) lists every host name crawled, with or without job pages archived. Two
+  readings of it:
+  * **Tools' tenants**, one subdomain per customer: Teamtailor 5 705 hosts (the URL index
+    had found ~1 400), Personio 7 777, Recruitee 3 659, Talentsoft 465, Welcome Kit 451,
+    Gestmax 111, iCIMS 7 829… — 17 000 hosts the registry didn't have became candidates
+    (`discovered_from` = `hostgraph`, `hostgraph:fr` for the French tools).
+  * **Recruitment host names** (`recrutement.`, `emploi.`, `carrieres.`, `talents.`… on
+    any domain, `jobs.`/`careers.` on .fr): 4 620 hosts for `probe`; 42 700 `careers.`/`jobs.`
+    hosts on .com, .eu… kept for later.
+* **iCIMS classic sites** (`careers-x.icims.com`) have complete sitemaps and JobPosting: they
+  are career sites (`icims.com` in the career-site hosts, so the monthly discovery finds
+  them too). Expleo: 471 French offers; Soitec 27.
+* **`probe --file hosts.txt [--add]`** inspects many hosts lightly (`inspect` limited to 3
+  pages each, 16 hosts at a time by default); with `--add`, the boards found that the
+  registry doesn't have become candidates: the tools' boards, and career sites with
+  JobPosting.
+* **Parallel checks**: `boards check --concurrency N`; never two boards of the same host,
+  nor of the same tool's shared API (Workable, Greenhouse…: Workable answered 429 when
+  checked in parallel). The nightly check runs 3 000 boards, 8 at a time.
+* Set aside: `place-ep-recrute.talent-soft.com` (Place de l'emploi public, 53 766 offers:
+  the same as Choisir le service public) as `duplicate`; a Talentsoft test site.
+* **Results** (checked here: the French-marked candidates, Recruitee, the probe's finds):
+  about 600 new active boards, ~28 000 French offers — Talentsoft 129 sites (~13 000:
+  Polynésie française 1 685, Emeis 1 269, Hlm 950, Ministère de l'Économie 746, Groupe SOS
+  731, Naval Group 683, Geodis 524, Cerba HealthCare, Groupe Fauché, Crédit Agricole CIB,
+  Apave, Elis…), career sites 205 (~8 900: DESTIA 1 195, LPCR 850, Fondation Partage et
+  Vie 488, Expleo 471, APEF, Groupe Zephyr, In Extenso, Match, Compass Group…), Gestmax 47
+  (départements and cities on their own domains: Val-de-Marne, Seine-Saint-Denis, Val-d'Oise,
+  La Réunion, Strasbourg, Rennes…), Verisure (Phenom, 529), Lactalis, Pomona, Sonepar, TF1
+  (SuccessFactors), Brico Dépôt (Jibe). Test sites (`testnge`, `testaftam`), intranet and
+  second addresses of known sites were set aside. The probe reached 1 794 of the 4 620 hosts.
+  The other ~16 000 host-graph candidates (Teamtailor, Personio, iCIMS worldwide) are left
+  to the nightly checks.
+
+**Moving this to production**: `data/boards-2026-10-23.json.gz` (62 856 boards) replaces
+the 2026-10-20 file: `boards import` on the server, as before.

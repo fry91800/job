@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import { backendConfig, prisma } from "@job/backend";
 import { collectorConfig } from "../config";
-import { checkBoards } from "../discovery/check-boards";
+import { checkBoards, hostKey } from "../discovery/check-boards";
 import { surtPrefixes } from "../discovery/cc-index";
 import { boardsFromCaptures, discoverBoards } from "../discovery/common-crawl";
 import { runConnector } from "../runs/run-connector";
@@ -316,6 +316,15 @@ describe("discovery and board checks", () => {
 
     const captures = [{ url: "https://jobs.ashbyhq.com/TEST-DISC-ONE/1", languages: null }];
     assert.equal(boardsFromCaptures(findAdapter("ashby")!, captures).size, 1);
+  });
+
+  test("concurrent checks: a board's host, else its tool's shared API", () => {
+    assert.equal(hostKey({ ats: "workable", slug: "motork" }), "workable");
+    assert.equal(hostKey({ ats: "smartrecruiters", slug: "COVEA1" }), "smartrecruiters");
+    assert.equal(hostKey({ ats: "recruitee", slug: "fleurymichon" }), "fleurymichon.recruitee.com");
+    assert.equal(hostKey({ ats: "workday", slug: "Babilou.wd3.myworkdayjobs.com/Babilou" }), "babilou.wd3.myworkdayjobs.com");
+    assert.equal(hostKey({ ats: "careersite", slug: "join.com/companies/acme" }), "join.com");
+    assert.equal(hostKey({ ats: "gestmax", slug: "127.0.0.1:8080" }), "127.0.0.1:8080");
   });
 
   test("checks give each board a status; active boards get their company", async () => {

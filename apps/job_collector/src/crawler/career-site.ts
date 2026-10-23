@@ -35,8 +35,9 @@ async function offerPages(slug: string) {
 // §17): their companies' career sites are found by discovery like the ATS boards; other
 // career sites are added by hand. One host per company ({company}.teamtailor.com), or one
 // section of a shared site (join.com/companies/{company}, see crawler.sharedHosts).
-const NOT_SITES = new Set(["www", "app", "api", "docs", "support", "help", "status", "partner", "partners", "assets", "blog", "go", "jobs", "careers"]);
-const COMPANY_HOSTS = ["teamtailor.com", "jobs.personio.de", "jobs.personio.com", "welcomekit.co"];
+const NOT_SITES = new Set(["www", "app", "api", "docs", "support", "help", "status", "partner", "partners", "assets", "blog", "go", "jobs", "careers", "team", "login", "community", "developer", "cdn"]);
+// iCIMS's classic sites ("careers-x.icims.com", COLLECTOR.md §17.23): sitemaps and JobPosting.
+const COMPANY_HOSTS = ["teamtailor.com", "jobs.personio.de", "jobs.personio.com", "welcomekit.co", "icims.com"];
 const COMPANY_SECTIONS: [host: string, path: string][] = [
   ["join.com", "/companies/"],
   ["jobs.jobvite.com", "/"],

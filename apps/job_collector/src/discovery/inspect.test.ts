@@ -5,7 +5,7 @@ import { after, before, describe, test } from "node:test";
 import { prisma } from "@job/backend";
 import { collectorConfig } from "../config";
 import { resetCrawler } from "../crawler/fetcher";
-import { inspectSite } from "./inspect";
+import { inspectSite, probeHosts } from "./inspect";
 
 // `inspect` on a local company site: from the home page to the career pages, then what they
 // run on.
@@ -27,6 +27,7 @@ before(async () => {
 
 after(async () => {
   server.close();
+  await prisma.companySource.deleteMany({ where: { ats: "workday", slug: "probetest.wd3.myworkdayjobs.com/Careers" } });
   await prisma.$disconnect();
 });
 
@@ -71,6 +72,16 @@ describe("inspect", () => {
     assert.deepEqual((await inspectSite(`http://${host}/`)).supported, [{ ats: "talentsoft", slug: host, registry: null }]);
     site({ "/": `<body class="gestmax-template"><img src="/_generic_bootstrap_rgaa/public/img/print.svg"></body>` });
     assert.deepEqual((await inspectSite(`http://${host}/`)).supported, [{ ats: "gestmax", slug: host, registry: null }]);
+  });
+
+  test("probe: many hosts lightly; new boards become candidates", async () => {
+    site({ "/": `<h1>Rejoignez-nous</h1><a href="https://probetest.wd3.myworkdayjobs.com/fr-FR/Careers">Nos offres</a>` });
+    const { found, added } = await probeHosts([`http://${host}/`], { add: true });
+    assert.deepEqual(found.map((board) => `${board.ats}/${board.slug}`), ["workday/probetest.wd3.myworkdayjobs.com/Careers"]);
+    assert.equal(added, 1);
+    const board = await prisma.companySource.findUniqueOrThrow({ where: { ats_slug: { ats: "workday", slug: "probetest.wd3.myworkdayjobs.com/Careers" } } });
+    assert.deepEqual([board.status, board.discoveredFrom], ["candidate", "hostgraph"]);
+    assert.equal((await probeHosts([`http://${host}/`], { add: true })).added, 0, "known boards aren't added again");
   });
 
   test("a tool we don't support yet, named by its code", async () => {

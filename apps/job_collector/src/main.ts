@@ -61,7 +61,7 @@ async function main() {
       if (job.data.action === "discover") {
         for (const adapter of atsAdapters.filter((item) => item.discovery)) await discoverBoards(adapter);
       } else {
-        await checkBoards({ limit: collectorConfig.discovery.checkBatch });
+        await checkBoards({ limit: collectorConfig.discovery.checkBatch, concurrency: collectorConfig.discovery.checkConcurrency });
       }
     }),
   );

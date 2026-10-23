@@ -376,6 +376,9 @@ Full plan in `COLLECTOR.md`.
 | D169 | Gestmax adapter (French employers and local authorities, `*.gestmax.fr` discovered in Common Crawl) and an Amazon adapter (its site's own search, full texts in the list); `inspect` recognises Talentsoft and Gestmax sites on employers' own domains | 43 Gestmax sites (MBDA, Beaumanoir, Kiloutou, regions, départements, cities: ~2 900 offers) with one adapter; Amazon's 220 French offers with one request a run |
 | D170 | Employers' own recruitment subdomains are probed once each for the tools' marks (Talentsoft list, Career Site Builder, Phenom, Jibe, DigitalRecruiters, Gestmax) | Tools on employers' domains can't be found by address prefix; one request per host found ~2 800 offers (CEA, Keolis, Bouygues Construction, Citya…) |
 | D171 | Temp agencies' career sites are collected like any career site (Crit: 16 600 offers); a branch name ("CRIT LUNEL") is shown as the board's company | They are real French offers with full JobPosting; one company per agency keeps search and filters readable. Sites whose sitemaps list mostly expired pages are paused (Domino RH) |
+| D172 | Common Crawl's host graph as a discovery source: the tools' tenants by host suffix, and recruitment host names probed for supported tools (`probe`) | It lists hosts with no archived job page: 4× more Teamtailor sites than the URL index, and employers' own recruitment hosts no prefix can find |
+| D173 | iCIMS classic sites are read by the career-site crawler | Complete sitemaps and JobPosting (Expleo 471 offers); no adapter needed |
+| D174 | Board checks run in parallel (8 a night, 3 000 boards), never two on one host or one tool's shared API | 17 000 new candidates would take weeks one at a time; parallel requests to one API are impolite (Workable answered 429) |
 
 ## Assumptions made (change if wrong)
 

@@ -111,7 +111,8 @@ export const collectorConfig = {
     retryPauseMs: 5000, // times the attempt number
     clusterChunkBytes: 4096, // per read of cluster.idx during the binary search
     checkCron: "0 2 * * *", // nightly: candidates and boards due for a re-check
-    checkBatch: 1000,
+    checkBatch: 3000,
+    checkConcurrency: 8, // boards checked at a time (different hosts; one request at a time per host)
     discoverCron: "0 1 1 * *", // monthly: Common Crawl publishes a new crawl about monthly
     // Boards are checked again after this delay, by status.
     recheckDays: { "no-france": 30, empty: 30, invalid: 90, active: 7 } as Record<string, number>,

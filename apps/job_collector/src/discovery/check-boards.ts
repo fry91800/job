@@ -55,8 +55,13 @@ export async function markDuplicateBoards(): Promise<number> {
     WHERE s.id = ranked.id AND ranked.position > 1 AND s.status <> 'duplicate'`;
 }
 
+// What a board's check requests: its own host ("kiloutou.gestmax.fr", "x.wd3.myworkdayjobs.com/…"),
+// else the tool's shared API ("workable"); Recruitee answers on each company's own host.
+export const hostKey = (board: Pick<CompanySource, "ats" | "slug">) =>
+  /^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/|$)/i.test(board.slug) ? board.slug.split("/")[0].toLowerCase() : board.ats === "recruitee" ? `${board.slug.toLowerCase()}.recruitee.com` : board.ats;
+
 // Candidates first, then boards whose re-check delay has passed.
-export async function checkBoards(options: { ats?: string; limit?: number; where?: Prisma.CompanySourceWhereInput; log?: (message: string) => void } = {}) {
+export async function checkBoards(options: { ats?: string; limit?: number; concurrency?: number; where?: Prisma.CompanySourceWhereInput; log?: (message: string) => void } = {}) {
   const log = options.log ?? ((message: string) => console.log(`[boards] ${message}`));
   const duplicates = await markDuplicateBoards();
   if (duplicates) log(`${duplicates} duplicate board(s) set aside`);
@@ -77,12 +82,31 @@ export async function checkBoards(options: { ats?: string; limit?: number; where
   });
   const boards = [...french, ...rest];
   const counts: Record<string, number> = {};
-  for (const board of boards) {
-    const result = await checkBoard(board);
-    counts[result.status] = (counts[result.status] ?? 0) + 1;
-    if (result.status === "active") log(`${board.ats}/${board.slug}: active (${result.franceJobCount} of ${result.jobCount} offers in France)`);
-    await pause(collectorConfig.ats.pauseBetweenBoardsMs);
-  }
+  // Several boards at a time (`concurrency`), never two on the same host: boards of the
+  // tools' shared APIs (Workable, Greenhouse…: slugs without a host) one at a time per tool.
+  const waiting = [...boards];
+  const busy = new Set<string>();
+  const worker = async () => {
+    for (;;) {
+      const index = waiting.findIndex((board) => !busy.has(hostKey(board)));
+      if (index === -1) {
+        if (!waiting.length) return;
+        await pause(200);
+        continue;
+      }
+      const [board] = waiting.splice(index, 1);
+      busy.add(hostKey(board));
+      try {
+        const result = await checkBoard(board);
+        counts[result.status] = (counts[result.status] ?? 0) + 1;
+        if (result.status === "active") log(`${board.ats}/${board.slug}: active (${result.franceJobCount} of ${result.jobCount} offers in France)`);
+        await pause(collectorConfig.ats.pauseBetweenBoardsMs);
+      } finally {
+        busy.delete(hostKey(board));
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, options.concurrency ?? 1) }, worker));
   log(`checked ${boards.length} board(s): ${JSON.stringify(counts)}`);
   return counts;
 }

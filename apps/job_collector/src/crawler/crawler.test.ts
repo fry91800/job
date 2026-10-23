@@ -122,9 +122,10 @@ describe("career sites of recruiting tools", () => {
     assert.equal(site("https://acme.teamtailor.com/jobs/1-dev"), "acme.teamtailor.com");
     assert.equal(site("https://acme.jobs.personio.de/job/2468793"), "acme.jobs.personio.de");
     assert.equal(site("https://acme.welcomekit.co/jobs/dev"), "acme.welcomekit.co");
+    assert.equal(site("https://expleo-jobs-fr-fr.icims.com/jobs/5418/technicien/job"), "expleo-jobs-fr-fr.icims.com");
     assert.equal(site("https://join.com/companies/Acme/16703211-dev"), "join.com/companies/acme");
     assert.equal(site("https://jobs.jobvite.com/acme/job/oGZcAfwb"), "jobs.jobvite.com/acme");
-    for (const url of ["https://www.teamtailor.com/fr/", "https://join.com/pricing", "https://jobs.jobvite.com/careers", "https://example.com/jobs/1"]) assert.equal(site(url), null, url);
+    for (const url of ["https://www.teamtailor.com/fr/", "https://join.com/pricing", "https://jobs.jobvite.com/careers", "https://team.icims.com/", "https://example.com/jobs/1"]) assert.equal(site(url), null, url);
   });
 
   test("a section of a shared site: only its own addresses, any deeper one may be an offer", async () => {

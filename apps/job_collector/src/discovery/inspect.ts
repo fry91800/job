@@ -98,7 +98,8 @@ function supportedBoards(urls: URL[]): { ats: string; slug: string }[] {
 
 const sameSite = (a: URL, b: URL) => a.hostname.replace(/^www\./, "").split(".").slice(-2).join(".") === b.hostname.replace(/^www\./, "").split(".").slice(-2).join(".");
 
-export async function inspectSite(input: string): Promise<Inspection> {
+export async function inspectSite(input: string, options: { maxPages?: number } = {}): Promise<Inspection> {
+  const maxPages = options.maxPages ?? MAX_PAGES;
   const result: Inspection = { input, url: null, pages: 0, status: "ok", supported: [], unsupported: [], jobPosting: null, verdict: "" };
   const start = /^https?:\/\//i.test(input) ? input : `https://${input}`;
   const queue: string[] = [start];
@@ -114,7 +115,7 @@ export async function inspectSite(input: string): Promise<Inspection> {
   const urls: URL[] = [];
   let offerPage: string | null = null;
 
-  while (queue.length && result.pages < MAX_PAGES) {
+  while (queue.length && result.pages < maxPages) {
     const next = queue.shift()!;
     if (seen.has(next)) continue;
     seen.add(next);
@@ -186,7 +187,7 @@ export async function inspectSite(input: string): Promise<Inspection> {
   if (cornerstoneBoards.size) unsupported.delete("cornerstone");
   if (oracleBoards.size) unsupported.delete("oracle-cloud");
   if (careerSiteHosts.size) unsupported.delete("digitalrecruiters");
-  if (jibeHosts.size) unsupported.delete("icims");
+  if (jibeHosts.size || boards.some((board) => board.slug.endsWith(".icims.com"))) unsupported.delete("icims");
   if (successFactorsHosts.size) unsupported.delete("successfactors");
   if (phenomBoards.size) unsupported.delete("phenom");
   const known = boards.length
@@ -219,7 +220,7 @@ export async function readSiteList(file: string): Promise<{ name: string; addres
     });
 }
 
-export async function inspectSites(sites: { name: string; address: string }[], options: { json?: string; concurrency?: number } = {}) {
+export async function inspectSites(sites: { name: string; address: string }[], options: { json?: string; concurrency?: number; maxPages?: number; quiet?: boolean } = {}) {
   const results: (Inspection & { name: string })[] = [];
   let next = 0;
   // A few sites at a time: each host still gets one request at a time, spaced.
@@ -228,18 +229,47 @@ export async function inspectSites(sites: { name: string; address: string }[], o
       while (next < sites.length) {
         const site = sites[next++];
         try {
-          const inspection = await inspectSite(site.address);
+          const inspection = await inspectSite(site.address, { maxPages: options.maxPages });
           results.push({ name: site.name, ...inspection });
           const also = inspection.unsupported.length && !inspection.verdict.includes("unsupported") ? ` [also: ${inspection.unsupported.join(", ")}]` : "";
-          console.log(`${site.name.padEnd(24)} ${inspection.verdict}${also}${inspection.error ? ` — ${inspection.error.slice(0, 120)}` : ""}`);
+          if (!options.quiet || inspection.supported.length || inspection.jobPosting) console.log(`${site.name.padEnd(24)} ${inspection.verdict}${also}${inspection.error ? ` — ${inspection.error.slice(0, 120)}` : ""}`);
         } catch (error) {
           if (!(error instanceof CrawlError) && !(error instanceof Error)) throw error;
           results.push({ name: site.name, input: site.address, url: null, pages: 0, status: "unreachable", supported: [], unsupported: [], jobPosting: null, verdict: "error", error: error.message });
-          console.log(`${site.name.padEnd(24)} error: ${error.message}`);
+          if (!options.quiet) console.log(`${site.name.padEnd(24)} error: ${error.message}`);
         }
       }
     }),
   );
   if (options.json) await writeFile(options.json, JSON.stringify(results, null, 2));
   return results;
+}
+
+// `npm run collector -- probe --file hosts.txt [--add]`: many hosts named like recruitment
+// sites ("recrutement.x.fr", from Common Crawl's host graph, COLLECTOR.md §17.23), each
+// inspected lightly (its home page and two more pages). With --add, the boards found that
+// the registry doesn't have become candidates, checked like the others: the tools' boards,
+// and career sites whose pages carry JobPosting.
+export async function probeHosts(hosts: string[], options: { add?: boolean; json?: string; concurrency?: number } = {}) {
+  const results = await inspectSites(hosts.map((host) => ({ name: host, address: host })), { json: options.json, concurrency: options.concurrency ?? 16, maxPages: 3, quiet: true });
+  const found = new Map<string, { ats: string; slug: string; host: string }>();
+  for (const result of results) {
+    if (result.status !== "ok") continue;
+    for (const board of result.supported) if (board.registry === null) found.set(`${board.ats}/${board.slug}`, { ...board, host: result.name });
+    if (result.jobPosting && result.url && !result.supported.some((board) => board.ats !== "careersite")) {
+      const slug = careerSiteFromUrl(new URL(result.url));
+      if (slug) found.set(`careersite/${slug}`, { ats: "careersite", slug, host: result.name });
+    }
+  }
+  let added = 0;
+  if (options.add) {
+    for (const board of found.values()) {
+      const created = await prisma.companySource.createMany({ data: [{ ats: board.ats, slug: board.slug, status: "candidate", discoveredFrom: `hostgraph${board.host.endsWith(".fr") ? ":fr" : ""}` }], skipDuplicates: true });
+      added += created.count;
+    }
+  }
+  const counts: Record<string, number> = {};
+  for (const board of found.values()) counts[board.ats] = (counts[board.ats] ?? 0) + 1;
+  console.log(`[probe] ${hosts.length} host(s), ${results.filter((result) => result.status === "ok").length} answered; new boards: ${JSON.stringify(counts)}${options.add ? `, ${added} added as candidates` : ""}`);
+  return { found: [...found.values()], added };
 }

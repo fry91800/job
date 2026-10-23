@@ -7,7 +7,8 @@
 //   discover [--ats greenhouse,ashby] [--crawls N | --crawl CC-MAIN-…,…]   find boards in Common Crawl
 //   census [--crawls N]                       companies per recruiting tool in Common Crawl, with French pages
 //   inspect <address…> [--file F] [--json F]  what a career site runs on (supported tool, JobPosting, other tool)
-//   boards check [--ats X] [--limit N]        check candidate / due boards
+//   probe --file hosts.txt [--add]            inspect many hosts lightly; new boards become candidates
+//   boards check [--ats X] [--limit N] [--concurrency N]  check candidate / due boards
 //   boards add <ats> <slug> [--name N]        add a board by hand (checked right away); careersite <address>
 //   boards list [--status S]                  boards by tool and status
 //   boards export [file]                      save the board registry (default data/boards-<date>.json.gz)
@@ -15,7 +16,7 @@
 //   token <source> <name>                     create a token for POST /api/collector/ingest
 //   contract                                  the ingestion contract as JSON Schema
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { prisma } from "@job/backend";
 import { collectedOfferJsonSchema } from "@job/shared";
@@ -24,7 +25,7 @@ import { importCatalogue } from "./catalogue/import";
 import { connectors, findConnector } from "./connectors/registry";
 import { checkBoard, checkBoards } from "./discovery/check-boards";
 import { atsCensus } from "./discovery/ats-census";
-import { inspectSites, readSiteList } from "./discovery/inspect";
+import { inspectSites, probeHosts, readSiteList } from "./discovery/inspect";
 import { discoverBoards, recentCrawls } from "./discovery/common-crawl";
 import { exportBoards, importBoards } from "./discovery/registry-file";
 import { collectorMetrics } from "./metrics";
@@ -77,11 +78,21 @@ async function main() {
       await inspectSites(sites, { json });
       break;
     }
+    case "probe": {
+      // probe --file hosts.txt [--add] [--json out.json] [--concurrency N]
+      const file = option(args, "--file");
+      if (!file) throw new Error("Usage: probe --file hosts.txt [--add] [--json out.json] [--concurrency N]");
+      const hosts = (await readFile(file, "utf8")).split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+      const concurrency = option(args, "--concurrency");
+      await probeHosts(hosts, { add: args.includes("--add"), json: option(args, "--json"), concurrency: concurrency ? Number(concurrency) : undefined });
+      break;
+    }
     case "boards": {
       const [action, ...rest] = args;
       if (action === "check") {
         const limit = option(rest, "--limit");
-        await checkBoards({ ats: option(rest, "--ats"), limit: limit ? Number(limit) : undefined });
+        const concurrency = option(rest, "--concurrency");
+        await checkBoards({ ats: option(rest, "--ats"), limit: limit ? Number(limit) : undefined, concurrency: concurrency ? Number(concurrency) : undefined });
       } else if (action === "add") {
         const [ats, given] = rest;
         // Career sites: an address is accepted ("https://careers.x.com/" → careers.x.com).
@@ -135,7 +146,7 @@ async function main() {
       console.log(JSON.stringify(collectedOfferJsonSchema(), null, 2));
       break;
     default:
-      console.log("Commands: catalogue [--esco <folder>] [--refresh] | discover [--ats …] [--crawls N] | census [--crawls N] | boards check|add|list|export|import | run <connector> | maintenance | reenrich | metrics | token <source> <name> | contract");
+      console.log("Commands: catalogue [--esco <folder>] [--refresh] | probe --file hosts.txt [--add] | discover [--ats …] [--crawls N] | census [--crawls N] | boards check|add|list|export|import | run <connector> | maintenance | reenrich | metrics | token <source> <name> | contract");
       process.exitCode = command ? 1 : 0;
   }
 }
