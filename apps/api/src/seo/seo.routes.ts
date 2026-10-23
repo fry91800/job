@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
-import { cityPage, hubPage, landingPaths, occupationPage, pairPage, type LandingPage } from "./landing";
+import { hubPage, landingPaths, occupationPage, pairPage, placePage, SCOPES, type LandingPage } from "./landing";
 import { appTemplate, loadPublicOffer, notFoundPageHtml, offerPageHtml } from "./offer-page";
 
 // Pages for search engines (SEO.md), outside /api: offer pages, sitemaps, robots.txt.
@@ -20,23 +20,33 @@ seoRouter.get("/offers/:id", async (req, res, next) => {
   res.send(offerPageHtml(page, offer));
 });
 
-// Landing pages by job and town (SEO.md): /emplois, /emplois/a/{ville}, /emplois/{métier},
-// /emplois/{métier}/{ville}.
+// Landing pages (SEO.md), for all offers (/emplois), apprenticeships (/alternance) and
+// internships (/stage): the hub, a job, a place (town /a/…, département, region), a job in a
+// place. Specific addresses first: /emplois/a/lyon-69 is a town, not a job in a town.
 const sendLanding = (res: import("express").Response, page: LandingPage) =>
   res.status(page.status).set("Cache-Control", "public, max-age=1800").type("html").send(page.html);
-seoRouter.get("/emplois", async (_req, res) => sendLanding(res, await hubPage()));
-seoRouter.get("/emplois/a/:city", async (req, res) => sendLanding(res, await cityPage(String(req.params.city))));
-seoRouter.get("/emplois/:occupation", async (req, res) => sendLanding(res, await occupationPage(String(req.params.occupation))));
-seoRouter.get("/emplois/:occupation/:city", async (req, res) => sendLanding(res, await pairPage(String(req.params.occupation), String(req.params.city))));
+for (const scope of SCOPES) {
+  const p = scope.prefix;
+  seoRouter.get(p, async (_req, res) => sendLanding(res, await hubPage(scope)));
+  seoRouter.get(`${p}/a/:place`, async (req, res) => sendLanding(res, await placePage(scope, "city", String(req.params.place))));
+  seoRouter.get(`${p}/departement/:place`, async (req, res) => sendLanding(res, await placePage(scope, "county", String(req.params.place))));
+  seoRouter.get(`${p}/region/:place`, async (req, res) => sendLanding(res, await placePage(scope, "region", String(req.params.place))));
+  seoRouter.get(`${p}/:occupation`, async (req, res) => sendLanding(res, await occupationPage(scope, String(req.params.occupation))));
+  seoRouter.get(`${p}/:occupation/departement/:place`, async (req, res) => sendLanding(res, await pairPage(scope, String(req.params.occupation), "county", String(req.params.place))));
+  seoRouter.get(`${p}/:occupation/region/:place`, async (req, res) => sendLanding(res, await pairPage(scope, String(req.params.occupation), "region", String(req.params.place))));
+  seoRouter.get(`${p}/:occupation/:place`, async (req, res) => sendLanding(res, await pairPage(scope, String(req.params.occupation), "city", String(req.params.place))));
+}
 
 const openPublicOffers = { isPublic: true, closedAt: null } as const;
 
-// GET /sitemap.xml — the home page and one sitemap per block of open public offers.
+// GET /sitemap.xml — the landing pages' sitemaps and one sitemap per block of open public
+// offers.
 seoRouter.get("/sitemap.xml", async (_req, res) => {
   const count = await prisma.offer.count({ where: openPublicOffers });
   const files = Math.max(1, Math.ceil(count / config.seo.sitemapSize));
+  const landingFiles = Math.max(1, Math.ceil((await landingPaths()).length / config.seo.sitemapSize));
   const entries = [
-    `<sitemap><loc>${xml(`${config.webBaseUrl}/sitemaps/landing.xml`)}</loc></sitemap>`,
+    ...Array.from({ length: landingFiles }, (_, index) => `<sitemap><loc>${xml(`${config.webBaseUrl}/sitemaps/${index === 0 ? "landing" : `landing-${index + 1}`}.xml`)}</loc></sitemap>`),
     ...Array.from({ length: files }, (_, index) => `<sitemap><loc>${xml(`${config.webBaseUrl}/sitemaps/offers-${index + 1}.xml`)}</loc></sitemap>`),
   ];
   res.set("Cache-Control", "public, max-age=3600").type("application/xml").send(
@@ -44,12 +54,20 @@ seoRouter.get("/sitemap.xml", async (_req, res) => {
   );
 });
 
-// GET /sitemaps/landing.xml — the landing pages worth indexing.
-seoRouter.get("/sitemaps/landing.xml", async (_req, res) => {
-  const urls = (await landingPaths()).map((path) => `<url><loc>${xml(`${config.webBaseUrl}${path}`)}</loc><changefreq>daily</changefreq></url>`);
+// GET /sitemaps/landing.xml, /sitemaps/landing-{n}.xml — the landing pages worth indexing.
+const sendLandingSitemap = async (res: import("express").Response, n: number) => {
+  const paths = (await landingPaths()).slice((n - 1) * config.seo.sitemapSize, n * config.seo.sitemapSize);
+  if (!paths.length && n > 1) return res.status(404).type("text").send("Not found");
+  const urls = paths.map((path) => `<url><loc>${xml(`${config.webBaseUrl}${path}`)}</loc><changefreq>daily</changefreq></url>`);
   res.set("Cache-Control", "public, max-age=3600").type("application/xml").send(
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`,
   );
+};
+seoRouter.get("/sitemaps/landing.xml", (_req, res) => sendLandingSitemap(res, 1));
+seoRouter.get("/sitemaps/landing-:n.xml", (req, res) => {
+  const n = Number(req.params.n);
+  if (!Number.isInteger(n) || n < 2) return res.status(404).type("text").send("Not found");
+  return sendLandingSitemap(res, n);
 });
 
 // GET /sitemaps/offers-{n}.xml — open public offers, by id, with their last change.
@@ -68,6 +86,13 @@ seoRouter.get("/sitemaps/offers-:n.xml", async (req, res) => {
   res.set("Cache-Control", "public, max-age=3600").type("application/xml").send(
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[...home, ...urls].join("\n")}\n</urlset>\n`,
   );
+});
+
+// GET /indexnow/{key}.txt — proves to IndexNow that the key is ours (seo/indexing.ts).
+seoRouter.get("/indexnow/:file", (req, res) => {
+  const key = config.seo.indexing.indexNowKey;
+  if (!key || req.params.file !== `${key}.txt`) return res.status(404).type("text").send("Not found");
+  res.set("Cache-Control", "public, max-age=86400").type("text").send(key);
 });
 
 // GET /robots.txt — everything may be crawled except the personal workspace pages (empty for

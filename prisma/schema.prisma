@@ -324,6 +324,7 @@ model Offer {
   @@index([locationId])
   @@index([createdByUserId])
   @@index([createdAt]) // new offers for the job alerts
+  @@index([closedAt]) // offers closed since the search engines were last told
   @@index([companyId])
   @@index([fingerprint])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -644,4 +645,16 @@ model JobAlert {
 
   @@index([userId])
   @@map("job_alerts")
+}
+
+// Search engines told about new and closed offer pages (SEO.md): Google's Indexing API and
+// IndexNow (Bing…). One row per engine.
+model SearchIndexing {
+  engine    String   @id // google | indexnow
+  cursorAt  DateTime @map("cursor_at") @db.Timestamptz // offers opened or closed after it aren't notified yet
+  day       String // the day (UTC, YYYY-MM-DD) `sentToday` counts
+  sentToday Int      @default(0) @map("sent_today")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("search_indexing")
 }

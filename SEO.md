@@ -34,32 +34,67 @@ empty page. Offer pages are now sent with their content:
 * The description Markdown → HTML conversion is shared with the web app
   (`packages/shared/src/markdown.ts`).
 
-### Landing pages by job and town
+### Landing pages by job and place
 
-The searches people type ("offres développeur Lyon", "emploi infirmier Bordeaux"), as
-server pages (`apps/api/src/seo/landing.ts`), without the app on top (its address handling
-would leave them), with the app's stylesheet:
+The searches people type ("offres développeur Lyon", "alternance commercial Bretagne",
+"stage marketing Paris"), as server pages (`apps/api/src/seo/landing.ts`), without the app on
+top (its address handling would leave them), with the app's stylesheet.
 
-| Address | Page |
+Three families of pages (scopes), each with the same addresses:
+
+| Scope | Prefix | Offers |
+|---|---|---|
+| All offers | `/emplois` | every open public offer |
+| Apprenticeships | `/alternance` | contract `apprenticeship` |
+| Internships | `/stage` | contract `internship` |
+
+| Address (after the prefix) | Page |
 |---|---|
-| `/emplois` | Hub: the jobs and towns with the most offers |
-| `/emplois/{métier}` | A job across France (`/emplois/developpeur-developpeuse-informatique`) |
-| `/emplois/{métier}/{ville-NN}` | A job in a town (`…/lyon-69`; the département number tells apart towns with the same name) |
-| `/emplois/a/{ville-NN}` | Every job in a town |
+| (none) | Hub: the jobs, regions, départements and towns with the most offers |
+| `/{métier}` | A job across France (`/emplois/developpeur-developpeuse-informatique`) |
+| `/a/{ville-NN}` | Every job in a town (`/emplois/a/lyon-69`; the département number tells apart towns with the same name) |
+| `/departement/{nom-NN}` | Every job in a département (`/emplois/departement/rhone-69`) |
+| `/region/{nom}` | Every job in a region (`/alternance/region/bretagne`) |
+| `/{métier}/{ville-NN}` | A job in a town |
+| `/{métier}/departement/{nom-NN}` | A job in a département |
+| `/{métier}/region/{nom}` | A job in a region |
 
 * Jobs are the ROME occupations (French names, both genders as in the catalogue), linked to
-  offers by enrichment; towns are the offers' places. Counts of open public offers per job,
-  town and job-in-town are kept in memory, rebuilt every hour (~3 s on 34 000 offers).
+  offers by enrichment; places are the offers' towns, with their département and region
+  (from the location table). Counts per scope, job, place and job in place are kept in
+  memory, rebuilt every hour (~1.5 s for the three scopes on 46 000 offers).
 * A page exists only with enough offers (`config.seo.landing`: 3 for a job or a job in a
-  town, 5 for a town); below, or unknown: 404 with `noindex`. Thin pages hurt the whole site.
-* Each page: a heading in the searched words, the count, the 30 newest offers (links to their
-  pages), links to the same job in other towns and to other jobs in the town (internal links
-  help search engines find and weigh the pages), a link to the app's search with the job and
-  town filled in. Title, description, canonical, Open Graph; no JobPosting (Google wants it
-  on the offer's own page only).
-* `/sitemaps/landing.xml` lists them all (the sitemap index points to it). On the development
-  data (34 000 offers): 4 588 pages: 373 jobs, 4 214 towns and jobs in towns. ~40 ms a page.
+  place, 5 for a place); below, or unknown: 404 with `noindex`. Thin pages hurt the whole
+  site.
+* Each page: a heading in the searched words ("Alternance Développeur à Lyon", "Offres
+  d'emploi en Bretagne", "dans le Grand Est", "– Rhône (69)"), the count, the 30 newest
+  offers (links to their pages), links to the same job in other places and to other jobs in
+  the place, to the wider places (town → département → region), to the same page in the
+  other scopes ("Voir aussi"), and to the app's search with the job, town and contract filled
+  in. Title, description, canonical, Open Graph; no JobPosting (Google wants it on the
+  offer's own page only).
+* The landing sitemaps (`/sitemaps/landing.xml`, then `landing-2.xml`… past 45 000 pages)
+  list them all; the sitemap index points to them. On the development data (46 000 offers):
+  13 725 pages (emplois 12 228, stage 1 153, alternance 344).
 
+### Instant indexing (Google's Indexing API, IndexNow)
+
+Instead of waiting for the crawlers to read 100 000 offer pages, the API tells the search
+engines about each new and closed offer (`apps/api/src/seo/indexing.ts`, every 30 minutes):
+
+* **IndexNow** (Bing, Yandex, Seznam, Naver; Bing feeds DuckDuckGo, Ecosia, Qwant): every
+  new or closed public offer page, up to 10 000 addresses a request. The key proves the site
+  is ours: it is served at `/indexnow/{key}.txt`.
+* **Google's Indexing API**, meant for pages with JobPosting: `URL_UPDATED` for a new offer,
+  `URL_DELETED` for a closed one, offers with JobPosting only. Its quota is 200 a day by
+  default: the newest offers go first, a quarter of the quota is kept for closed ones, what
+  doesn't fit is left to the sitemaps. More quota can be asked from Google once the site is
+  established.
+* Each engine has a cursor (table `search_indexing`): offers opened or closed after it are
+  told on the next run; a failed run leaves it, so the next run tries again, and sends an
+  alert. A first run only tells the last day's changes.
+* Off until configured: `INDEXNOW_KEY`, `GOOGLE_INDEXING_CREDENTIALS_BASE64` in
+  `.env.production` (below).
 
 ## To do once the site is deployed (you)
 
@@ -74,6 +109,21 @@ would leave them), with the app's stylesheet:
    click); Bing also feeds other search engines (DuckDuckGo, Ecosia, Qwant).
 5. Watch, in Search Console: *Pages* (indexed or not, and why) and *Job postings*
    (enhancements: errors and warnings in the markup).
+6. **IndexNow** (no account): on the server, `openssl rand -hex 16`, and put the result in
+   `.env.production` as `INDEXNOW_KEY=…`.
+7. **Google's Indexing API** (a service account, about 10 minutes):
+   1. console.cloud.google.com → create a project ("MonPoste").
+   2. *APIs & Services → Library* → "Web Search Indexing API" → *Enable*.
+   3. *IAM & Admin → Service accounts → Create service account* ("indexing"), no role →
+      *Done*. Open it → *Keys → Add key → Create new key → JSON*: a file downloads.
+   4. Search Console → *Settings → Users and permissions → Add user*: the service account's
+      address (`indexing@….iam.gserviceaccount.com`), permission **Owner** (Google requires
+      it for this API).
+   5. Copy the file to the server, then `base64 -w0 key.json` and put the result in
+      `.env.production` as `GOOGLE_INDEXING_CREDENTIALS_BASE64=…`; delete the file from the
+      server and keep a copy somewhere safe (it is a password).
+8. `dc up -d api` to apply. The API's log shows `search_indexing_done` with the counts every
+   30 minutes (`dc logs api | grep search_indexing`).
 
 Indexing takes days to weeks for a new domain; Google decides how many offers it indexes,
 based on the site's reputation and the pages' quality and uniqueness. Offers also published
@@ -82,9 +132,9 @@ several "apply on" options.
 
 ## Next steps worth considering
 
-1. ~~Landing pages by job and place~~: built (above). Later: départements and regions
-   ("emploi développeur Bretagne"), contract types ("alternance développeur Lyon"), and a
-   short text per job (what the job is) to make pages more than lists.
+1. ~~Landing pages by job and place~~, ~~départements, regions, apprenticeships and
+   internships~~: built (above). Later: a short text per job (what the job is, salaries seen)
+   to make pages more than lists; links from each offer page to its landing pages.
 2. **Readable offer addresses** (`/offres/developpeur-typescript-lyon-{id}`), with redirects
    from the current ones.
 3. Server-rendered home page text (what MonPoste does), and the legal pages.

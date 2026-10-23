@@ -77,6 +77,16 @@ export const config = {
     // Landing pages by job and town: a page exists only with this many open public offers
     // (thin pages hurt the whole site's standing with search engines).
     landing: { minOccupation: 3, minPair: 3, minCity: 5, offersShown: 30, linksShown: 20 },
+    // Search engines told at once about new and closed offer pages (SEO.md), every
+    // `checkMinutes` inside the API process. Google's Indexing API: a service account's key
+    // (the JSON file, base64), `dailyQuota` notifications a day (Google's default is 200).
+    // IndexNow (Bing, Yandex, Seznam…): a key of our choosing, served at /indexnow/{key}.txt.
+    indexing: {
+      checkMinutes: Number(process.env.SEARCH_INDEXING_CHECK_MINUTES ?? 30),
+      googleCredentials: process.env.GOOGLE_INDEXING_CREDENTIALS_BASE64,
+      dailyQuota: Number(process.env.GOOGLE_INDEXING_DAILY_QUOTA ?? 190),
+      indexNowKey: process.env.INDEXNOW_KEY,
+    },
   },
 
   // Job alerts (GROWTH.md phase 2): new offers emailed at `sendHour` (Paris time), every day

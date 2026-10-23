@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { config } from "../config";
 import { prisma, startTestServer } from "../test/helpers";
-import { resetLandingIndex, slugify } from "./landing";
+import { placePhrase, resetLandingIndex, slugify } from "./landing";
 import { resetAppTemplate } from "./offer-page";
 
 // Offer pages, sitemaps and robots.txt for search engines (SEO.md), on a built-app page
@@ -29,7 +29,7 @@ const ids: string[] = [];
 let open: string, closed: string, privateOffer: string;
 let companyId: string;
 let occupation: { id: number; name: string };
-let city: { id: number; name: string; countyCode: string | null };
+let city: { id: number; name: string; countyCode: string | null; countyName: string | null; regionName: string | null };
 const landing = config.seo.landing;
 
 const get = (path: string) => fetch(new URL(path, server.baseUrl)).then(async (response) => ({ status: response.status, type: response.headers.get("content-type") ?? "", body: await response.text() }));
@@ -68,9 +68,12 @@ before(async () => {
     data: { source: "rome", externalId: "TSEO1", names: { create: { language: "fr", name: "Testeur / Testeuse SEO", normalizedName: "testeur testeuse seo", isCanonical: true } } },
   });
   occupation = { id: rome.id, name: "Testeur / Testeuse SEO" };
-  city = await prisma.location.findUniqueOrThrow({ where: { id: location.id }, select: { id: true, name: true, countyCode: true } });
+  city = await prisma.location.findUniqueOrThrow({ where: { id: location.id }, select: { id: true, name: true, countyCode: true, countyName: true, regionName: true } });
   for (const title of ["Poste landing A", "Poste landing B"]) {
     await create({ title, description: "Une offre pour les pages par métier.", publishedAt: new Date(), occupations: { create: { occupationId: occupation.id } } });
+  }
+  for (const title of ["Alternant landing C", "Alternant landing D"]) {
+    await create({ title, description: "Une offre en alternance.", contractType: "apprenticeship", publishedAt: new Date(), occupations: { create: { occupationId: occupation.id } } });
   }
   config.seo.landing = { ...landing, minOccupation: 2, minPair: 2, minCity: 2 };
   resetLandingIndex();
@@ -144,6 +147,18 @@ describe("sitemaps and robots.txt", () => {
     assert.equal((await get("/sitemaps/offers-0.xml")).status, 404);
   });
 
+  test("the IndexNow key file: our key only", async () => {
+    const saved = config.seo.indexing.indexNowKey;
+    config.seo.indexing.indexNowKey = "abcdef0123456789abcdef0123456789";
+    try {
+      const file = await get("/indexnow/abcdef0123456789abcdef0123456789.txt");
+      assert.deepEqual([file.status, file.body], [200, "abcdef0123456789abcdef0123456789"]);
+      assert.equal((await get("/indexnow/other.txt")).status, 404);
+    } finally {
+      config.seo.indexing.indexNowKey = saved;
+    }
+  });
+
   test("robots.txt names the sitemap and keeps the personal pages out", async () => {
     const { body } = await get("/robots.txt");
     assert.match(body, new RegExp(`Sitemap: ${config.webBaseUrl}/sitemap.xml`));
@@ -167,7 +182,7 @@ describe("landing pages by job and town", () => {
     const pair = await get(`/emplois/${slugify(occupation.name)}/${citySlug()}`);
     assert.equal(pair.status, 200);
     assert.match(pair.body, new RegExp(`à ${city.name}</h1>`));
-    assert.match(pair.body, /2 offres en cours/);
+    assert.match(pair.body, /4 offres en cours/, "every contract, apprenticeships included");
     assert.match(pair.body, /href="\/offers\/[0-9a-f-]{36}">Poste landing B<\/a>/);
     assert.match(pair.body, /href="\/\?q=[^"]*locationId=/, "a link to the app's search");
 
@@ -175,6 +190,36 @@ describe("landing pages by job and town", () => {
     assert.equal(town.status, 200);
     assert.match(town.body, /Poste landing A/);
     assert.doesNotMatch(town.body, /Comptable H\/F/, "closed offers are not listed");
+  });
+
+  test("départements and regions, alone and with the job", async () => {
+    assert.ok(city.countyCode && city.countyName && city.regionName, "the test town has its département and region");
+    const county = await get(`/emplois/departement/${slugify(`${city.countyName}-${city.countyCode}`)}`);
+    assert.equal(county.status, 200);
+    assert.match(county.body, /Poste landing A/);
+    assert.match(county.body, new RegExp(`href="/emplois/${slugify(occupation.name)}/departement/`), "links to the job in the département");
+    const region = await get(`/emplois/${slugify(occupation.name)}/region/${slugify(city.regionName!)}`);
+    assert.equal(region.status, 200);
+    assert.match(region.body, /Poste landing B/);
+    assert.match(region.body, new RegExp(`<link rel="canonical" href="${config.webBaseUrl}/emplois/${slugify(occupation.name)}/region/${slugify(city.regionName!)}" />`));
+    assert.equal(placePhrase({ kind: "region", name: "Grand Est", label: "Grand Est" }), "dans le Grand Est");
+    assert.equal(placePhrase({ kind: "region", name: "Bretagne", label: "Bretagne" }), "en Bretagne");
+    assert.equal(placePhrase({ kind: "county", name: "Rhône", label: "Rhône (69)" }), "– Rhône (69)");
+  });
+
+  test("apprenticeships: their own pages, only their offers; linked from the general pages", async () => {
+    const job = await get(`/alternance/${slugify(occupation.name)}/${citySlug()}`);
+    assert.equal(job.status, 200);
+    assert.match(job.body, new RegExp(`<h1>Alternance Testeur / Testeuse SEO à ${city.name}</h1>`));
+    assert.match(job.body, /Alternant landing C/);
+    assert.doesNotMatch(job.body, /Poste landing A/, "other contracts aren't listed");
+    assert.match(job.body, /contractType=apprenticeship/, "the app's search keeps the contract");
+    const general = await get(`/emplois/${slugify(occupation.name)}/${citySlug()}`);
+    assert.match(general.body, new RegExp(`href="/alternance/${slugify(occupation.name)}/${citySlug()}"`));
+    assert.equal((await get(`/stage/${slugify(occupation.name)}`)).status, 404, "no internships: no page");
+    const sitemap = await get("/sitemaps/landing.xml");
+    assert.match(sitemap.body, new RegExp(`/alternance/${slugify(occupation.name)}/${citySlug()}</loc>`));
+    assert.match(sitemap.body, new RegExp(`/emplois/region/${slugify(city.regionName!)}</loc>`));
   });
 
   test("too few offers or unknown: 404, not indexed", async () => {

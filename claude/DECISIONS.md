@@ -379,6 +379,8 @@ Full plan in `COLLECTOR.md`.
 | D172 | Common Crawl's host graph as a discovery source: the tools' tenants by host suffix, and recruitment host names probed for supported tools (`probe`) | It lists hosts with no archived job page: 4× more Teamtailor sites than the URL index, and employers' own recruitment hosts no prefix can find |
 | D173 | iCIMS classic sites are read by the career-site crawler | Complete sitemaps and JobPosting (Expleo 471 offers); no adapter needed |
 | D174 | Board checks run in parallel (8 a night, 3 000 boards), never two on one host or one tool's shared API | 17 000 new candidates would take weeks one at a time; parallel requests to one API are impolite (Workable answered 429) |
+| D175 | Landing pages in three scopes (all offers /emplois, apprenticeships /alternance, internships /stage) × job × place, places being towns, départements and regions, each only above the minimum count | "alternance/stage + job + place" and regional searches are frequent and match the first users (students); the same thresholds keep thin pages out |
+| D176 | New and closed offers are told to Google's Indexing API (JobPosting pages, newest first within the 200/day quota, a quarter for closed offers) and to IndexNow (all), every 30 minutes, with a cursor per engine | A new domain gets crawled slowly; job pages change daily; Google allows this API for JobPosting pages and expired postings must leave its index quickly |
 
 ## Assumptions made (change if wrong)
 

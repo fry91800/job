@@ -6,6 +6,7 @@ import { scheduleAlerts } from "./alerts/send";
 import { scheduleCleanup } from "./jobs/cleanup";
 import { prisma } from "./lib/prisma";
 import { stopQueue } from "./lib/queue";
+import { scheduleSearchIndexing } from "./seo/indexing";
 import { closeBrowser } from "./templates/pdf";
 
 // A production server with missing or development settings doesn't start (DEPLOYMENT.md).
@@ -22,12 +23,14 @@ const server = createApp().listen(config.port, () => {
 });
 const stopCleanup = scheduleCleanup();
 const stopAlerts = scheduleAlerts();
+const stopIndexing = scheduleSearchIndexing();
 
 // Stop cleanly: finish requests, then close Chromium and the database pool.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     stopCleanup?.();
     stopAlerts?.();
+    stopIndexing?.();
     server.close(async () => {
       await closeBrowser();
       await stopQueue();
