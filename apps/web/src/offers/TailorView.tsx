@@ -1,17 +1,20 @@
-import { Check, FileText, Loader2, Sparkles, Target } from "lucide-react";
+import { Check, FileText, Loader2, PenLine, Sparkles, Target } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { GenerateForm } from "../generated/GenerateDialog";
+import { LetterForm } from "../letters/LetterDialog";
 import { track } from "../lib/analytics";
 import { useResumes } from "../resumes/queries";
 import { UploadZone } from "../resumes/ResumesView";
 import { useWorkspace } from "../tabs/workspace";
+import type { TabViewProps } from "../views/registry";
 import { AddOfferFlow } from "./AddOfferView";
 
-// "Adapter mon CV" (/adapter-mon-cv, SEO.md "Tool pages"): the three steps of a tailored
-// resume on one screen, for visitors arriving from a search: the resume (pick one or
-// upload), the offer (its address or text, checked), then the generation. Everything it
-// uses exists elsewhere: the upload zone, the offer form, the generation form.
+// The guided paths (SEO.md "Tool pages"), for visitors arriving from a search, on one
+// screen: the resume (pick one or upload), the offer (its address or text, checked), then a
+// tailored resume ("Adapter mon CV", /adapter-mon-cv) or a cover letter ("Ma lettre de
+// motivation", /ma-lettre-de-motivation). Everything it uses exists elsewhere: the upload
+// zone, the offer form, the generation and letter forms.
 
 type Step = 1 | 2 | 3;
 
@@ -28,8 +31,10 @@ function StepCard({ number, title, done, current, summary, children }: { number:
   );
 }
 
-export default function TailorView() {
+export default function TailorView({ tab }: TabViewProps) {
   const { t } = useTranslation();
+  const letter = tab.kind === "write-letter";
+  const texts = letter ? "tailor.letter" : "tailor";
   const { open } = useWorkspace();
   const resumes = useResumes();
   const list = resumes.data?.results ?? [];
@@ -37,7 +42,7 @@ export default function TailorView() {
   const [offerId, setOfferId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(1);
 
-  useEffect(() => track("tailor_open"), []);
+  useEffect(() => track(letter ? "write_letter_open" : "tailor_open"), [letter]);
   // The selected resume, else the first, is proposed.
   useEffect(() => {
     if (resumeId === null && list.length) setResumeId(list.find((item) => item.isSelected)?.id ?? list[0].id);
@@ -49,9 +54,9 @@ export default function TailorView() {
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-6 sm:px-8 sm:py-8">
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <Target size={20} className="text-accent" /> {t("tailor.title")}
+          {letter ? <PenLine size={20} className="text-accent" /> : <Target size={20} className="text-accent" />} {t(`${texts}.title`)}
         </h1>
-        <p className="text-sm text-fg-muted">{t("tailor.intro")}</p>
+        <p className="text-sm text-fg-muted">{t(`${texts}.intro`)}</p>
       </header>
 
       <StepCard number={1} title={t("tailor.resumeStep")} done={step > 1} current={step === 1} summary={chosen && <span className="flex items-center gap-1.5"><FileText size={14} /> {chosen.name}</span>}>
@@ -99,19 +104,29 @@ export default function TailorView() {
         </button>
       </StepCard>
 
-      <StepCard number={3} title={t("tailor.generateStep")} done={false} current={step === 3}>
-        {offerId && (
-          <GenerateForm
-            offerId={offerId}
-            initialResumeId={resumeId}
-            onDone={(generatedId) => {
-              track("tailor_done");
-              open({ kind: "generated", id: generatedId });
-            }}
-          />
-        )}
+      <StepCard number={3} title={t(`${texts}.generateStep`)} done={false} current={step === 3}>
+        {offerId &&
+          (letter ? (
+            <LetterForm
+              offerId={offerId}
+              initialResumeId={resumeId}
+              onDone={(letterId) => {
+                track("write_letter_done");
+                open({ kind: "letter", id: letterId });
+              }}
+            />
+          ) : (
+            <GenerateForm
+              offerId={offerId}
+              initialResumeId={resumeId}
+              onDone={(generatedId) => {
+                track("tailor_done");
+                open({ kind: "generated", id: generatedId });
+              }}
+            />
+          ))}
         <p className="flex items-center gap-1.5 text-xs text-fg-subtle">
-          <Sparkles size={12} /> {t("tailor.honest")}
+          <Sparkles size={12} /> {t(`${texts}.honest`)}
         </p>
       </StepCard>
     </div>

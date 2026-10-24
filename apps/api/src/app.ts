@@ -4,6 +4,7 @@ import { alertsRouter } from "./alerts/alerts.routes";
 import { authRouter } from "./auth/auth.routes";
 import { ingestRouter } from "./collector/ingest.routes";
 import { loadSession } from "./auth/session";
+import { coverLettersRouter } from "./cover-letters/cover-letters.routes";
 import { generatedResumesRouter } from "./generated-resumes/generated-resumes.routes";
 import { feedbackRouter } from "./feedback/feedback.routes";
 import { errorHandler, notFound } from "./lib/error-handler";
@@ -50,6 +51,7 @@ export function createApp() {
   app.use("/api/resumes", resumesRouter);
   app.use("/api/photos", photosRouter);
   app.use("/api/generated-resumes", generatedResumesRouter);
+  app.use("/api/cover-letters", coverLettersRouter);
   app.use("/api/templates", templatesRouter);
   app.use("/api/settings", settingsRouter);
   app.use("/api/feedback", feedbackRouter);

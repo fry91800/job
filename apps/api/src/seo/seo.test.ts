@@ -215,6 +215,20 @@ describe("tool pages", () => {
     assert.match((await get("/sitemaps/landing.xml")).body, /\/adapter-son-cv\/stage<\/loc>/);
     assert.match((await get("/robots.txt")).body, /Disallow: \/adapter-mon-cv/);
   });
+
+  test("cover letters: own pages leading to the letter's guided path; letters themselves not crawled", async () => {
+    for (const path of ["/lettre-de-motivation", "/lettre-de-motivation/alternance", "/lettre-de-motivation/stage"]) {
+      const page = await get(path);
+      assert.equal(page.status, 200, path);
+      assert.match(page.body, /<a class="landing-cta" href="\/ma-lettre-de-motivation">/, path);
+      assert.match(page.body, new RegExp(`écrire ${config.limits.coverLetters.guestTotal} lettres de motivation`), "the letters' own limits");
+    }
+    assert.match((await get("/lettre-de-motivation/stage")).body, /<a href="\/lettre-de-motivation">Lettre de motivation<\/a>/, "breadcrumbs through the main page");
+    assert.match((await get("/sitemaps/landing.xml")).body, /\/lettre-de-motivation\/alternance<\/loc>/);
+    const robots = (await get("/robots.txt")).body;
+    assert.match(robots, /Disallow: \/letters/);
+    assert.match(robots, /Disallow: \/ma-lettre-de-motivation/);
+  });
 });
 
 describe("landing pages by job and town", () => {

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { config } from "../config";
 import { hubPage, landingPaths, occupationPage, pairPage, placePage, SCOPES, type LandingPage } from "./landing";
 import { indexableOffers } from "./indexable";
-import { TOOL_START, toolPage, toolPaths } from "./tools";
+import { LETTER_START, TOOL_START, toolPage, toolPaths } from "./tools";
 import { appTemplate, loadPublicOffer, notFoundPageHtml, offerPageHtml } from "./offer-page";
 
 // Pages for search engines (SEO.md), outside /api: offer pages, sitemaps, robots.txt.
@@ -101,7 +101,7 @@ seoRouter.get("/:file", (req, res, next) => {
 // GET /robots.txt — everything may be crawled except the personal workspace pages (empty for
 // a crawler); the API stays allowed: search engines run the app, which calls it.
 seoRouter.get("/robots.txt", (_req, res) => {
-  const personal = ["/resumes", "/photos", "/saved", "/generated", "/settings", "/add-offer", TOOL_START];
+  const personal = ["/resumes", "/photos", "/saved", "/generated", "/letters", "/settings", "/add-offer", TOOL_START, LETTER_START];
   res.set("Cache-Control", "public, max-age=86400").type("text").send(
     `User-agent: *\nAllow: /\n${personal.map((path) => `Disallow: ${path}`).join("\n")}\n\nSitemap: ${config.webBaseUrl}/sitemap.xml\n`,
   );

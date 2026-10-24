@@ -8,6 +8,7 @@ export async function mergeGuestInto(tx: Prisma.TransactionClient, guestId: stri
   await tx.resume.updateMany({ where: { userId: guestId }, data: moveTo });
   await tx.userPhoto.updateMany({ where: { userId: guestId }, data: moveTo });
   await tx.generatedResume.updateMany({ where: { userId: guestId }, data: moveTo });
+  await tx.coverLetter.updateMany({ where: { userId: guestId }, data: moveTo });
   await tx.offer.updateMany({ where: { createdByUserId: guestId }, data: { createdByUserId: accountId } });
 
   // Saved offers: when both saved the same offer, the account's row wins and the

@@ -1,4 +1,4 @@
-import { Briefcase, FileText, History, Image, type LucideIcon, Plus, ScrollText, Settings, Shield, Sparkles, Star, Target } from "lucide-react";
+import { Briefcase, FileText, History, Image, type LucideIcon, Mail, PenLine, Plus, ScrollText, Settings, Shield, Sparkles, Star, Target } from "lucide-react";
 import { lazy, type ComponentType } from "react";
 import OfferView from "../offers/OfferView";
 import type { Tab, TabKind } from "../tabs/model";
@@ -20,6 +20,7 @@ const loaders = {
   settings: () => import("../settings/SettingsView"),
   addOffer: () => import("../offers/AddOfferView"),
   tailor: () => import("../offers/TailorView"),
+  letter: () => import("../letters/LetterView"),
   legal: () => import("../legal/LegalView"),
   // Not tabs, but loaded the same way: the account dialog and the offer edit form.
   authDialog: () => import("../auth/AuthDialog"),
@@ -33,6 +34,7 @@ const saved = lazy(loaders.saved);
 const settings = lazy(loaders.settings);
 const addOffer = lazy(loaders.addOffer);
 const tailor = lazy(loaders.tailor);
+const letter = lazy(loaders.letter);
 const legal = lazy(loaders.legal);
 
 // Once the page is idle, every view's code is fetched in the background, so the first
@@ -46,6 +48,7 @@ export function preloadViews(): void {
 export const VIEWS: Record<TabKind, ViewEntry> = {
   offer: { icon: Briefcase, view: OfferView },
   generated: { icon: Sparkles, view: generated },
+  letter: { icon: Mail, view: letter },
   resumes: { icon: FileText, view: resumes },
   photos: { icon: Image, view: photos },
   saved: { icon: Star, view: saved },
@@ -53,6 +56,7 @@ export const VIEWS: Record<TabKind, ViewEntry> = {
   settings: { icon: Settings, view: settings },
   "add-offer": { icon: Plus, view: addOffer },
   tailor: { icon: Target, view: tailor },
+  "write-letter": { icon: PenLine, view: tailor },
   privacy: { icon: Shield, view: legal },
   terms: { icon: ScrollText, view: legal },
 };

@@ -73,6 +73,9 @@ with its own text for its readers, leading to the app's guided path:
 | `/adapter-son-cv` | "adapter son CV à une offre (d'emploi)", "CV personnalisé" |
 | `/adapter-son-cv/alternance` | "CV alternance", "CV pour une alternance" |
 | `/adapter-son-cv/stage` | "CV stage", "CV pour un stage" |
+| `/lettre-de-motivation` | "lettre de motivation", "lettre de motivation adaptée à l'offre" |
+| `/lettre-de-motivation/alternance` | "lettre de motivation alternance" |
+| `/lettre-de-motivation/stage` | "lettre de motivation stage" |
 
 * Each page: why tailor a resume, what the resume must show (apprenticeship: diploma,
   school, rhythm, start date; internship: studies, dates, agreement), how it works (three
@@ -82,10 +85,16 @@ with its own text for its readers, leading to the app's guided path:
   limits (`config.limits`: 3 resumes without an account, 30 a day with one) and data
   deletion (`config.cleanup`), breadcrumbs, `WebApplication` data (free), links to the
   offers. In the landing sitemap.
-* **The guided path** (`/adapter-mon-cv`, the app's "tailor" tab, `offers/TailorView.tsx`):
+* The cover letter pages (FEATURE M5) lead to the letter's guided path
+  (`/ma-lettre-de-motivation`): what a good letter contains (and, for an apprenticeship or
+  an internship, what it must say), how it works, what the AI never invents, an FAQ with the
+  letters' own limits (2 without an account, 20 a day with one).
+* **The guided path** (`/adapter-mon-cv`, the app's "tailor" tab, `offers/TailorView.tsx`;
+  the same view at `/ma-lettre-de-motivation` ends with the letter):
   the resume (pick or upload), the offer (address or text, checked), then the generation,
   on one screen — the upload zone, the offer form and the generation form reused. The empty
-  workspace's first button leads to it. Not crawled (robots.txt): an app screen.
+  workspace's first button leads to it. Not crawled (robots.txt): app screens, like the
+  letters themselves (`/letters`).
 * "faire un CV en ligne" is left for later: Canva, Zety, CVDesignR and Indeed hold it; the
   tailoring searches are less contested and are exactly MonPoste's users.
 

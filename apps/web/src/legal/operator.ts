@@ -10,5 +10,5 @@ export const OPERATOR = {
   publicationDirector: "François Nguinbu",
   host: "Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Germany",
   emailProvider: "Brevo (Sendinblue SAS, France)", // DEPLOYMENT.md §5
-  updatedAt: "2026-10-18",
+  updatedAt: "2026-10-24",
 };

@@ -263,6 +263,15 @@ Goal: the user sees exactly what the AI changed and keeps only what they want.
 * **Modifier off**: no review step; the generated resume is the original rendered with the template.
 * Edge cases: the AI returns an invalid document → one automatic retry, then error (nothing saved, no quota used). The source resume is edited after generation → no effect (the generated resume uses its snapshot).
 
+### M5. Cover letter for an offer
+Goal: a cover letter written for the offer, from the user's resume, ready to read through, edit and send.
+
+* **Where**: a "Lettre de motivation" button next to "Générer un CV" on each offer (a dialog: the resume, if the user has several, then "Écrire ma lettre"); the guided path `/ma-lettre-de-motivation` (resume, offer, letter on one screen, SEO.md "Tool pages"). The letter opens in its own tab (`/letters/{id}`).
+* **Writing** (AI task `write-cover-letter`, the generation's model): in the offer's language (French or English; else the resume's), from the resume and the offer only. Never invented: experience, figures, results, qualities, anything about the company beyond the offer. No clichés, no placeholders ("[Nom]"): a sentence whose detail is unknown is written without it. 220–350 words in 3–4 paragraphs (the offer and why, what the candidate brings with concrete elements, availability), the language's conventions (French salutation and closing formulas; subject "Candidature au poste de …"). Apprenticeship and internship: studies, school, rhythm or dates when the resume gives them. The resume is sent **without its contact details** (the letter doesn't need them).
+* **The header** is filled in by the API, not the AI, and kept as at writing: the sender (name, title, place, phone, email from the resume), the recipient (company, place from the offer), the place and date ("Lyon, le 24 octobre 2026").
+* **The letter's tab**: the subject and the text to edit (unsaved edits mark the tab), the page as it prints, copy the text, download the PDF (one A4 page, `Lettre_{Name}_{Company}_{date}.pdf`, the last saved version), delete. Letters are listed on their offer and in the history ("CV générés", then "Lettres de motivation").
+* **Limits**: 2 letters without an account, 20 a day with one (deleted ones count). Writing saves the offer, as generating a resume does.
+
 ---
 
 ## T — Translation

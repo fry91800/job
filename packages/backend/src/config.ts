@@ -24,7 +24,7 @@ export const backendConfig = {
     taskModels: taskModels({
       AI_MODEL_EXTRACT: { tasks: ["parse-resume", "extract-offer", "extract-bot-page"], model: "gemini-3.5-flash-lite" },
       AI_MODEL_TRANSLATE: { tasks: ["translate-resume", "translate-field"], model: "gemini-3.5-flash-lite" },
-      AI_MODEL_GENERATE: { tasks: ["generate-resume"], model: "gemini-3.8-flash" },
+      AI_MODEL_GENERATE: { tasks: ["generate-resume", "write-cover-letter"], model: "gemini-3.8-flash" },
     }),
     timeoutMs: 60 * 1000,
     geminiApiKey: process.env.GEMINI_API_KEY,

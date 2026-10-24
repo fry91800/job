@@ -1,4 +1,4 @@
-import { AlertTriangle, Briefcase, Building2, ChevronDown, Clock, ExternalLink, Lock, MapPin, Pencil, Sparkles, Star, Wallet } from "lucide-react";
+import { AlertTriangle, Briefcase, Building2, ChevronDown, Clock, ExternalLink, Lock, Mail, MapPin, Pencil, PenLine, Sparkles, Star, Wallet } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { OfferDetail, SavedOfferStatus } from "@job/shared";
@@ -7,6 +7,8 @@ import { computeMatch } from "@job/shared/src/match";
 import { ApiError } from "../api/client";
 import { useMe, useOffer, useSavedOfferMutation } from "../api/queries";
 import { useGenerateDialog } from "../generated/GenerateDialog";
+import { useLetterDialog } from "../letters/LetterDialog";
+import { useLetters } from "../letters/queries";
 import { MenuChoice, MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "../layout/menu";
 import { formatAge, formatDate, formatSalary } from "../lib/format";
 import { useTabsStore } from "../tabs/store";
@@ -198,6 +200,13 @@ export default function OfferView({ tab }: TabViewProps) {
           >
             <Sparkles size={15} /> {t("offer.generate")}
           </button>
+          <button
+            type="button"
+            onClick={() => useLetterDialog.getState().open({ id: data.id, title: data.title })}
+            className="flex h-8 items-center gap-1.5 rounded-control border border-border px-3 text-sm font-medium transition-colors duration-150 hover:bg-hover"
+          >
+            <PenLine size={15} /> {t("letter.title")}
+          </button>
           {data.isOwn && !data.isPublic && (
             <button
               type="button"
@@ -268,6 +277,8 @@ export default function OfferView({ tab }: TabViewProps) {
         </section>
       )}
 
+      <OfferLetters offerId={data.id} />
+
       {/* The landing pages covering the offer (server pages, SEO.md): plain links, they leave the
           app. Absent from an API older than the app (during a deploy). */}
       {(data.landingLinks ?? []).length > 0 && (
@@ -285,5 +296,29 @@ export default function OfferView({ tab }: TabViewProps) {
         </section>
       )}
     </article>
+  );
+}
+
+// The cover letters written for this offer (FEATURE M5).
+function OfferLetters({ offerId }: { offerId: string }) {
+  const { t, i18n } = useTranslation();
+  const { open } = useWorkspace();
+  const letters = useLetters(offerId).data?.results ?? [];
+  if (!letters.length) return null;
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-semibold">{t("letter.forOffer")}</h2>
+      <ul className="flex flex-col">
+        {letters.map((letter) => (
+          <li key={letter.id}>
+            <button type="button" onClick={() => open({ kind: "letter", id: letter.id })} className="flex w-full items-center gap-3 rounded-control px-2 py-1.5 text-left text-sm transition-colors hover:bg-hover">
+              <Mail size={14} className="text-accent" />
+              <span>{formatDate(letter.createdAt, i18n.language)}</span>
+              <span className="text-xs uppercase text-fg-subtle">{letter.language}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -1,7 +1,7 @@
 // The workspace's tabs (FRONTEND.md §2.2): pure functions over the tab list, used by the
 // tab store. One tab per thing; a single reused preview tab; at most MAX_TABS tabs.
 
-export const TAB_KINDS = ["offer", "generated", "resumes", "photos", "saved", "history", "settings", "add-offer", "tailor", "privacy", "terms"] as const;
+export const TAB_KINDS = ["offer", "generated", "letter", "resumes", "photos", "saved", "history", "settings", "add-offer", "tailor", "write-letter", "privacy", "terms"] as const;
 export type TabKind = (typeof TAB_KINDS)[number];
 
 // What a tab shows: a kind, and an id for the kinds that show one thing (an offer…).
@@ -20,19 +20,20 @@ export type TabsState = { tabs: Tab[]; activeKey: string | null };
 export const MAX_TABS = 10;
 export const EMPTY: TabsState = { tabs: [], activeKey: null };
 
-const WITH_ID: ReadonlySet<TabKind> = new Set(["offer", "generated"]);
+const WITH_ID: ReadonlySet<TabKind> = new Set(["offer", "generated", "letter"]);
 
 export const tabKey = (ref: TabRef) => (ref.id ? `${ref.kind}:${ref.id}` : ref.kind);
 
 // Addresses (FRONTEND.md §2.4).
-const PATHS: Record<Exclude<TabKind, "offer" | "generated">, string> = {
+const PATHS: Record<Exclude<TabKind, "offer" | "generated" | "letter">, string> = {
   resumes: "/resumes",
   photos: "/photos",
   saved: "/saved",
   history: "/generated",
   settings: "/settings",
   "add-offer": "/add-offer",
-  tailor: "/adapter-mon-cv", // the guided path the tool pages lead to (SEO.md)
+  tailor: "/adapter-mon-cv", // the guided paths the tool pages lead to (SEO.md)
+  "write-letter": "/ma-lettre-de-motivation",
   privacy: "/privacy",
   terms: "/terms",
 };
@@ -40,13 +41,14 @@ const PATHS: Record<Exclude<TabKind, "offer" | "generated">, string> = {
 export function tabPath(ref: TabRef): string {
   if (ref.kind === "offer") return `/offers/${encodeURIComponent(ref.id ?? "")}`;
   if (ref.kind === "generated") return `/generated/${encodeURIComponent(ref.id ?? "")}`;
+  if (ref.kind === "letter") return `/letters/${encodeURIComponent(ref.id ?? "")}`;
   return PATHS[ref.kind];
 }
 
 export function tabFromPath(pathname: string): TabRef | null {
   const path = pathname.replace(/\/+$/, "") || "/";
-  const withId = /^\/(offers|generated)\/([^/]+)$/.exec(path);
-  if (withId) return { kind: withId[1] === "offers" ? "offer" : "generated", id: decodeURIComponent(withId[2]) };
+  const withId = /^\/(offers|generated|letters)\/([^/]+)$/.exec(path);
+  if (withId) return { kind: ({ offers: "offer", generated: "generated", letters: "letter" } as const)[withId[1] as "offers" | "generated" | "letters"], id: decodeURIComponent(withId[2]) };
   const kind = (Object.keys(PATHS) as (keyof typeof PATHS)[]).find((key) => PATHS[key] === path);
   return kind ? { kind } : null;
 }

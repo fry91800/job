@@ -44,6 +44,8 @@ export const config = {
     userOffers: { guestTotal: 3, registeredPerDay: 30 },
     // Generations with the modifier on (AI); modifier off is free (FEATURE G4, P16).
     aiGenerations: { guestTotal: 3, registeredPerDay: 30 },
+    // Cover letters written by the AI (FEATURE M5), deleted ones included.
+    coverLetters: { guestTotal: 2, registeredPerDay: 20 },
     // Resume translations (T1), counted from translated resumes, deleted ones included.
     translations: { guestTotal: 2, registeredPerDay: 20 },
     photoMaxPixels: 1000, // longest side after resizing (R6)

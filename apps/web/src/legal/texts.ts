@@ -14,7 +14,7 @@ Cette page explique quelles données ${O.site} traite, pourquoi, combien de temp
 
 ## Données traitées
 - **Compte** : adresse e-mail et mot de passe (stocké uniquement sous forme chiffrée, jamais en clair).
-- **Contenu que vous ajoutez** : CV (texte et fichiers importés), photos, offres enregistrées ou ajoutées, CV générés, alertes e-mail (recherches enregistrées) et réglages.
+- **Contenu que vous ajoutez** : CV (texte et fichiers importés), photos, offres enregistrées ou ajoutées, CV générés, lettres de motivation, alertes e-mail (recherches enregistrées) et réglages.
 - **Session** : un identifiant de session aléatoire, dans un cookie.
 - **Messages envoyés avec « Un avis ? »** : le message, l'adresse e-mail si vous en indiquez une, la page d'où il est envoyé. Ils nous parviennent par e-mail ; nous les gardons le temps de les traiter, au plus un an.
 - **Mesure d'audience** : pages vues, provenance (site ou moteur de recherche d'où vous venez), type d'appareil, navigateur, pays, et quelques actions (recherche et ses mots-clés, CV importé ou généré, téléchargement). Sans cookie et sans enregistrer votre adresse IP : les visites ne sont pas reliées à vous, ni d'un jour à l'autre. Si votre navigateur demande à ne pas être suivi (« Do Not Track »), rien n'est mesuré.
@@ -35,7 +35,7 @@ MonPoste n'utilise ni publicité ni traceur tiers. La mesure d'audience (Umami) 
 Aucun de ces éléments ne sert à vous suivre : aucun consentement n'est donc demandé. La mesure d'audience n'utilise ni cookie ni stockage du navigateur.
 
 ## Services utilisés
-- **Google Gemini** (intelligence artificielle) : quand vous importez un CV, le traduisez, ajoutez une offre à partir d'un texte ou générez un CV, le texte concerné (votre CV, l'offre) est envoyé à Google pour être traité. Google peut traiter ces données hors de l'Union européenne, avec les garanties prévues par le RGPD (clauses contractuelles types).
+- **Google Gemini** (intelligence artificielle) : quand vous importez un CV, le traduisez, ajoutez une offre à partir d'un texte, générez un CV ou écrivez une lettre de motivation, le texte concerné (votre CV, sans vos coordonnées pour une lettre ; l'offre) est envoyé à Google pour être traité. Google peut traiter ces données hors de l'Union européenne, avec les garanties prévues par le RGPD (clauses contractuelles types).
 - **Geoapify** (lieux) : le texte tapé dans le champ « lieu » de la recherche, sans aucune donnée vous concernant.
 - **${O.emailProvider}** : envoi des e-mails du compte.
 - **Hébergement** : ${O.host}.
@@ -73,7 +73,7 @@ Vous fournissez une adresse e-mail valide et gardez votre mot de passe pour vous
 Les CV, photos et offres que vous ajoutez restent les vôtres. Vous devez avoir le droit de les utiliser (notamment pour les photos). Nous les utilisons uniquement pour vous rendre le service, comme décrit dans la politique de confidentialité.
 
 ## Contenu généré
-Les CV générés, traductions et extractions sont produits par une intelligence artificielle à partir de vos informations. Ils peuvent contenir des erreurs : relisez-les avant de les envoyer. Vous restez responsable de ce que vous transmettez aux employeurs.
+Les CV générés, lettres de motivation, traductions et extractions sont produits par une intelligence artificielle à partir de vos informations. Ils peuvent contenir des erreurs : relisez-les avant de les envoyer. Vous restez responsable de ce que vous transmettez aux employeurs.
 
 ## Offres d'emploi
 Les offres viennent des sites des employeurs et sont mises à jour régulièrement. Nous ne garantissons ni leur exactitude ni leur disponibilité, et ne participons pas aux recrutements.
@@ -104,7 +104,7 @@ This page explains what data ${O.site} processes, why, how long it keeps it and 
 
 ## Data processed
 - **Account**: email address and password (stored only in hashed form, never in clear).
-- **Content you add**: resumes (text and uploaded files), photos, saved or added offers, generated resumes, email alerts (saved searches) and settings.
+- **Content you add**: resumes (text and uploaded files), photos, saved or added offers, generated resumes, cover letters, email alerts (saved searches) and settings.
 - **Session**: a random session identifier, in a cookie.
 - **Messages sent with "Feedback?"**: the message, your email address if you give one, the page it was sent from. They reach us by email; we keep them as long as needed to handle them, one year at most.
 - **Audience measurement**: pages viewed, origin (the site or search engine you came from), device type, browser, country, and a few actions (searches and their keywords, resume uploaded or generated, download). Without cookies and without storing your IP address: visits are not linked to you, nor from one day to the next. If your browser asks not to be tracked ("Do Not Track"), nothing is measured.
@@ -125,7 +125,7 @@ MonPoste uses no advertising and no third-party trackers. Audience measurement (
 None of these is used to track you, so no consent is asked. Audience measurement uses no cookies and no browser storage.
 
 ## Services used
-- **Google Gemini** (artificial intelligence): when you import a resume, translate it, add an offer from a text or generate a resume, the text concerned (your resume, the offer) is sent to Google for processing. Google may process this data outside the European Union, with the safeguards required by the GDPR (standard contractual clauses).
+- **Google Gemini** (artificial intelligence): when you import a resume, translate it, add an offer from a text, generate a resume or write a cover letter, the text concerned (your resume, without your contact details for a letter; the offer) is sent to Google for processing. Google may process this data outside the European Union, with the safeguards required by the GDPR (standard contractual clauses).
 - **Geoapify** (places): the text typed in the search's "place" field, without any data about you.
 - **${O.emailProvider}**: sending account emails.
 - **Hosting**: ${O.host}.
@@ -163,7 +163,7 @@ You give a valid email address and keep your password to yourself. You can delet
 The resumes, photos and offers you add remain yours. You must have the right to use them (photos in particular). We use them only to provide the service, as described in the privacy policy.
 
 ## Generated content
-Generated resumes, translations and extractions are produced by artificial intelligence from your information. They may contain mistakes: read them before sending them. You remain responsible for what you send to employers.
+Generated resumes, cover letters, translations and extractions are produced by artificial intelligence from your information. They may contain mistakes: read them before sending them. You remain responsible for what you send to employers.
 
 ## Job offers
 Offers come from employers' sites and are updated regularly. We guarantee neither their accuracy nor their availability, and take no part in hiring.

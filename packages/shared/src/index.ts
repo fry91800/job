@@ -13,5 +13,6 @@ export * from "./photos";
 export * from "./resumes/api";
 export * from "./resumes/changes";
 export * from "./resumes/content";
+export * from "./resumes/cover-letters";
 export * from "./resumes/generated";
 export * from "./settings";

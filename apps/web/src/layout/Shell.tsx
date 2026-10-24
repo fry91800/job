@@ -6,6 +6,7 @@ import { useTabsStore } from "../tabs/store";
 import { useAddressSync, useWorkspace } from "../tabs/workspace";
 import { preloadViews, VIEWS } from "../views/registry";
 import { GenerateDialog } from "../generated/GenerateDialog";
+import { LetterDialog } from "../letters/LetterDialog";
 import { useAccountLanguage, useAuthDialog } from "../auth/session";
 import { ConfirmDialog } from "../lib/confirm";
 import { FeedbackDialog } from "../feedback/FeedbackDialog";
@@ -108,6 +109,7 @@ export function Shell() {
         </Suspense>
       )}
       <GenerateDialog />
+      <LetterDialog />
       <FeedbackDialog />
       <ConfirmDialog />
       <Toaster />

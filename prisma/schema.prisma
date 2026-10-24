@@ -118,6 +118,7 @@ model User {
   photos           UserPhoto[]       @relation("UserPhotos")
   resumes          Resume[]          @relation("UserResumes")
   generatedResumes GeneratedResume[]
+  coverLetters     CoverLetter[]
   savedOffers      SavedOffer[]
   createdOffers    Offer[]
   jobAlerts        JobAlert[]
@@ -215,6 +216,7 @@ model Resume {
   skills           ResumeSkill[]
   occupations      ResumeOccupation[]
   generatedResumes GeneratedResume[]
+  coverLetters     CoverLetter[]
   translatedFrom   Resume?            @relation("ResumeTranslations", fields: [translatedFromResumeId], references: [id], onDelete: SetNull)
   translations     Resume[]           @relation("ResumeTranslations")
 
@@ -318,6 +320,7 @@ model Offer {
   occupations      OfferOccupation[]
   savedBy          SavedOffer[]
   generatedResumes GeneratedResume[]
+  coverLetters     CoverLetter[]
 
   @@unique([source, externalId])
   @@index([isPublic, closedAt, publishedAt(sort: Desc)])
@@ -657,4 +660,31 @@ model SearchIndexing {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("search_indexing")
+}
+
+// Cover letters for an offer (FEATURE M5), written by the AI from a resume and the offer,
+// then edited by the user. The sender and recipient blocks are kept as they were at writing.
+model CoverLetter {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  offerId       String    @map("offer_id") @db.Uuid
+  resumeId      String?   @map("resume_id") @db.Uuid
+  language      String    @db.VarChar(10)
+  subject       String // "Candidature au poste de …"
+  body          String // salutation, paragraphs and closing, separated by blank lines
+  sender        Json // { name, title, email, phone, location } from the resume
+  recipient     Json // { company, place } from the offer
+  aiModel       String?   @map("ai_model")
+  promptVersion String?   @map("prompt_version")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer  Offer   @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  resume Resume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, offerId])
+  @@index([userId, createdAt])
+  @@map("cover_letters")
 }
