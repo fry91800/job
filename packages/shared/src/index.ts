@@ -15,4 +15,5 @@ export * from "./resumes/changes";
 export * from "./resumes/content";
 export * from "./resumes/cover-letters";
 export * from "./resumes/generated";
+export * from "./resumes/help";
 export * from "./settings";

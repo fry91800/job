@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Circle, Download, FilePlus2, Languages, Loader2, MoreHorizontal, Trash2, UploadCloud } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Download, FilePlus2, Languages, Loader2, MoreHorizontal, Trash2, UploadCloud, Wand2 } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { ResumeListItem } from "@job/shared";
@@ -12,6 +12,7 @@ import { confirm } from "../lib/confirm";
 import { errorMessage } from "../lib/errors";
 import { formatAge } from "../lib/format";
 import { toast } from "../lib/toast";
+import { useWorkspace } from "../tabs/workspace";
 import type { TabViewProps } from "../views/registry";
 import { useCreateResume, useDeleteResume, useResume, useResumes, useSelectResume, useTranslateResume, useUploadResume } from "./queries";
 import { ResumeEditor } from "./ResumeEditor";
@@ -147,6 +148,7 @@ function ResumeRow({ item, open, onOpen }: { item: ResumeListItem; open: boolean
 
 export default function ResumesView({ tab }: TabViewProps) {
   const { t } = useTranslation();
+  const { open: openTab } = useWorkspace();
   const resumes = useResumes();
   const create = useCreateResume();
   const me = useMe().data?.user ?? null;
@@ -179,6 +181,13 @@ export default function ResumesView({ tab }: TabViewProps) {
             openResume(id);
           }}
         />
+        <button
+          type="button"
+          onClick={() => openTab({ kind: "new-resume" })}
+          className="flex h-8 items-center justify-center gap-1.5 rounded-control text-sm text-accent transition-colors hover:bg-accent-soft"
+        >
+          <Wand2 size={15} /> {t("wizard.title")}
+        </button>
         <button
           type="button"
           disabled={create.isPending}

@@ -52,7 +52,7 @@ export function useUploadResume() {
 export function useCreateResume() {
   const after = useAfterChange();
   return useMutation({
-    mutationFn: (input: { language: ResumeLanguage; content: ResumeContent }) => api<ResumeDetail>("POST", "/api/resumes", { body: input }),
+    mutationFn: (input: { language: ResumeLanguage; content: ResumeContent; name?: string }) => api<ResumeDetail>("POST", "/api/resumes", { body: input }),
     onSuccess: () => {
       track("resume_create");
       after();

@@ -1,4 +1,4 @@
-import { Briefcase, FileText, History, Image, type LucideIcon, Mail, PenLine, Plus, ScrollText, Settings, Shield, Sparkles, Star, Target } from "lucide-react";
+import { Briefcase, FilePlus2, FileText, History, Image, type LucideIcon, Mail, PenLine, Plus, ScrollText, Settings, Shield, Sparkles, Star, Target } from "lucide-react";
 import { lazy, type ComponentType } from "react";
 import OfferView from "../offers/OfferView";
 import type { Tab, TabKind } from "../tabs/model";
@@ -21,6 +21,7 @@ const loaders = {
   addOffer: () => import("../offers/AddOfferView"),
   tailor: () => import("../offers/TailorView"),
   letter: () => import("../letters/LetterView"),
+  newResume: () => import("../resumes/ResumeWizard"),
   legal: () => import("../legal/LegalView"),
   // Not tabs, but loaded the same way: the account dialog and the offer edit form.
   authDialog: () => import("../auth/AuthDialog"),
@@ -35,6 +36,7 @@ const settings = lazy(loaders.settings);
 const addOffer = lazy(loaders.addOffer);
 const tailor = lazy(loaders.tailor);
 const letter = lazy(loaders.letter);
+const newResume = lazy(loaders.newResume);
 const legal = lazy(loaders.legal);
 
 // Once the page is idle, every view's code is fetched in the background, so the first
@@ -57,6 +59,7 @@ export const VIEWS: Record<TabKind, ViewEntry> = {
   "add-offer": { icon: Plus, view: addOffer },
   tailor: { icon: Target, view: tailor },
   "write-letter": { icon: PenLine, view: tailor },
+  "new-resume": { icon: FilePlus2, view: newResume },
   privacy: { icon: Shield, view: legal },
   terms: { icon: ScrollText, view: legal },
 };

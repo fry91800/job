@@ -1,4 +1,4 @@
-import { ArrowLeft, Target, Upload } from "lucide-react";
+import { ArrowLeft, Target, Upload, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useWorkspace } from "../tabs/workspace";
 
@@ -31,6 +31,9 @@ export function Welcome() {
           </button>
         </div>
         <p className="text-sm text-fg-subtle">{t("welcome.uploadHint")}</p>
+        <button type="button" onClick={() => open({ kind: "new-resume" })} className="flex items-center gap-1.5 text-sm text-accent hover:underline">
+          <Wand2 size={14} /> {t("welcome.noResume")}
+        </button>
         <p className="mt-4 flex items-center gap-2 text-sm text-fg-muted">
           <ArrowLeft size={14} /> {t("welcome.searchHint")}
         </p>

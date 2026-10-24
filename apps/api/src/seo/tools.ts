@@ -5,13 +5,14 @@ import { breadcrumbs, landingDocument, type LandingPage } from "./landing";
 // Tool pages (SEO.md "Tool pages"): what people search before applying ("adapter son CV à
 // une offre", "CV alternance", "lettre de motivation", "lettre de motivation stage"…), as
 // server pages explaining the tool, each with its own text for its readers, leading to the
-// app's guided paths (/adapter-mon-cv, /ma-lettre-de-motivation). What
+// app's guided paths (/adapter-mon-cv, /ma-lettre-de-motivation, /creer-mon-cv). What
 // they promise is what the app does: the generation rules (generated-resumes/
 // resume-modifier.ts), the limits (config.limits), the guests' data deletion
 // (config.cleanup).
 
 export const TOOL_START = "/adapter-mon-cv"; // the app's guided paths (apps/web tabs/model.ts)
 export const LETTER_START = "/ma-lettre-de-motivation";
+export const CREATE_START = "/creer-mon-cv";
 
 type Faq = [question: string, answer: string];
 type Tool = {
@@ -51,6 +52,7 @@ const never = {
 };
 
 const resumeFaq = (limits: typeof config.limits): Faq[] => [
+  ["Je n'ai pas de CV, comment faire ?", "Créez-le en quelques minutes avec l'assistant : vos expériences et votre formation avec vos mots, les compétences que les employeurs demandent pour le poste visé, et une reformulation par l'IA si vous le souhaitez."],
   ["Est-ce gratuit ?", `Oui. Sans compte, vous pouvez générer ${limits.aiGenerations.guestTotal} CV adaptés ; avec un compte gratuit, jusqu'à ${limits.aiGenerations.registeredPerDay} par jour.`],
   ["Que deviennent mes données ?", `Votre CV n'est visible que par vous. Sans compte, il est supprimé après ${config.cleanup.guestInactiveDays} jours sans visite ; avec un compte, vous le supprimez quand vous voulez.`],
   ["Le CV passe-t-il les logiciels de recrutement (ATS) ?", "Oui : le PDF contient du vrai texte, dans l'ordre de lecture, avec des titres de rubriques standards, que les logiciels de tri lisent correctement. Huit modèles au choix, avec ou sans photo."],
@@ -78,6 +80,7 @@ const letterRules = {
 };
 
 const letterFaq = (limits: typeof config.limits): Faq[] => [
+  ["Je n'ai pas de CV, comment faire ?", "Créez-le en quelques minutes avec l'assistant : vos expériences et votre formation avec vos mots, les compétences que les employeurs demandent pour le poste visé, et une reformulation par l'IA si vous le souhaitez."],
   ["Est-ce gratuit ?", `Oui. Sans compte, vous pouvez écrire ${limits.coverLetters.guestTotal} lettres de motivation ; avec un compte gratuit, jusqu'à ${limits.coverLetters.registeredPerDay} par jour.`],
   ["Puis-je modifier la lettre ?", "Oui, entièrement : l'objet et le texte. L'aperçu montre la page telle qu'elle sera imprimée, et le PDF reprend votre dernière version enregistrée."],
   ["Dans quelle langue est écrite la lettre ?", "Dans la langue de l'offre : en français pour une offre en français, en anglais pour une offre en anglais."],
@@ -86,6 +89,14 @@ const letterFaq = (limits: typeof config.limits): Faq[] => [
 
 const LETTER_CTA: [string, string] = ["Écrire ma lettre maintenant — gratuit", "Commencer avec mon CV"];
 const LETTER_CRUMBS = [{ name: "Lettre de motivation", path: "/lettre-de-motivation" }];
+
+const createFaq = (): Faq[] => [
+  ["Est-ce gratuit ?", "Oui, et sans inscription pour commencer : votre CV est enregistré dans votre espace. Créez un compte pour le garder sur tous vos appareils."],
+  ["Je n'ai pas d'expérience professionnelle", "Les stages, jobs d'été, missions de bénévolat, associations étudiantes et projets d'études comptent : décrivez-les avec vos mots, l'assistant les met en forme. Vous pouvez aussi passer l'étape."],
+  ["L'IA écrit-elle mon CV à ma place ?", "Non : vous écrivez ce que vous avez fait, et l'IA peut le reformuler en phrases de CV ou rédiger votre profil à partir de ce que vous avez saisi. Elle n'ajoute ni tâche, ni outil, ni chiffre que vous n'avez pas écrit."],
+  ["Et ensuite ?", "Votre CV prêt, adaptez-le à chaque offre qui vous intéresse, écrivez votre lettre de motivation, et téléchargez-les en PDF."],
+  ["Que deviennent mes données ?", `Votre CV n'est visible que par vous. Sans compte, il est supprimé après ${config.cleanup.guestInactiveDays} jours sans visite ; avec un compte, vous le supprimez quand vous voulez.`],
+];
 
 const TOOLS: Tool[] = [
   {
@@ -241,6 +252,49 @@ const TOOLS: Tool[] = [
       { href: "/lettre-de-motivation", label: "Lettre de motivation adaptée à l'offre" },
     ],
   },
+  {
+    path: "/creer-son-cv",
+    start: CREATE_START,
+    cta: ["Créer mon CV maintenant — gratuit", "Commencer mon CV"],
+    application: "Créer son CV en ligne",
+    crumbs: [],
+    title: "Créer son CV en ligne, gratuitement et étape par étape",
+    heading: "Créer son CV en ligne, étape par étape",
+    description: "Créez votre CV en quelques minutes, sans partir d'une page blanche : vos expériences avec vos mots, les compétences que les employeurs demandent, une reformulation par l'IA. Gratuit, sans inscription.",
+    crumb: "Créer son CV",
+    intro: [
+      "Le plus difficile, c'est souvent la page blanche : quoi mettre, dans quel ordre, avec quels mots. Surtout pour un premier CV, quand on pense ne rien avoir à raconter.",
+      "L'assistant de MonPoste vous pose les bonnes questions, une étape à la fois, et vous aide à formuler — sans jamais rien inventer.",
+    ],
+    sections: [
+      {
+        ordered: true,
+        title: "Comment ça marche",
+        items: [
+          "Vous : votre nom, le poste que vous recherchez, vos coordonnées.",
+          "Vos expériences : emplois, stages, jobs d'été, bénévolat — ce que vous y faisiez, avec vos mots. Un bouton les reformule en phrases de CV.",
+          "Votre formation : le diplôme en cours ou obtenu, l'établissement, les dates.",
+          "Vos compétences et langues, avec celles que les employeurs demandent pour le poste visé.",
+          "Votre profil, en deux ou trois phrases, que l'IA peut rédiger à partir de ce que vous avez saisi.",
+        ],
+      },
+      {
+        title: "Les compétences que les employeurs demandent vraiment",
+        paragraphs: ["Pour le poste que vous visez, l'assistant vous propose les compétences qui reviennent dans les offres d'emploi actuelles des employeurs qui recrutent ce métier — pas une liste générique. Vous ajoutez celles que vous avez, d'un clic."],
+      },
+      {
+        title: "Et ensuite",
+        paragraphs: ["Votre CV est enregistré et modifiable à tout moment. Adaptez-le à chaque offre qui vous intéresse, écrivez votre lettre de motivation, et téléchargez-les en PDF, avec huit modèles au choix."],
+      },
+    ],
+    faq: [],
+    see: [
+      { href: "/adapter-son-cv", label: "Adapter son CV à une offre" },
+      { href: "/lettre-de-motivation", label: "Lettre de motivation adaptée à l'offre" },
+      { href: "/alternance", label: "Les offres en alternance" },
+      { href: "/stage", label: "Les offres de stage" },
+    ],
+  },
 ];
 
 export const toolPaths = () => TOOLS.map((tool) => tool.path);
@@ -250,7 +304,7 @@ const cta = (start: string, label: string) => `<p><a class="landing-cta" href="$
 export function toolPage(path: string): LandingPage | null {
   const tool = TOOLS.find((item) => item.path === path);
   if (!tool) return null;
-  const faq = [...tool.faq, ...(tool.start === LETTER_START ? letterFaq : resumeFaq)(config.limits)];
+  const faq = [...tool.faq, ...(tool.start === LETTER_START ? letterFaq(config.limits) : tool.start === CREATE_START ? createFaq() : resumeFaq(config.limits))];
   const trail = breadcrumbs([{ name: config.seo.siteName, path: "/" }, ...tool.crumbs, { name: tool.crumb, path: tool.path }]);
   const body = `${trail.html}
 <h1>${escapeHtml(tool.heading)}</h1>

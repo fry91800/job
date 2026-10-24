@@ -1,7 +1,7 @@
 // The workspace's tabs (FRONTEND.md §2.2): pure functions over the tab list, used by the
 // tab store. One tab per thing; a single reused preview tab; at most MAX_TABS tabs.
 
-export const TAB_KINDS = ["offer", "generated", "letter", "resumes", "photos", "saved", "history", "settings", "add-offer", "tailor", "write-letter", "privacy", "terms"] as const;
+export const TAB_KINDS = ["offer", "generated", "letter", "resumes", "photos", "saved", "history", "settings", "add-offer", "tailor", "write-letter", "new-resume", "privacy", "terms"] as const;
 export type TabKind = (typeof TAB_KINDS)[number];
 
 // What a tab shows: a kind, and an id for the kinds that show one thing (an offer…).
@@ -34,6 +34,7 @@ const PATHS: Record<Exclude<TabKind, "offer" | "generated" | "letter">, string> 
   "add-offer": "/add-offer",
   tailor: "/adapter-mon-cv", // the guided paths the tool pages lead to (SEO.md)
   "write-letter": "/ma-lettre-de-motivation",
+  "new-resume": "/creer-mon-cv",
   privacy: "/privacy",
   terms: "/terms",
 };

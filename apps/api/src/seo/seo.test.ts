@@ -216,6 +216,15 @@ describe("tool pages", () => {
     assert.match((await get("/robots.txt")).body, /Disallow: \/adapter-mon-cv/);
   });
 
+  test("creating a resume: its page leads to the guided creation; the other tool pages mention it", async () => {
+    const page = await get("/creer-son-cv");
+    assert.equal(page.status, 200);
+    assert.match(page.body, /<a class="landing-cta" href="\/creer-mon-cv">/);
+    assert.match(page.body, /<h1>Créer son CV en ligne, étape par étape<\/h1>/);
+    assert.match((await get("/adapter-son-cv")).body, /Je n&#39;ai pas de CV, comment faire/);
+    assert.match((await get("/sitemaps/landing.xml")).body, /\/creer-son-cv<\/loc>/);
+  });
+
   test("cover letters: own pages leading to the letter's guided path; letters themselves not crawled", async () => {
     for (const path of ["/lettre-de-motivation", "/lettre-de-motivation/alternance", "/lettre-de-motivation/stage"]) {
       const page = await get(path);
@@ -226,6 +235,7 @@ describe("tool pages", () => {
     assert.match((await get("/lettre-de-motivation/stage")).body, /<a href="\/lettre-de-motivation">Lettre de motivation<\/a>/, "breadcrumbs through the main page");
     assert.match((await get("/sitemaps/landing.xml")).body, /\/lettre-de-motivation\/alternance<\/loc>/);
     const robots = (await get("/robots.txt")).body;
+    assert.match(robots, /Disallow: \/creer-mon-cv/);
     assert.match(robots, /Disallow: \/letters/);
     assert.match(robots, /Disallow: \/ma-lettre-de-motivation/);
   });

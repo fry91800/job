@@ -148,6 +148,15 @@ Conventions: **Guest** = visitor without an account (server-side guest user). **
 * Delete: soft delete; if selected → selection cleared. Generated resumes that used it render without a photo once the file is purged.
 * Photos are served through an authenticated API route that checks ownership (signed URLs once S3 storage is used) and are never publicly listed.
 
+### R7. Create a resume from scratch, step by step
+Goal: someone without a resume (often a student) writes one without facing the full empty editor.
+
+* **Where**: `/creer-mon-cv` (the "Créer mon CV" tab), linked from the empty workspace, the Résumés tab, the guided paths' first step when the user has no resume, and the tool page `/creer-son-cv` (SEO.md). "Créer un CV vide" (R2, the full editor) stays for those who prefer it.
+* **Five steps** on one screen, each can be revisited: (1) name, the job sought (the resume's title), town, resume language, email, phone; (2) experiences — position, employer, dates or "J'y suis encore", what they did in their own words, one task per line; the help says internships, summer jobs, volunteering and associations count, and the step can be skipped; (3) education — degree, school, dates or "En cours"; (4) skills — typed, or picked among the skills employers ask for the job sought (below), and languages with a level; (5) a profile summary, optional.
+* **Suggested skills** (`GET /api/resume-help/skills?title=`, no AI): the open offers of the occupation the title names (narrowed to titles containing the job's own word when 30+ remain: "Vendeuse" keeps sellers, not estate agents), counted **by employer** (one company's boilerplate counts once), ranked by how characteristic they are of the job (share × log of the lift over all employers), one of each family, languages and a few never-candidate skills (e-learning platforms, carpools) left out; 12 at most, cached an hour.
+* **AI help, on request only** (task `write-resume-text`, the generation's model; the per-address AI limit): "Reformuler" turns an experience's lines into resume phrasing, never more lines than written and nothing added; "Rédiger avec l'IA" writes the 2–3 sentence profile from what was entered. Both truthful to the input only.
+* **The draft** stays in the browser (local storage) until the resume is created, so a reload loses nothing; the tab is marked while unsaved. At the end, the resume is created (named "CV – {job sought}", selected if it is the first) from complete entries only, and the screen offers the next steps: tailor it to an offer, write a cover letter, view and edit it.
+
 ---
 
 ## O — Offers

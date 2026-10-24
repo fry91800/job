@@ -76,6 +76,7 @@ with its own text for its readers, leading to the app's guided path:
 | `/lettre-de-motivation` | "lettre de motivation", "lettre de motivation adaptée à l'offre" |
 | `/lettre-de-motivation/alternance` | "lettre de motivation alternance" |
 | `/lettre-de-motivation/stage` | "lettre de motivation stage" |
+| `/creer-son-cv` | "créer son CV", "faire un CV en ligne" (long term: the big sites hold it) |
 
 * Each page: why tailor a resume, what the resume must show (apprenticeship: diploma,
   school, rhythm, start date; internship: studies, dates, agreement), how it works (three
@@ -85,6 +86,8 @@ with its own text for its readers, leading to the app's guided path:
   limits (`config.limits`: 3 resumes without an account, 30 a day with one) and data
   deletion (`config.cleanup`), breadcrumbs, `WebApplication` data (free), links to the
   offers. In the landing sitemap.
+* `/creer-son-cv` leads to the guided creation (`/creer-mon-cv`, FEATURE R7); the other tool
+  pages' FAQ points to it for visitors without a resume.
 * The cover letter pages (FEATURE M5) lead to the letter's guided path
   (`/ma-lettre-de-motivation`): what a good letter contains (and, for an apprenticeship or
   an internship, what it must say), how it works, what the AI never invents, an FAQ with the
@@ -94,7 +97,7 @@ with its own text for its readers, leading to the app's guided path:
   the resume (pick or upload), the offer (address or text, checked), then the generation,
   on one screen — the upload zone, the offer form and the generation form reused. The empty
   workspace's first button leads to it. Not crawled (robots.txt): app screens, like the
-  letters themselves (`/letters`).
+  letters themselves (`/letters`) and the guided creation (`/creer-mon-cv`).
 * "faire un CV en ligne" is left for later: Canva, Zety, CVDesignR and Indeed hold it; the
   tailoring searches are less contested and are exactly MonPoste's users.
 

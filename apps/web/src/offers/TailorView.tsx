@@ -1,4 +1,4 @@
-import { Check, FileText, Loader2, PenLine, Sparkles, Target } from "lucide-react";
+import { Check, FileText, Loader2, PenLine, Sparkles, Target, Wand2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { GenerateForm } from "../generated/GenerateDialog";
@@ -82,6 +82,11 @@ export default function TailorView({ tab }: TabViewProps) {
                 setStep(2);
               }}
             />
+            {list.length === 0 && (
+              <button type="button" onClick={() => open({ kind: "new-resume" })} className="flex items-center gap-1.5 self-start text-sm text-accent hover:underline">
+                <Wand2 size={14} /> {t("tailor.noResume")}
+              </button>
+            )}
             {list.length > 0 && (
               <button type="button" disabled={!resumeId} onClick={() => setStep(2)} className="self-start rounded-control bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-50">
                 {t("tailor.next")}
