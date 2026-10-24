@@ -1,6 +1,7 @@
 import type { OfferDetail, UiLanguage } from "@job/shared";
 import { HttpError } from "../lib/http-error";
 import { prisma } from "../lib/prisma";
+import { offerLandingLinks } from "../seo/landing";
 import { toSavedOfferInfo } from "../saved-offers/saved-offers";
 import { toLocationSummary, toSalary, visibleOfferWhere } from "./offer-access";
 
@@ -36,6 +37,9 @@ export async function getOfferDetail(offerId: string, userId: string | undefined
       ])
     : [null, null, []];
   const language = lang ?? (user?.uiLanguage as UiLanguage | undefined) ?? "fr";
+  const landing = offer.isPublic
+    ? await offerLandingLinks({ occupationIds: offer.occupations.map(({ occupation }) => occupation.id), locationId: offer.locationId, contractType: offer.contractType })
+    : { links: [] };
 
   return {
     id: offer.id,
@@ -56,5 +60,6 @@ export async function getOfferDetail(offerId: string, userId: string | undefined
     occupations: offer.occupations.map(({ occupation }) => ({ id: occupation.id, name: pickName(occupation.names, language) })),
     saved: saved && toSavedOfferInfo(saved),
     generatedResumes: generatedResumes.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
+    landingLinks: landing.links,
   };
 }

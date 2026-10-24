@@ -119,6 +119,7 @@ export const en: Shape<typeof fr> = {
     skills: "Skills asked for",
     description: "Description",
     generatedResumes: "Resumes generated for this offer",
+    seeAlso: "More offers like this one",
     notFound: "This offer doesn't exist or is no longer available.",
     error: "The offer couldn't be loaded.",
   },

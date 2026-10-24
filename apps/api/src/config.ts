@@ -74,6 +74,8 @@ export const config = {
     webDistDir: process.env.WEB_DIST_DIR,
     siteName: "MonPoste",
     sitemapSize: 45_000, // offers per sitemap file (the limit is 50 000)
+    // Offers with a shorter description aren't indexed (seo/indexable.ts).
+    minDescriptionLength: 500,
     // Landing pages by job and town: a page exists only with this many open public offers
     // (thin pages hurt the whole site's standing with search engines).
     // A salary range is shown from `minSalaries` offers that state one.
@@ -86,7 +88,7 @@ export const config = {
       checkMinutes: Number(process.env.SEARCH_INDEXING_CHECK_MINUTES ?? 30),
       googleCredentials: process.env.GOOGLE_INDEXING_CREDENTIALS_BASE64,
       dailyQuota: Number(process.env.GOOGLE_INDEXING_DAILY_QUOTA ?? 190),
-      indexNowKey: process.env.INDEXNOW_KEY,
+      indexNowKey: process.env.INDEXNOW_KEY?.trim().replace(/^["']|["']$/g, "") || undefined, // stray spaces, quotes or a CR from the env file would break the key file
     },
   },
 

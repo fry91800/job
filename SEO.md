@@ -34,6 +34,30 @@ empty page. Offer pages are now sent with their content:
 * The description Markdown → HTML conversion is shared with the web app
   (`packages/shared/src/markdown.ts`).
 
+### Offer pages lead to their landing pages
+
+Each offer page (the server's version and the app's view) links to the landing pages that
+cover it: the job in its town, département and region, the job in France, the town,
+département and region, and the same in `/alternance` or `/stage` when the offer is one
+(`offerLandingLinks`, only pages that exist). The server's version also has breadcrumbs
+(Offres d'emploi › job › town › offer, visible and as `BreadcrumbList`) and five similar
+offers (same job, same town first). A closed offer points to its most precise landing page
+instead of the home page. The app's offer view shows the links under "Offres du même métier
+et du même lieu" (`landingLinks` in `GET /api/offers/:id`): the app replaces the server's
+content when it starts, so the links must exist in both.
+
+### Only our best offers are indexed
+
+`apps/api/src/seo/indexable.ts`. A new domain gets a small crawl budget, and thin or repeated
+pages lower the whole site's standing. Indexed offers are the open public offers with
+JobPosting (a company, and a place or fully remote), a description of at least 500
+characters (`config.seo.minDescriptionLength`), and one of each group of copies (the same
+employer, title and place — Foncia posts "Consultant immobilier indépendant" 32 times): the
+most complete, then the newest. Copies point to it (`rel=canonical`, no JobPosting); thin
+offers are `noindex` (no JobPosting). Both stay visible to visitors, leave the sitemaps
+(the list of indexable offers is kept an hour) and aren't told to the search engines. On
+the development data: 45 205 of 48 625 open offers indexed (93 %).
+
 ### Landing pages by job and place
 
 The searches people type ("offres développeur Lyon", "alternance commercial Bretagne",
@@ -153,8 +177,9 @@ several "apply on" options.
 
 1. ~~Landing pages by job and place~~, ~~départements, regions, apprenticeships and
    internships~~, ~~summaries from the offers, related jobs, breadcrumbs~~: built (above).
-   Next: links from each offer page to its landing pages; the ROME job definitions (open
-   data) as a short "what the job is" paragraph.
+   ~~Links from each offer page to its landing pages~~, ~~only the best offers indexed~~:
+   built (above). Next: the ROME job definitions (open data) as a short "what the job is"
+   paragraph.
 2. **Readable offer addresses** (`/offres/developpeur-typescript-lyon-{id}`), with redirects
    from the current ones.
 3. Server-rendered home page text (what MonPoste does), and the legal pages.

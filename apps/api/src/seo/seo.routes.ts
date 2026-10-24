@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { config } from "../config";
-import { prisma } from "../lib/prisma";
 import { hubPage, landingPaths, occupationPage, pairPage, placePage, SCOPES, type LandingPage } from "./landing";
+import { indexableOffers } from "./indexable";
 import { appTemplate, loadPublicOffer, notFoundPageHtml, offerPageHtml } from "./offer-page";
 
 // Pages for search engines (SEO.md), outside /api: offer pages, sitemaps, robots.txt.
@@ -17,7 +17,7 @@ seoRouter.get("/offers/:id", async (req, res, next) => {
   const offer = await loadPublicOffer(String(req.params.id));
   res.set("Cache-Control", "public, max-age=300").type("html");
   if (!offer) return res.status(404).send(notFoundPageHtml(page));
-  res.send(offerPageHtml(page, offer));
+  res.send(await offerPageHtml(page, offer));
 });
 
 // Landing pages (SEO.md), for all offers (/emplois), apprenticeships (/alternance) and
@@ -37,12 +37,10 @@ for (const scope of SCOPES) {
   seoRouter.get(`${p}/:occupation/:place`, async (req, res) => sendLanding(res, await pairPage(scope, String(req.params.occupation), "city", String(req.params.place))));
 }
 
-const openPublicOffers = { isPublic: true, closedAt: null } as const;
-
 // GET /sitemap.xml — the landing pages' sitemaps and one sitemap per block of open public
 // offers.
 seoRouter.get("/sitemap.xml", async (_req, res) => {
-  const count = await prisma.offer.count({ where: openPublicOffers });
+  const count = (await indexableOffers()).length;
   const files = Math.max(1, Math.ceil(count / config.seo.sitemapSize));
   const landingFiles = Math.max(1, Math.ceil((await landingPaths()).length / config.seo.sitemapSize));
   const entries = [
@@ -70,17 +68,12 @@ seoRouter.get("/sitemaps/landing-:n.xml", (req, res) => {
   return sendLandingSitemap(res, n);
 });
 
-// GET /sitemaps/offers-{n}.xml — open public offers, by id, with their last change.
+// GET /sitemaps/offers-{n}.xml — the open public offers worth indexing, by id, with their last change.
 seoRouter.get("/sitemaps/offers-:n.xml", async (req, res) => {
   const n = Number(req.params.n);
   if (!Number.isInteger(n) || n < 1) return res.status(404).type("text").send("Not found");
-  const offers = await prisma.offer.findMany({
-    where: openPublicOffers,
-    select: { id: true, updatedAt: true },
-    orderBy: { id: "asc" },
-    skip: (n - 1) * config.seo.sitemapSize,
-    take: config.seo.sitemapSize,
-  });
+  // Only the offers worth indexing (seo/indexable.ts): no thin pages, one of each group of copies.
+  const offers = (await indexableOffers()).slice((n - 1) * config.seo.sitemapSize, n * config.seo.sitemapSize);
   const home = n === 1 ? [`<url><loc>${xml(`${config.webBaseUrl}/`)}</loc><changefreq>daily</changefreq></url>`] : [];
   const urls = offers.map((offer) => `<url><loc>${xml(`${config.webBaseUrl}/offers/${offer.id}`)}</loc><lastmod>${offer.updatedAt.toISOString().slice(0, 10)}</lastmod></url>`);
   res.set("Cache-Control", "public, max-age=3600").type("application/xml").send(

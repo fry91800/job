@@ -3,12 +3,17 @@ import { join } from "node:path";
 import { escapeHtml, markdownToHtml } from "@job/shared/src/markdown";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
+import { offerIndexing } from "./indexable";
+import { breadcrumbs, jsonLd, offerLandingLinks, offerListHtml, similarOffers } from "./landing";
 
 // Offer pages for search engines (SEO.md): /offers/{id} answered with the web app's page
 // (its built index.html) carrying the offer in HTML, its title, description and canonical
 // address, and schema.org JobPosting (Google for Jobs). Everyone gets the same page: the
 // app starts on top of it and shows the same offer. Closed offers: "no longer available",
-// not indexed, no JobPosting. Private offers (added by users) and unknown ids: 404.
+// not indexed, no JobPosting. Private offers (added by users) and unknown ids: 404. Thin
+// offers and copies (seo/indexable.ts): no JobPosting, thin ones not indexed, copies
+// pointing to their group's offer. Each page links to its landing pages (job in town,
+// département, region…) and to similar offers, with breadcrumbs.
 
 const CONTRACTS: Record<string, string> = { permanent: "CDI", fixed_term: "CDD", temporary: "Intérim", freelance: "Freelance", internship: "Stage", apprenticeship: "Alternance", other: "Autre contrat" };
 const REMOTE: Record<string, string> = { remote: "Télétravail complet", hybrid: "Télétravail partiel", onsite: "Sur site" };
@@ -39,6 +44,7 @@ const offerInclude = {
   company: { select: { name: true, website: true } },
   sources: { where: { closedAt: null }, select: { source: true, url: true, applyUrl: true, expiresAt: true } },
   skills: { select: { skill: { select: { names: { where: { isCanonical: true, language: "fr" }, select: { name: true } } } } } },
+  occupations: { select: { occupationId: true } },
 } as const;
 
 export async function loadPublicOffer(id: string) {
@@ -111,8 +117,10 @@ export function jobPosting(offer: PublicOffer, canonical: string): Record<string
   };
 }
 
+type Extras = { crumbs: string; links: { href: string; label: string }[]; similar: Awaited<ReturnType<typeof similarOffers>> };
+
 // The offer as plain HTML (inside the app's root element, replaced when the app starts).
-function offerArticle(offer: PublicOffer): string {
+function offerArticle(offer: PublicOffer, extras: Extras): string {
   const company = offer.company?.name ?? offer.companyName;
   const facts = [company, placeText(offer), offer.contractType && CONTRACTS[offer.contractType], offer.remoteType && REMOTE[offer.remoteType], salaryText(offer)].filter(Boolean) as string[];
   const published = offer.publishedAt ?? offer.createdAt;
@@ -120,29 +128,44 @@ function offerArticle(offer: PublicOffer): string {
   const original = source?.url ?? offer.url;
   const sourceName = source && (SOURCE_NAMES[source.source] ?? (company ? `site carrières de ${company}` : null));
   const skills = offer.skills.map(({ skill }) => skill.names[0]?.name).filter(Boolean) as string[];
+  // A closed offer leads to the offers like it.
+  const elsewhere = extras.links[0];
   return `<article class="seo-offer">
-<p><a href="/">${escapeHtml(config.seo.siteName)}</a> › Offres d'emploi</p>
-${offer.closedAt ? `<p class="seo-closed"><strong>Cette offre n'est plus disponible.</strong> <a href="/">Voir les offres du moment</a></p>` : ""}
+${extras.crumbs}
+${offer.closedAt ? `<p class="seo-closed"><strong>Cette offre n'est plus disponible.</strong> ${elsewhere ? `<a href="${escapeHtml(elsewhere.href)}">${escapeHtml(elsewhere.label)}</a>` : `<a href="/">Voir les offres du moment</a>`}</p>` : ""}
 <h1>${escapeHtml(offer.title)}</h1>
 <p>${facts.map(escapeHtml).join(" · ")}</p>
 <p>Publiée le ${escapeHtml(frenchDate(published))}</p>
 ${markdownToHtml(offer.description)}
 ${skills.length ? `<h2>Compétences</h2><ul>${skills.map((skill) => `<li>${escapeHtml(skill)}</li>`).join("")}</ul>` : ""}
 ${original && !offer.closedAt ? `<p><a href="${escapeHtml(original)}" rel="nofollow noopener">Voir l'offre d'origine et postuler</a>${sourceName ? ` · Source : ${escapeHtml(sourceName)}` : ""}</p>` : ""}
+${extras.similar.length ? `<h2>Offres similaires</h2>${offerListHtml(extras.similar)}` : ""}
+${extras.links.length ? `<h2>Voir aussi</h2><ul>${extras.links.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul>` : ""}
 </article>`;
 }
 
 const replaceTag = (html: string, pattern: RegExp, replacement: string) => (pattern.test(html) ? html.replace(pattern, () => replacement) : html);
 
-// The app's page with the offer: title, meta tags, canonical, JobPosting, content.
-export function offerPageHtml(page: string, offer: PublicOffer): string {
-  const canonical = `${config.webBaseUrl}/offers/${offer.id}`;
+// The app's page with the offer: title, meta tags, canonical, JobPosting, breadcrumbs,
+// content, links to its landing pages and to similar offers.
+export async function offerPageHtml(page: string, offer: PublicOffer): Promise<string> {
+  const own = `${config.webBaseUrl}/offers/${offer.id}`;
+  const occupationIds = offer.occupations.map((item) => item.occupationId);
+  const [indexing, landing, similar] = await Promise.all([
+    offerIndexing(offer.id),
+    offerLandingLinks({ occupationIds, locationId: offer.locationId, contractType: offer.contractType }),
+    offer.closedAt ? Promise.resolve([]) : similarOffers({ id: offer.id, occupationIds, locationId: offer.locationId }),
+  ]);
+  // A copy points to its group's offer; thin and closed offers aren't indexed.
+  const canonical = !indexing.indexable && indexing.reason === "copy" && indexing.canonicalId ? `${config.webBaseUrl}/offers/${indexing.canonicalId}` : own;
+  const noindex = !indexing.indexable && indexing.reason !== "copy";
   const company = offer.company?.name ?? offer.companyName;
   const place = placeText(offer);
   const title = [offer.title, company, place].filter(Boolean).join(" – ");
   const facts = [CONTRACTS[offer.contractType ?? ""], place].filter(Boolean).join(", ");
   const description = plainText(offer.description, 160 - facts.length - 2).replace(/^/, facts ? `${facts}. ` : "");
-  const posting = jobPosting(offer, canonical);
+  const posting = indexing.indexable ? jobPosting(offer, own) : null;
+  const trail = breadcrumbs([...landing.crumbs, { name: offer.title, path: `/offers/${offer.id}` }]);
   const head = [
     `<link rel="canonical" href="${escapeHtml(canonical)}" />`,
     `<meta property="og:type" content="website" />`,
@@ -150,14 +173,15 @@ export function offerPageHtml(page: string, offer: PublicOffer): string {
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:url" content="${escapeHtml(canonical)}" />`,
-    offer.closedAt ? `<meta name="robots" content="noindex" />` : "",
+    noindex ? `<meta name="robots" content="noindex" />` : "",
     // Data for search engines, not a script (the CSP forbids inline scripts, not data).
-    posting ? `<script type="application/ld+json">${JSON.stringify(posting).replace(/</g, "\\u003c")}</script>` : "",
+    posting ? jsonLd(posting) : "",
+    jsonLd(trail.data),
   ].filter(Boolean).join("\n    ");
   let html = replaceTag(page, /<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(`${title} | ${config.seo.siteName}`)}</title>`);
   html = replaceTag(html, /<meta name="description" content="[^"]*"\s*\/?>/, `<meta name="description" content="${escapeHtml(description)}" />`);
   html = html.replace("</head>", () => `    ${head}\n  </head>`);
-  return html.replace(/<div id="root"><\/div>/, () => `<div id="root">${offerArticle(offer)}</div>`);
+  return html.replace(/<div id="root"><\/div>/, () => `<div id="root">${offerArticle(offer, { crumbs: trail.html, links: landing.links, similar })}</div>`);
 }
 
 // The app's page for an address that doesn't exist (any more): status 404, not indexed.

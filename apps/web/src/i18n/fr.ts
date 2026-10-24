@@ -115,6 +115,7 @@ export const fr = {
     skills: "Compétences demandées",
     description: "Description",
     generatedResumes: "CV générés pour cette offre",
+    seeAlso: "Offres du même métier et du même lieu",
     notFound: "Cette offre n'existe pas ou n'est plus accessible.",
     error: "L'offre n'a pas pu être chargée.",
   },

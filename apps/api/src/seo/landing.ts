@@ -587,3 +587,56 @@ ${linkList(`Autres métiers ${placePhrase(place)}`, occupationLinks(scope, index
 ${linkList("Voir aussi", await otherScopes(scope, occupation.slug, { kind, slug: place.slug }))}`;
   return { status: 200, html: document({ title, description: metaDescription(scope, stats, count, `${occupation.name} ${placePhrase(place)}`), path: pairPath(scope, occupation, place), body, data: [trail.data] }) };
 }
+
+// --- From an offer to its landing pages ----------------------------------------------------
+
+export type LandingLink = { href: string; label: string };
+
+// The landing pages covering an offer (its job in its town, département and region, the job
+// in France, the places), only those that exist, and the same in the apprenticeship or
+// internship scope when the offer is one; with the trail from the hub to the most precise
+// one. For the offer page (server and app), so that offers lead to the pages that rank.
+export async function offerLandingLinks(offer: { occupationIds: number[]; locationId: number | null; contractType: string | null }): Promise<{ links: LandingLink[]; crumbs: Crumb[] }> {
+  const links: LandingLink[] = [];
+  let crumbs: Crumb[] = [];
+  for (const scope of SCOPES) {
+    if (scope.contract && scope.contract !== offer.contractType) continue;
+    const index = await landingIndex(scope);
+    const occupation = offer.occupationIds.map((id) => index.byOccupationId.get(id)).filter((item): item is Occupation => !!item).sort((a, b) => b.total - a.total)[0];
+    const city = offer.locationId !== null ? index.places.get(`c:${offer.locationId}`) : undefined;
+    const places = [city, city?.countyKey ? index.places.get(city.countyKey) : undefined, city?.regionKey ? index.places.get(city.regionKey) : undefined].filter((item): item is Place => !!item);
+    const own: (LandingLink & { count: number })[] = [];
+    if (occupation) {
+      for (const place of places) {
+        const count = index.pairs.get(pairKey(occupation.id, place.key));
+        if (pairShown(count)) own.push({ href: pairPath(scope, occupation, place), label: heading(scope, occupation, place), count: count! });
+      }
+      own.push({ href: occupationPath(scope, occupation), label: `${heading(scope, occupation)} en France`, count: occupation.total });
+    }
+    for (const place of places) if (placeShown(place)) own.push({ href: placePath(scope, place), label: heading(scope, undefined, place), count: place.total });
+    links.push(...own.map(({ href, label, count }) => ({ href, label: `${label} (${number(count)})` })));
+    // The trail: the general scope, its job, then the job in the town when it exists.
+    if (!scope.contract) {
+      crumbs = [hubCrumb(scope)];
+      if (occupation) crumbs.push({ name: occupation.name, path: occupationPath(scope, occupation) });
+      const cityPair = occupation && city && pairShown(index.pairs.get(pairKey(occupation.id, city.key)));
+      if (cityPair) crumbs.push({ name: city.name, path: pairPath(scope, occupation, city) });
+      else if (!occupation && city && placeShown(city)) crumbs.push({ name: city.name, path: placePath(scope, city) });
+    }
+  }
+  return { links, crumbs };
+}
+
+// A few open offers like this one (same job, same town, else same job), for the offer page.
+export async function similarOffers(offer: { id: string; occupationIds: number[]; locationId: number | null }, count = 5): Promise<ListedOffer[]> {
+  const occupationId = offer.occupationIds[0];
+  if (occupationId === undefined) return [];
+  const select = { id: true, title: true, companyName: true, contractType: true, publishedAt: true, createdAt: true, location: { select: { name: true, countyCode: true } } } as const;
+  const where = { isPublic: true, closedAt: null, id: { not: offer.id }, occupations: { some: { occupationId } } };
+  const near = offer.locationId === null ? [] : await prisma.offer.findMany({ where: { ...where, locationId: offer.locationId }, select, orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }, { id: "asc" }], take: count });
+  if (near.length >= count) return near;
+  const far = await prisma.offer.findMany({ where: { ...where, id: { notIn: [offer.id, ...near.map((item) => item.id)] } }, select, orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }, { id: "asc" }], take: count - near.length });
+  return [...near, ...far];
+}
+
+export { breadcrumbs, offerList as offerListHtml, jsonLd };

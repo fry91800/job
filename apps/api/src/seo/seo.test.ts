@@ -6,6 +6,7 @@ import { after, before, describe, test } from "node:test";
 import { config } from "../config";
 import { prisma, startTestServer } from "../test/helpers";
 import { commonSkills, placePhrase, resetLandingIndex, SCOPES, slugify, summary } from "./landing";
+import { resetIndexableOffers } from "./indexable";
 import { resetAppTemplate } from "./offer-page";
 
 // Offer pages, sitemaps and robots.txt for search engines (SEO.md), on a built-app page
@@ -26,17 +27,16 @@ const PAGE = `<!doctype html>
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 const ids: string[] = [];
-let open: string, closed: string, privateOffer: string;
+let open: string, closed: string, privateOffer: string, landingA: string;
 let companyId: string;
 let occupation: { id: number; name: string };
 let city: { id: number; name: string; countyCode: string | null; countyName: string | null; regionName: string | null };
 const landing = config.seo.landing;
 
 const get = (path: string) => fetch(new URL(path, server.baseUrl)).then(async (response) => ({ status: response.status, type: response.headers.get("content-type") ?? "", body: await response.text() }));
-const jsonLd = (html: string) => {
-  const match = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html);
-  return match ? (JSON.parse(match[1]) as Record<string, unknown>) : null;
-};
+// The page's JobPosting (other blocks, like the breadcrumbs, are skipped).
+const jsonLd = (html: string) =>
+  [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => JSON.parse(match[1]) as Record<string, unknown>).find((data) => data["@type"] === "JobPosting") ?? null;
 
 before(async () => {
   const dist = mkdtempSync(join(tmpdir(), "seo-"));
@@ -56,7 +56,7 @@ before(async () => {
   };
   open = await create({
     title: "Développeur <Java> H/F",
-    description: "## Missions\n\nDévelopper des **API** sécurisées.\n\n- Spring\n- PostgreSQL",
+    description: `## Missions\n\nDévelopper des **API** sécurisées.\n\n- Spring\n- PostgreSQL\n\n${"Vous travaillerez avec les équipes produit et sécurité sur des services utilisés chaque jour. ".repeat(6)}`,
     salaryMin: 45000, salaryMax: 55000, salaryCurrency: "EUR", salaryPeriod: "year",
     publishedAt: new Date("2026-10-10T00:00:00Z"),
     sources: { create: { source: "test-seo", externalId: "seo-1", url: "https://jobs.seo-test.example/1", expiresAt: new Date("2026-12-31T00:00:00Z") } },
@@ -70,7 +70,8 @@ before(async () => {
   occupation = { id: rome.id, name: "Testeur / Testeuse SEO" };
   city = await prisma.location.findUniqueOrThrow({ where: { id: location.id }, select: { id: true, name: true, countyCode: true, countyName: true, regionName: true } });
   for (const title of ["Poste landing A", "Poste landing B"]) {
-    await create({ title, description: "Une offre pour les pages par métier.", publishedAt: new Date(), occupations: { create: { occupationId: occupation.id } } });
+    const id = await create({ title, description: "Une offre pour les pages par métier.", publishedAt: new Date(), occupations: { create: { occupationId: occupation.id } } });
+    if (title.endsWith("A")) landingA = id;
   }
   for (const title of ["Alternant landing C", "Alternant landing D"]) {
     await create({ title, description: "Une offre en alternance.", contractType: "apprenticeship", publishedAt: new Date(), occupations: { create: { occupationId: occupation.id } } });
@@ -115,6 +116,38 @@ describe("offer pages for search engines", () => {
     assert.deepEqual((posting.baseSalary as { value: unknown }).value, { "@type": "QuantitativeValue", minValue: 45000, maxValue: 55000, unitText: "YEAR" });
     assert.match(String(posting.description), /<h3>Missions<\/h3>/);
     assert.ok(!/<\/script/i.test(body.split('application/ld+json">')[1].split("</script>")[0]), "no early end of the data block");
+  });
+
+  test("copies of one offer point to the newest; thin offers aren't indexed; neither in the sitemaps", async () => {
+    const long = "Vous animerez le réseau de partenaires et développerez le portefeuille clients de l'agence. ".repeat(7);
+    const older = await prisma.offer.create({ data: { source: "test-seo", language: "fr", title: "Consultant immobilier H/F", description: long, companyId, companyName: "SEO Test SAS", locationId: city.id, publishedAt: new Date("2026-10-01T00:00:00Z") } });
+    const newer = await prisma.offer.create({ data: { source: "test-seo", language: "fr", title: "Consultant  immobilier h/f", description: long, companyId, companyName: "SEO Test SAS", locationId: city.id, publishedAt: new Date("2026-10-15T00:00:00Z") } });
+    const thin = await prisma.offer.create({ data: { source: "test-seo", language: "fr", title: "Voir l'annonce", description: "Postulez sur notre site.", companyId, companyName: "SEO Test SAS", locationId: city.id } });
+    ids.push(older.id, newer.id, thin.id);
+    resetIndexableOffers();
+    const copy = await get(`/offers/${older.id}`);
+    assert.match(copy.body, new RegExp(`<link rel="canonical" href="${config.webBaseUrl}/offers/${newer.id}" />`), "the copy points to the newest");
+    assert.doesNotMatch(copy.body, /noindex/);
+    assert.equal(jsonLd(copy.body), null, "no JobPosting on a copy");
+    assert.ok(jsonLd((await get(`/offers/${newer.id}`)).body), "the representative keeps it");
+    const short = await get(`/offers/${thin.id}`);
+    assert.match(short.body, /<meta name="robots" content="noindex" \/>/);
+    assert.equal(jsonLd(short.body), null);
+    const sitemap = (await get("/sitemaps/offers-1.xml")).body;
+    assert.match(sitemap, new RegExp(newer.id));
+    assert.doesNotMatch(sitemap, new RegExp(`${older.id}|${thin.id}`));
+  });
+
+  test("an offer page leads to its landing pages, with breadcrumbs and similar offers; so does the app", async () => {
+    const { body } = await get(`/offers/${landingA}`);
+    const job = slugify(occupation.name);
+    assert.match(body, new RegExp(`href="/emplois/${job}/${slugify(`${city.name}-${city.countyCode}`)}"`), "the job in its town");
+    assert.match(body, new RegExp(`href="/emplois/${job}"`), "the job in France");
+    assert.match(body, /<nav class="landing-crumbs"/);
+    assert.match(body, /"@type":"BreadcrumbList"/);
+    assert.match(body, /<h2>Offres similaires<\/h2>[\s\S]*Poste landing B/);
+    const detail = (await (await fetch(new URL(`/api/offers/${landingA}`, server.baseUrl))).json()) as { landingLinks: { href: string; label: string }[] };
+    assert.ok(detail.landingLinks.some((link) => link.href === `/emplois/${job}`), JSON.stringify(detail.landingLinks));
   });
 
   test("a closed offer: shown as no longer available, not indexed, no JobPosting", async () => {

@@ -267,6 +267,23 @@ export default function OfferView({ tab }: TabViewProps) {
           </ul>
         </section>
       )}
+
+      {/* The landing pages covering the offer (server pages, SEO.md): plain links, they leave the
+          app. Absent from an API older than the app (during a deploy). */}
+      {(data.landingLinks ?? []).length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold">{t("offer.seeAlso")}</h2>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {(data.landingLinks ?? []).map((link) => (
+              <li key={link.href}>
+                <a href={link.href} className="text-accent hover:underline">
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </article>
   );
 }

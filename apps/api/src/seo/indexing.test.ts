@@ -16,6 +16,8 @@ let base: string;
 let received: { path: string; body: string; authorization?: string }[] = [];
 let publishStatus = 200;
 const ids: string[] = [];
+// Long enough to be indexed (config.seo.minDescriptionLength).
+const DESCRIPTION = "Vous rejoindrez l'équipe et participerez à la conception des nouveaux services. ".repeat(10);
 const saved = { ...config.seo.indexing };
 const savedEndpoints = { ...endpoints };
 
@@ -59,7 +61,7 @@ async function offers(start: Date) {
   for (const engine of ["google", "indexnow"]) await prisma.searchIndexing.create({ data: { engine, cursorAt: start, day: "", sentToday: 0 } });
   const location = await prisma.location.findFirstOrThrow({ where: { type: "city", countryCode: "FR" } });
   const make = async (fields: Record<string, unknown>) => {
-    const offer = await prisma.offer.create({ data: { source: "test-indexing", language: "fr", title: "Offre", description: "Texte.", ...fields } as never });
+    const offer = await prisma.offer.create({ data: { source: "test-indexing", language: "fr", title: `Offre ${ids.length}`, description: DESCRIPTION, ...fields } as never });
     ids.push(offer.id);
     return offer.id;
   };
@@ -79,17 +81,18 @@ describe("search engine notifications", () => {
     assert.equal(withinQuota(change(10, "URL_UPDATED"), [], 0).length, 0);
   });
 
-  test("IndexNow: every new or closed public offer, with our key; the cursor moves on", async () => {
+  test("IndexNow: new offers worth indexing and closed ones, with our key; the cursor moves on", async () => {
     const start = new Date(Date.now() - 1000);
     const { withPage, noPlace, closed, hidden } = await offers(start);
     config.seo.indexing.indexNowKey = "0123456789abcdef0123456789abcdef";
     received = [];
     const result = await notifyIndexNow(new Date(Date.now() + 5000));
-    assert.equal(result?.sent, 3);
+    assert.equal(result?.sent, 2);
     const body = JSON.parse(received.find((request) => request.path === "/indexnow")!.body);
     assert.equal(body.key, "0123456789abcdef0123456789abcdef");
     assert.match(body.keyLocation, /^https?:\/\/[^/]+\/0123456789abcdef0123456789abcdef\.txt$/, "at the root: a key file only covers its own folder");
-    for (const id of [withPage, noPlace, closed]) assert.ok(body.urlList.some((url: string) => url.endsWith(`/offers/${id}`)), id);
+    for (const id of [withPage, closed]) assert.ok(body.urlList.some((url: string) => url.endsWith(`/offers/${id}`)), id);
+    assert.ok(!body.urlList.some((url: string) => url.endsWith(noPlace)), "no JobPosting, not worth indexing");
     assert.ok(!body.urlList.some((url: string) => url.endsWith(hidden)), "private offers are never sent");
     received = [];
     assert.equal((await notifyIndexNow(new Date(Date.now() + 6000)))?.sent, 0, "nothing new since the last run");

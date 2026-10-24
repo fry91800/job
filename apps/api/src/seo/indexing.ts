@@ -2,6 +2,7 @@ import { createSign } from "node:crypto";
 import { errorFields, logEvent, sendAlert } from "@job/backend";
 import { config } from "../config";
 import { prisma } from "../lib/prisma";
+import { indexableAmong } from "./indexable";
 
 // Search engines told at once about new and closed offer pages (SEO.md), instead of waiting
 // for them to crawl the sitemaps:
@@ -36,8 +37,10 @@ async function changes(since: Date, until: Date, jobPostingOnly: boolean): Promi
     prisma.offer.findMany({ where: { isPublic: true, closedAt: null, createdAt: { gt: since, lte: until }, ...eligible }, select: { id: true, createdAt: true }, orderBy: { createdAt: "desc" } }),
     prisma.offer.findMany({ where: { isPublic: true, closedAt: { gt: since, lte: until }, ...eligible }, select: { id: true, closedAt: true }, orderBy: { closedAt: "desc" } }),
   ]);
+  // New offers only when worth indexing (no thin page, one of each group of copies).
+  const worth = await indexableAmong(opened.map((offer) => offer.id));
   return {
-    opened: opened.map((offer) => ({ url: offerUrl(offer.id), type: "URL_UPDATED", at: offer.createdAt })),
+    opened: opened.filter((offer) => worth.has(offer.id)).map((offer) => ({ url: offerUrl(offer.id), type: "URL_UPDATED", at: offer.createdAt })),
     closed: closed.map((offer) => ({ url: offerUrl(offer.id), type: "URL_DELETED", at: offer.closedAt! })),
   };
 }

@@ -22,4 +22,7 @@ export type OfferDetail = Omit<OfferSearchResult, "locationMatch" | "distanceKm"
   occupations: CatalogueItem[];
   saved: SavedOfferInfo | null;
   generatedResumes: { id: string; language: string; matchScore: number | null; createdAt: string }[];
+  // Public offers: the landing pages covering the offer ("Offres d'emploi Développeur à Lyon
+  // (42)"), server pages outside the app (SEO.md).
+  landingLinks: { href: string; label: string }[];
 };
