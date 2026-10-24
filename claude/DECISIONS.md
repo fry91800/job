@@ -387,6 +387,7 @@ Full plan in `COLLECTOR.md`.
 | D180 | An unreachable host makes a board invalid only when confirmed 3+ days later; such boards are re-checked after 3 days, and their offers are not closed meanwhile | One DNS failure took Decathlon (746 offers) out of collection for 90 days |
 | D181 | Offer pages link to the landing pages covering them (job × town/département/region, job, places, alternance/stage), in the server's page and in the app's view, with breadcrumbs and similar offers | Internal links let search engines find and weigh the landing pages, which match the searches people type; the app replaces the server's content, so the links are in both |
 | D182 | Only open public offers with JobPosting, a description of 500+ characters and one per group of copies (employer, title, place) are indexed: copies get rel=canonical to it, thin offers noindex; neither in the sitemaps nor told to the engines | A new domain's crawl budget is small and thin or repeated pages lower the whole site; 7 % of open offers (dev) are copies or thin |
+| D183 | Tool pages for the tailoring searches (/adapter-son-cv, /alternance, /stage variants), server pages with their own text and the app's real rules and limits, leading to a guided path in the app (/adapter-mon-cv: resume, offer, generation on one screen) | MonPoste's own value, on searches less contested than "faire un CV en ligne"; the app had all the steps but no path through them for a first visitor |
 
 ## Assumptions made (change if wrong)
 

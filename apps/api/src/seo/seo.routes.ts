@@ -2,6 +2,7 @@ import { Router } from "express";
 import { config } from "../config";
 import { hubPage, landingPaths, occupationPage, pairPage, placePage, SCOPES, type LandingPage } from "./landing";
 import { indexableOffers } from "./indexable";
+import { TOOL_START, toolPage, toolPaths } from "./tools";
 import { appTemplate, loadPublicOffer, notFoundPageHtml, offerPageHtml } from "./offer-page";
 
 // Pages for search engines (SEO.md), outside /api: offer pages, sitemaps, robots.txt.
@@ -25,6 +26,10 @@ seoRouter.get("/offers/:id", async (req, res, next) => {
 // place. Specific addresses first: /emplois/a/lyon-69 is a town, not a job in a town.
 const sendLanding = (res: import("express").Response, page: LandingPage) =>
   res.status(page.status).set("Cache-Control", "public, max-age=1800").type("html").send(page.html);
+
+// Tool pages (seo/tools.ts): "adapter son CV à une offre", for an apprenticeship, an internship.
+for (const path of toolPaths()) seoRouter.get(path, (_req, res) => sendLanding(res, toolPage(path)!));
+
 for (const scope of SCOPES) {
   const p = scope.prefix;
   seoRouter.get(p, async (_req, res) => sendLanding(res, await hubPage(scope)));
@@ -42,7 +47,7 @@ for (const scope of SCOPES) {
 seoRouter.get("/sitemap.xml", async (_req, res) => {
   const count = (await indexableOffers()).length;
   const files = Math.max(1, Math.ceil(count / config.seo.sitemapSize));
-  const landingFiles = Math.max(1, Math.ceil((await landingPaths()).length / config.seo.sitemapSize));
+  const landingFiles = Math.max(1, Math.ceil((await allLandingPaths()).length / config.seo.sitemapSize));
   const entries = [
     ...Array.from({ length: landingFiles }, (_, index) => `<sitemap><loc>${xml(`${config.webBaseUrl}/sitemaps/${index === 0 ? "landing" : `landing-${index + 1}`}.xml`)}</loc></sitemap>`),
     ...Array.from({ length: files }, (_, index) => `<sitemap><loc>${xml(`${config.webBaseUrl}/sitemaps/offers-${index + 1}.xml`)}</loc></sitemap>`),
@@ -52,9 +57,12 @@ seoRouter.get("/sitemap.xml", async (_req, res) => {
   );
 });
 
+// The tool pages, then the landing pages worth indexing.
+const allLandingPaths = async () => [...toolPaths(), ...(await landingPaths())];
+
 // GET /sitemaps/landing.xml, /sitemaps/landing-{n}.xml — the landing pages worth indexing.
 const sendLandingSitemap = async (res: import("express").Response, n: number) => {
-  const paths = (await landingPaths()).slice((n - 1) * config.seo.sitemapSize, n * config.seo.sitemapSize);
+  const paths = (await allLandingPaths()).slice((n - 1) * config.seo.sitemapSize, n * config.seo.sitemapSize);
   if (!paths.length && n > 1) return res.status(404).type("text").send("Not found");
   const urls = paths.map((path) => `<url><loc>${xml(`${config.webBaseUrl}${path}`)}</loc><changefreq>daily</changefreq></url>`);
   res.set("Cache-Control", "public, max-age=3600").type("application/xml").send(
@@ -93,7 +101,7 @@ seoRouter.get("/:file", (req, res, next) => {
 // GET /robots.txt — everything may be crawled except the personal workspace pages (empty for
 // a crawler); the API stays allowed: search engines run the app, which calls it.
 seoRouter.get("/robots.txt", (_req, res) => {
-  const personal = ["/resumes", "/photos", "/saved", "/generated", "/settings", "/add-offer"];
+  const personal = ["/resumes", "/photos", "/saved", "/generated", "/settings", "/add-offer", TOOL_START];
   res.set("Cache-Control", "public, max-age=86400").type("text").send(
     `User-agent: *\nAllow: /\n${personal.map((path) => `Disallow: ${path}`).join("\n")}\n\nSitemap: ${config.webBaseUrl}/sitemap.xml\n`,
   );

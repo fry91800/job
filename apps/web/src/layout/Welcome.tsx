@@ -1,4 +1,4 @@
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, Target, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useWorkspace } from "../tabs/workspace";
 
@@ -14,13 +14,22 @@ export function Welcome() {
         </span>
         <h1 className="text-2xl font-semibold tracking-tight">{t("welcome.title")}</h1>
         <p className="leading-relaxed text-fg-muted">{t("welcome.text")}</p>
-        <button
-          type="button"
-          onClick={() => open({ kind: "resumes" })}
-          className="mt-2 flex h-9 items-center gap-2 rounded-control bg-accent px-4 text-sm font-medium text-accent-fg transition-colors duration-150 hover:bg-accent-hover"
-        >
-          <Upload size={16} /> {t("welcome.upload")}
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => open({ kind: "tailor" })}
+            className="flex h-9 items-center gap-2 rounded-control bg-accent px-4 text-sm font-medium text-accent-fg transition-colors duration-150 hover:bg-accent-hover"
+          >
+            <Target size={16} /> {t("welcome.tailor")}
+          </button>
+          <button
+            type="button"
+            onClick={() => open({ kind: "resumes" })}
+            className="flex h-9 items-center gap-2 rounded-control border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover"
+          >
+            <Upload size={16} /> {t("welcome.upload")}
+          </button>
+        </div>
         <p className="text-sm text-fg-subtle">{t("welcome.uploadHint")}</p>
         <p className="mt-4 flex items-center gap-2 text-sm text-fg-muted">
           <ArrowLeft size={14} /> {t("welcome.searchHint")}

@@ -21,6 +21,23 @@ type Mode = "url" | "text";
 export default function AddOfferView() {
   const { t } = useTranslation();
   const { open } = useWorkspace();
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+          <Plus size={20} className="text-accent" /> {t("search.addOffer")}
+        </h1>
+        <p className="text-sm text-fg-muted">{t("addOffer.intro")}</p>
+      </header>
+      <AddOfferFlow onSaved={(offerId) => open({ kind: "offer", id: offerId })} />
+    </div>
+  );
+}
+
+// The address or text, then the fields to check, then saved. Also used by the guided path
+// (offers/TailorView). `onSaved` gets the saved offer, or the known offer with that address.
+export function AddOfferFlow({ onSaved }: { onSaved: (offerId: string) => void }) {
+  const { t } = useTranslation();
   const client = useQueryClient();
   const [mode, setMode] = useState<Mode>("url");
   const [url, setUrl] = useState("");
@@ -47,7 +64,7 @@ export default function AddOfferView() {
       if ("existingOfferId" in result) {
         toast(t("addOffer.exists"), "info");
         void client.invalidateQueries({ queryKey: ["saved-offers"] });
-        open({ kind: "offer", id: result.existingOfferId });
+        onSaved(result.existingOfferId);
         return;
       }
       setDraft({ ...result.draft, url: result.draft.url ?? (mode === "url" ? url.trim() : null), location: result.location ? { id: result.location.id, name: result.location.name } : null });
@@ -85,14 +102,7 @@ export default function AddOfferView() {
   };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <Plus size={20} className="text-accent" /> {t("search.addOffer")}
-        </h1>
-        <p className="text-sm text-fg-muted">{t("addOffer.intro")}</p>
-      </header>
-
+    <>
       {!draft ? (
         <form onSubmit={onExtract} className="flex flex-col gap-3">
           <div role="tablist" className="flex self-start rounded-box bg-hover p-1">
@@ -150,13 +160,13 @@ export default function AddOfferView() {
                 onSuccess: (offer) => {
                   toast(t("addOffer.saved"));
                   reset();
-                  open({ kind: "offer", id: offer.id });
+                  onSaved(offer.id);
                 },
               })
             }
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

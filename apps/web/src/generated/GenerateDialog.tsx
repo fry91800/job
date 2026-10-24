@@ -38,7 +38,8 @@ function Choice({ selected, onClick, children }: { selected: boolean; onClick: (
   );
 }
 
-function Form({ offerId, onDone }: { offerId: string; onDone: (generatedId: string) => void }) {
+// Also used by the guided path (offers/TailorView), with the resume chosen there.
+export function GenerateForm({ offerId, onDone, initialResumeId = null }: { offerId: string; onDone: (generatedId: string) => void; initialResumeId?: string | null }) {
   const { t } = useTranslation();
   const { open } = useWorkspace();
   const settings = useSettings();
@@ -47,7 +48,7 @@ function Form({ offerId, onDone }: { offerId: string; onDone: (generatedId: stri
   const generate = useGenerate();
   const translate = useTranslateResume();
   const list = resumes.data?.results ?? [];
-  const [resumeId, setResumeId] = useState<string | null>(null);
+  const [resumeId, setResumeId] = useState<string | null>(initialResumeId);
   const [modifierEnabled, setModifierEnabled] = useState(true);
   const [strength, setStrength] = useState<ModifierStrength>("medium");
   const [templateId, setTemplateId] = useState<number | null>(null);
@@ -241,7 +242,7 @@ export function GenerateDialog() {
               </Dialog.Close>
             </div>
             {offer && (
-              <Form
+              <GenerateForm
                 key={offer.id}
                 offerId={offer.id}
                 onDone={(generatedId) => {

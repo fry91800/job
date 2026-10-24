@@ -639,4 +639,4 @@ export async function similarOffers(offer: { id: string; occupationIds: number[]
   return [...near, ...far];
 }
 
-export { breadcrumbs, offerList as offerListHtml, jsonLd };
+export { breadcrumbs, document as landingDocument, offerList as offerListHtml, jsonLd };

@@ -256,6 +256,33 @@ body {
 .landing-summary {
   color: var(--fg-muted);
 }
+.landing h3 {
+  font-weight: 600;
+  margin: 16px 0 4px;
+}
+.landing-list {
+  padding-left: 20px;
+  list-style: disc;
+}
+ol.landing-list {
+  list-style: decimal;
+}
+.landing-list li {
+  margin: 4px 0;
+}
+.landing .landing-cta {
+  display: inline-block;
+  margin: 8px 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-control, 6px);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 500;
+  text-decoration: none;
+}
+.landing .landing-cta:hover {
+  background: var(--accent-hover);
+}
 
 /* Short, purposeful motion (FRONTEND.md §5). */
 @keyframes fade-in {

@@ -63,6 +63,32 @@ offers are `noindex` (no JobPosting). Both stay visible to visitors, leave the s
 (the list of indexable offers is kept an hour) and aren't told to the search engines. On
 the development data: 45 205 of 48 625 open offers indexed (93 %).
 
+### Tool pages: "adapter son CV à une offre"
+
+What people search before applying, as server pages (`apps/api/src/seo/tools.ts`), each
+with its own text for its readers, leading to the app's guided path:
+
+| Address | For |
+|---|---|
+| `/adapter-son-cv` | "adapter son CV à une offre (d'emploi)", "CV personnalisé" |
+| `/adapter-son-cv/alternance` | "CV alternance", "CV pour une alternance" |
+| `/adapter-son-cv/stage` | "CV stage", "CV pour un stage" |
+
+* Each page: why tailor a resume, what the resume must show (apprenticeship: diploma,
+  school, rhythm, start date; internship: studies, dates, agreement), how it works (three
+  steps), what the AI changes and never changes (the generation's rules:
+  `generated-resumes/resume-modifier.ts` — employers, titles, dates, degrees never
+  changed, nothing added; the strong level may add requested skills), an FAQ with the real
+  limits (`config.limits`: 3 resumes without an account, 30 a day with one) and data
+  deletion (`config.cleanup`), breadcrumbs, `WebApplication` data (free), links to the
+  offers. In the landing sitemap.
+* **The guided path** (`/adapter-mon-cv`, the app's "tailor" tab, `offers/TailorView.tsx`):
+  the resume (pick or upload), the offer (address or text, checked), then the generation,
+  on one screen — the upload zone, the offer form and the generation form reused. The empty
+  workspace's first button leads to it. Not crawled (robots.txt): an app screen.
+* "faire un CV en ligne" is left for later: Canva, Zety, CVDesignR and Indeed hold it; the
+  tailoring searches are less contested and are exactly MonPoste's users.
+
 ### Landing pages by job and place
 
 The searches people type ("offres développeur Lyon", "alternance commercial Bretagne",
@@ -185,7 +211,10 @@ several "apply on" options.
    ~~Links from each offer page to its landing pages~~, ~~only the best offers indexed~~:
    built (above). Next: the ROME job definitions (open data) as a short "what the job is"
    paragraph.
-2. **Readable offer addresses** (`/offres/developpeur-typescript-lyon-{id}`), with redirects
+2. ~~Tool pages ("adapter son CV à une offre", alternance, stage) and the app's guided
+   path~~: built (above). Next: "Exemple de CV [métier]" pages for the ~50 most frequent
+   jobs, from our data (skills asked, salaries, titles, an example in our templates).
+3. **Readable offer addresses** (`/offres/developpeur-typescript-lyon-{id}`), with redirects
    from the current ones.
-3. Server-rendered home page text (what MonPoste does), and the legal pages.
-4. Page speed is already good (first load ~190 KB compressed); keep it so.
+4. Server-rendered home page text (what MonPoste does), and the legal pages.
+5. Page speed is already good (first load ~190 KB compressed); keep it so.

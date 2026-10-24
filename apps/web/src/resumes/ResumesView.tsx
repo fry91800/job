@@ -22,7 +22,8 @@ import { ResumeEditor } from "./ResumeEditor";
 
 const ACCEPT = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-function UploadZone({ onUploaded }: { onUploaded: (id: string) => void }) {
+// Also used by the guided path (offers/TailorView).
+export function UploadZone({ onUploaded }: { onUploaded: (id: string) => void }) {
   const { t } = useTranslation();
   const upload = useUploadResume();
   const input = useRef<HTMLInputElement>(null);

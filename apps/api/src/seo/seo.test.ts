@@ -201,6 +201,22 @@ describe("sitemaps and robots.txt", () => {
   });
 });
 
+describe("tool pages", () => {
+  test("adapting a resume: own text, the app's guided path, in the sitemap; the path itself not crawled", async () => {
+    for (const path of ["/adapter-son-cv", "/adapter-son-cv/alternance", "/adapter-son-cv/stage"]) {
+      const page = await get(path);
+      assert.equal(page.status, 200, path);
+      assert.match(page.body, /<a class="landing-cta" href="\/adapter-mon-cv">/, path);
+      assert.match(page.body, new RegExp(`<link rel="canonical" href="${config.webBaseUrl}${path}" />`));
+      assert.match(page.body, /"@type":"WebApplication"/);
+      assert.match(page.body, new RegExp(`générer ${config.limits.aiGenerations.guestTotal} CV adaptés`), "the real limits");
+    }
+    assert.match((await get("/adapter-son-cv/alternance")).body, /<h1>CV pour une alternance/);
+    assert.match((await get("/sitemaps/landing.xml")).body, /\/adapter-son-cv\/stage<\/loc>/);
+    assert.match((await get("/robots.txt")).body, /Disallow: \/adapter-mon-cv/);
+  });
+});
+
 describe("landing pages by job and town", () => {
   const citySlug = () => slugify(`${city.name}-${city.countyCode}`);
 
