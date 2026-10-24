@@ -8,4 +8,6 @@
   } catch (e) {}
   var dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
+  // JavaScript runs: the app will replace the offer the server sent (styles.css, .seo-offer).
+  document.documentElement.classList.add("js");
 })();

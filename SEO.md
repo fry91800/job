@@ -14,6 +14,11 @@ empty page. Offer pages are now sent with their content:
 | `/sitemaps/offers-{n}.xml` | API | Open public offers, 45 000 per file, with their last change; the home page in the first |
 | `/robots.txt` | API | Everything allowed except the personal pages (`/resumes`, `/photos`, `/saved`, `/generated`, `/settings`, `/add-offer`); the sitemap's address |
 
+* **No flash of the plain version**: the app replaces the server's content when it starts,
+  in its own layout. `theme-init.js` marks pages where JavaScript runs (`.js`), and the
+  server's content stays invisible there while the app starts, shown after 3 s if the app
+  doesn't start. It is still in the page's HTML for search engines, and the app shows the
+  same offer.
 * **Everyone gets the same page.** Visitors and search engines receive the same HTML; the app
   starts on top of it and shows the same offer in its tab. Showing search engines something
   else (cloaking) is penalised by Google.

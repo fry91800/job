@@ -180,6 +180,19 @@ body {
 .seo-offer a {
   color: var(--accent);
 }
+/* With JavaScript, the app replaces this content within a moment, in its own layout: it
+   stays hidden meanwhile, so the page doesn't flash a different layout. Shown after 3 s
+   in case the app doesn't start (a blocked or failing script). Search engines read it in
+   the page's HTML either way. */
+.js .seo-offer {
+  opacity: 0;
+  animation: seo-reveal 0s linear 3s forwards;
+}
+@keyframes seo-reveal {
+  to {
+    opacity: 1;
+  }
+}
 
 /* Landing pages by job and town (SEO.md), sent by the server without the app. */
 .landing {
