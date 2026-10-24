@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import { backendConfig, prisma } from "@job/backend";
 import { collectorConfig } from "../config";
-import { checkBoards, hostKey } from "../discovery/check-boards";
+import { checkBoards, hostKey, isJobBoardFeed } from "../discovery/check-boards";
 import { surtPrefixes } from "../discovery/cc-index";
 import { boardsFromCaptures, discoverBoards } from "../discovery/common-crawl";
 import { runConnector } from "../runs/run-connector";
@@ -45,6 +45,8 @@ function route(url: URL): [number, unknown] {
   if (path === "/v1/boards/test-acme/jobs") return failing ? [500, {}] : [200, { jobs: greenhouseJobs, meta: { total: greenhouseJobs.length } }];
   if (path === "/v1/boards/test-abroad") return [200, { name: "Test Abroad" }];
   if (path === "/v1/boards/test-abroad/jobs") return [200, { jobs: [greenhouseJob(9, "London, UK")] }];
+  if (path === "/v1/boards/test-acmelinkedin") return [200, { name: "LinkedIn Job Wrapping" }];
+  if (path === "/v1/boards/test-acmelinkedin/jobs") return [200, { jobs: [greenhouseJob(21, "Paris, France")] }];
   if (path === "/v1/boards/test-empty") return [200, { name: "Test Empty" }];
   if (path === "/v1/boards/test-empty/jobs") return [200, { jobs: [] }];
   // Ashby
@@ -327,8 +329,31 @@ describe("discovery and board checks", () => {
     assert.equal(hostKey({ ats: "gestmax", slug: "127.0.0.1:8080" }), "127.0.0.1:8080");
   });
 
+  test("job boards' feeds of an employer's offers; the job boards' own boards stay", () => {
+    assert.ok(isJobBoardFeed("artefactlinkedin", "LinkedIn Job Wrapping"));
+    assert.ok(isJobBoardFeed("artefactjobs", "Welcome to the Jungle"));
+    assert.ok(isJobBoardFeed("teneolinkedin", "Teneo external feed for LinkedIn"));
+    assert.ok(!isJobBoardFeed("linkedin", "LinkedIn"), "LinkedIn hiring for itself");
+    assert.ok(!isJobBoardFeed("welcometothejungle", "Welcome to the Jungle"));
+    assert.ok(!isJobBoardFeed("monsterenergy", "Monster Energy"));
+  });
+
+  test("an unreachable host: invalid only when it still is days later", async () => {
+    const where = { ats_slug: { ats: "careersite", slug: "test-nowhere.invalid" } };
+    await prisma.companySource.upsert({ where, create: { ats: "careersite", slug: "test-nowhere.invalid", status: "candidate" }, update: { status: "candidate", lastError: null, checkedAt: null } });
+    await checkBoards({ ats: "careersite", where: { ...TEST_BOARDS, slug: "test-nowhere.invalid" }, limit: 1, log: () => {} });
+    let board = await prisma.companySource.findUniqueOrThrow({ where });
+    assert.equal(board.status, "candidate", "a first failure may be passing");
+    assert.match(board.lastError ?? "", /unreachable|unknown host/);
+    await prisma.companySource.update({ where, data: { checkedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000) } });
+    await checkBoards({ ats: "careersite", where: { ...TEST_BOARDS, slug: "test-nowhere.invalid" }, limit: 1, log: () => {} });
+    board = await prisma.companySource.findUniqueOrThrow({ where });
+    assert.equal(board.status, "invalid", "still unreachable days later");
+    await prisma.companySource.delete({ where });
+  });
+
   test("checks give each board a status; active boards get their company", async () => {
-    for (const slug of ["test-acme", "test-abroad", "test-empty", "test-gone"]) {
+    for (const slug of ["test-acme", "test-abroad", "test-empty", "test-gone", "test-acmelinkedin"]) {
       await prisma.companySource.upsert({ where: { ats_slug: { ats: "greenhouse", slug } }, create: { ats: "greenhouse", slug, status: "candidate" }, update: { status: "candidate" } });
     }
     await checkBoards({ ats: "greenhouse", where: TEST_BOARDS, log: () => {} });
@@ -338,6 +363,7 @@ describe("discovery and board checks", () => {
       [
         ["test-abroad", "no-france", 0, null],
         ["test-acme", "active", 2, "Test Acme"],
+        ["test-acmelinkedin", "duplicate", 1, null],
         ["test-empty", "empty", 0, null],
         ["test-gone", "invalid", null, null],
       ],

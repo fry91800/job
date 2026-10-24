@@ -981,3 +981,31 @@ the 2026-10-19 file: `boards import` on the server, as before.
 
 **Moving this to production**: `data/boards-2026-10-23.json.gz` (62 856 boards) replaces
 the 2026-10-20 file: `boards import` on the server, as before.
+
+### 17.24 Data quality: skill matching, job boards' feeds, boards left behind (2026-10-24)
+
+* **Skill matching**: the landing pages' summaries showed the words behind the most frequent
+  skills. Ordinary words matched skills: "histoire" ("notre histoire"), "email" ("envoyez
+  votre CV par email", as electronic communication), "saisie" (data entry, as repossession),
+  "IDE" (the nurse, as a development environment), "SaaS" (as service-oriented
+  architecture), "design" (as a creative mind), "électrique(s)" (as electricity basics),
+  "report", "energy", "logique", "animations", "consultation"; the English pronoun "it" as
+  IT. The matcher's ambiguous words now cover phrases of any length and these words; "RSE"
+  and "CSR" count in titles only (in descriptions they are the company's boilerplate); "IT"
+  only in capitals (`CAPITALS_ONLY`). `npm run collector -- reenrich` recomputes the stored
+  offers.
+* **Job boards' feeds**: some employers keep a second board to feed a job board, with the
+  same offers under the job board's name (Greenhouse `artefactlinkedin` "LinkedIn Job
+  Wrapping", `artefactjobs` "Welcome to the Jungle", `teneolinkedin`): such boards become
+  `duplicate` at their check (`isJobBoardFeed`); the job boards' own boards (LinkedIn hiring
+  for itself) stay.
+* **Offers of boards no longer collected**: a board set aside (duplicate, feed, test site,
+  paused, no offer in France any more, gone) wasn't run any more, so its offers stayed open
+  forever. The daily maintenance now closes the sources of boards that were collected (they
+  have a company) and aren't active, except boards that are only unreachable for now.
+* **Unreachable is not gone**: a board was made `invalid` at its first "unknown host" or
+  "site unreachable" — passing network failures (this machine's connection on 2026-10-16/19)
+  took Decathlon (746 offers), Transavia and six Teamtailor sites out of collection, to be
+  checked again only after 90 days. A board is now invalid only when it is still unreachable
+  at a check 3 or more days later, and boards made invalid that way are checked again after
+  3 days (production repairs itself at its nightly checks).

@@ -73,6 +73,20 @@ Three families of pages (scopes), each with the same addresses:
   other scopes ("Voir aussi"), and to the app's search with the job, town and contract filled
   in. Title, description, canonical, Open Graph; no JobPosting (Google wants it on the
   offer's own page only).
+* **What the offers say** ("En bref", computed from the page's own offers, cached an hour
+  per page): how many and how many published in the last 7 days; the contracts' shares (all
+  offers only); the share with remote work; the advertised salary — the middle half and the
+  median of the offers stating one, as a yearly gross amount (per month for internships and
+  apprenticeships), shown from 5 offers (`config.seo.landing.minSalaries`); the employers
+  with the most offers; on job pages, the skills found in at least 5 % of the offers (one of
+  each family, a few matching false positives left out). Every sentence appears only when the
+  data supports it, so each page's text is its own. The median salary also goes into the
+  meta description (the snippet in search results).
+* **Related jobs** ("Métiers proches"): jobs with the same parent in the ROME catalogue,
+  linked in the same place when that page exists.
+* **Breadcrumbs** above the heading (scope › job › region › département › town, only levels
+  whose pages exist) and as schema.org `BreadcrumbList`, which Google shows in results.
+* Cold page ~30–360 ms on 46 000 offers, then ~20–60 ms.
 * The landing sitemaps (`/sitemaps/landing.xml`, then `landing-2.xml`… past 45 000 pages)
   list them all; the sitemap index points to them. On the development data (46 000 offers):
   13 725 pages (emplois 12 228, stage 1 153, alternance 344).
@@ -84,7 +98,8 @@ engines about each new and closed offer (`apps/api/src/seo/indexing.ts`, every 3
 
 * **IndexNow** (Bing, Yandex, Seznam, Naver; Bing feeds DuckDuckGo, Ecosia, Qwant): every
   new or closed public offer page, up to 10 000 addresses a request. The key proves the site
-  is ours: it is served at `/indexnow/{key}.txt`.
+  is ours: it is served at `/{key}.txt`, at the root (a key file only covers the addresses
+  under its own folder: IndexNow refused the offers with the key in `/indexnow/`).
 * **Google's Indexing API**, meant for pages with JobPosting: `URL_UPDATED` for a new offer,
   `URL_DELETED` for a closed one, offers with JobPosting only. Its quota is 200 a day by
   default: the newest offers go first, a quarter of the quota is kept for closed ones, what
@@ -119,9 +134,13 @@ engines about each new and closed offer (`apps/api/src/seo/indexing.ts`, every 3
    4. Search Console → *Settings → Users and permissions → Add user*: the service account's
       address (`indexing@….iam.gserviceaccount.com`), permission **Owner** (Google requires
       it for this API).
-   5. Copy the file to the server, then `base64 -w0 key.json` and put the result in
-      `.env.production` as `GOOGLE_INDEXING_CREDENTIALS_BASE64=…`; delete the file from the
-      server and keep a copy somewhere safe (it is a password).
+   5. Copy the file to the server (`scp key.json admin@monposte.com:/opt/monposte/`), then
+      write it into `.env.production` without pasting it (a pasted value is easily cut):
+      `sed -i '/^GOOGLE_INDEXING_CREDENTIALS_BASE64=/d' .env.production && printf 'GOOGLE_INDEXING_CREDENTIALS_BASE64=%s\n' "$(base64 -w0 key.json)" >> .env.production`.
+      Check it decodes whole (prints two equal numbers, nothing secret):
+      `grep '^GOOGLE_INDEXING_CREDENTIALS_BASE64=' .env.production | cut -d= -f2- | base64 -d | wc -c; wc -c < key.json`. Then
+      delete the file from the server (`rm key.json`) and keep a copy somewhere safe (it is
+      a password).
 8. `dc up -d api` to apply. The API's log shows `search_indexing_done` with the counts every
    30 minutes (`dc logs api | grep search_indexing`).
 
@@ -133,8 +152,9 @@ several "apply on" options.
 ## Next steps worth considering
 
 1. ~~Landing pages by job and place~~, ~~départements, regions, apprenticeships and
-   internships~~: built (above). Later: a short text per job (what the job is, salaries seen)
-   to make pages more than lists; links from each offer page to its landing pages.
+   internships~~, ~~summaries from the offers, related jobs, breadcrumbs~~: built (above).
+   Next: links from each offer page to its landing pages; the ROME job definitions (open
+   data) as a short "what the job is" paragraph.
 2. **Readable offer addresses** (`/offres/developpeur-typescript-lyon-{id}`), with redirects
    from the current ones.
 3. Server-rendered home page text (what MonPoste does), and the legal pages.

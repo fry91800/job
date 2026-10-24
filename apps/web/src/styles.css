@@ -232,6 +232,17 @@ body {
   flex-wrap: wrap;
   gap: 6px 18px;
 }
+.landing-crumbs {
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.landing-crumbs a {
+  color: var(--fg-muted);
+}
+.landing-summary {
+  color: var(--fg-muted);
+}
 
 /* Short, purposeful motion (FRONTEND.md §5). */
 @keyframes fade-in {

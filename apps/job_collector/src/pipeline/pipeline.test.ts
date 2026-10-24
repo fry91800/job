@@ -197,6 +197,27 @@ describe("pipeline", () => {
     assert.deepEqual(left.map((raw) => raw.contentHash), [latest], "only the latest version stays (older than 90 days removed)");
   });
 
+  test("maintenance closes the offers of boards no longer collected, not of boards unreachable for now", async () => {
+    const company = await prisma.company.create({ data: { name: "Cloudine Test boards", normalizedName: "cloudine test boards" } });
+    const boards = { feed: `test-feed-${uid()}`, unreachable: `test-unreachable-${uid()}` };
+    await prisma.companySource.createMany({
+      data: [
+        { ats: "test-ats", slug: boards.feed, status: "duplicate", companyId: company.id },
+        { ats: "test-ats", slug: boards.unreachable, status: "invalid", companyId: company.id, lastError: "https://x/robots.txt: site unreachable (unknown host)" },
+      ],
+    });
+    try {
+      const fromFeed = (await processRecord(record(offer({ source: "test-ats", externalId: `${boards.feed}:1` })))) as { offerId: string };
+      const fromUnreachable = (await processRecord(record(offer({ source: "test-ats", externalId: `${boards.unreachable}:1` })))) as { offerId: string };
+      const result = await runMaintenance();
+      assert.ok(result.inactiveBoardSources >= 1);
+      assert.ok((await load(fromFeed.offerId)).closedAt, "a duplicate board's offer is closed");
+      assert.equal((await load(fromUnreachable.offerId)).closedAt, null, "an unreachable board's offer stays open");
+    } finally {
+      await prisma.companySource.deleteMany({ where: { slug: { in: Object.values(boards) } } });
+    }
+  });
+
   test("maintenance closes sources past their expiry date", async () => {
     const value = offer({ expiresAt: new Date(Date.now() - 3600 * 1000).toISOString() });
     const { offerId } = (await processRecord(record(value))) as { offerId: string };

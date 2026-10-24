@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { config } from "../config";
 import { prisma, startTestServer } from "../test/helpers";
-import { placePhrase, resetLandingIndex, slugify } from "./landing";
+import { commonSkills, placePhrase, resetLandingIndex, SCOPES, slugify, summary } from "./landing";
 import { resetAppTemplate } from "./offer-page";
 
 // Offer pages, sitemaps and robots.txt for search engines (SEO.md), on a built-app page
@@ -151,9 +151,10 @@ describe("sitemaps and robots.txt", () => {
     const saved = config.seo.indexing.indexNowKey;
     config.seo.indexing.indexNowKey = "abcdef0123456789abcdef0123456789";
     try {
-      const file = await get("/indexnow/abcdef0123456789abcdef0123456789.txt");
+      const file = await get("/abcdef0123456789abcdef0123456789.txt");
       assert.deepEqual([file.status, file.body], [200, "abcdef0123456789abcdef0123456789"]);
-      assert.equal((await get("/indexnow/other.txt")).status, 404);
+      assert.equal((await get("/other.txt")).status, 404);
+      assert.match((await get("/robots.txt")).body, /Sitemap:/, "robots.txt still answered");
     } finally {
       config.seo.indexing.indexNowKey = saved;
     }
@@ -220,6 +221,43 @@ describe("landing pages by job and town", () => {
     const sitemap = await get("/sitemaps/landing.xml");
     assert.match(sitemap.body, new RegExp(`/alternance/${slugify(occupation.name)}/${citySlug()}</loc>`));
     assert.match(sitemap.body, new RegExp(`/emplois/region/${slugify(city.regionName!)}</loc>`));
+  });
+
+  test("the summary: only what the data supports, salaries per year or per month", () => {
+    const [emplois, alternance] = SCOPES;
+    const stats = {
+      total: 40, recent: 6, remote: 8,
+      contracts: [["permanent", 24], ["fixed_term", 10], ["internship", 6]] as [string, number][],
+      salary: { count: 12, low: 32000, median: 36000, high: 41000 },
+      employers: [{ name: "Acme", count: 9 }, { name: "Globex", count: 4 }, { name: "Seule", count: 1 }],
+      skills: ["SQL", "Python", "Anglais"],
+    };
+    // French numbers use narrow no-break spaces: plain spaces here.
+    const plain = (html: string) => html.replace(/[\u202f\u00a0]/g, " ");
+    const text = plain(summary(emplois, stats, "à Lyon"));
+    assert.match(text, /40 offres en cours à Lyon, dont 6 publiées ces 7 derniers jours\./);
+    assert.match(text, /60 % en CDI, 25 % en CDD, 15 % en stage/);
+    assert.match(text, /20 % des offres permettent le télétravail/);
+    assert.match(text, /entre 32 000 € et 41 000 € brut par an .* 36 000 € en valeur médiane \(sur 12 offres\)/);
+    assert.match(text, /Acme \(9\), Globex \(4\)\./, "employers with a single offer aren't listed");
+    assert.match(plain(summary(alternance, { ...stats, salary: { count: 6, low: 9600, median: 10800, high: 12000 } }, "à Lyon")), /entre 800 € et 1 000 € brut par mois/);
+    assert.doesNotMatch(summary(emplois, { ...stats, salary: null, remote: 0 }, "à Lyon"), /Salaire|télétravail/);
+    assert.equal(summary(emplois, { ...stats, total: 0 }, "à Lyon"), "");
+  });
+
+  test("skills: common enough, one of each family, no matching noise", () => {
+    const rows = [{ name: "Travail en équipe", count: 30 }, { name: "travailler en équipe", count: 25 }, { name: "histoire", count: 20 }, { name: "SQL", count: 12 }, { name: "Rare", count: 2 }];
+    assert.deepEqual(commonSkills(rows, 100), ["Travail en équipe", "SQL"]);
+  });
+
+  test("breadcrumbs: on the page and as structured data", async () => {
+    const pair = await get(`/emplois/${slugify(occupation.name)}/${citySlug()}`);
+    assert.match(pair.body, /<nav class="landing-crumbs"/);
+    assert.match(pair.body, /<h2>En bref<\/h2>/);
+    const crumbs = [...pair.body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => JSON.parse(match[1])).find((data) => data["@type"] === "BreadcrumbList");
+    assert.ok(crumbs, "a BreadcrumbList");
+    assert.equal(crumbs.itemListElement[0].item, `${config.webBaseUrl}/emplois`);
+    assert.equal(crumbs.itemListElement.at(-1).item, `${config.webBaseUrl}/emplois/${slugify(occupation.name)}/${citySlug()}`);
   });
 
   test("too few offers or unknown: 404, not indexed", async () => {

@@ -76,11 +76,12 @@ export const config = {
     sitemapSize: 45_000, // offers per sitemap file (the limit is 50 000)
     // Landing pages by job and town: a page exists only with this many open public offers
     // (thin pages hurt the whole site's standing with search engines).
-    landing: { minOccupation: 3, minPair: 3, minCity: 5, offersShown: 30, linksShown: 20 },
+    // A salary range is shown from `minSalaries` offers that state one.
+    landing: { minOccupation: 3, minPair: 3, minCity: 5, offersShown: 30, linksShown: 20, minSalaries: 5 },
     // Search engines told at once about new and closed offer pages (SEO.md), every
     // `checkMinutes` inside the API process. Google's Indexing API: a service account's key
     // (the JSON file, base64), `dailyQuota` notifications a day (Google's default is 200).
-    // IndexNow (Bing, Yandex, Seznam…): a key of our choosing, served at /indexnow/{key}.txt.
+    // IndexNow (Bing, Yandex, Seznam…): a key of our choosing, served at /{key}.txt.
     indexing: {
       checkMinutes: Number(process.env.SEARCH_INDEXING_CHECK_MINUTES ?? 30),
       googleCredentials: process.env.GOOGLE_INDEXING_CREDENTIALS_BASE64,

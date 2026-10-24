@@ -13,7 +13,7 @@ import { importCatalogue, parseRomeEscoMapping } from "./import";
 const ESCO_DEV = "http://data.europa.eu/esco/occupation/test-dev";
 const ESCO_ADMIN = "http://data.europa.eu/esco/occupation/test-admin";
 const ESCO_SKILL = "http://data.europa.eu/esco/skill/test-kotlin-multiplatform";
-const TEST_SKILLS = ["test-python-esco", "test-planning", "test-gambling"].map((name) => `http://data.europa.eu/esco/skill/${name}`);
+const TEST_SKILLS = ["test-python-esco", "test-planning", "test-gambling", "test-email", "test-it"].map((name) => `http://data.europa.eu/esco/skill/${name}`);
 
 // ROME files are Windows-1252 (accents as single bytes).
 const cp1252 = (value: unknown) => Buffer.from(JSON.stringify(value), "latin1");
@@ -132,6 +132,14 @@ describe("catalogue import (ROME + ESCO)", () => {
     assert.ok((await matchInText("skill", "Strong planning skills.", "en")).includes(planning), "in an English text they do");
     assert.ok((await matchLabels("skill", ["paris"], "fr")).includes(gambling), "a source's own label still matches");
     assert.deepEqual(await canonicalIds("skill", [escoPython, manualPython]), [manualPython], "resumes count it once too");
+
+    const email = await add(TEST_SKILLS[3], [{ language: "en", name: "email", isCanonical: true }, { language: "en", name: "e-mail", isCanonical: false }]);
+    // A lowercase name, as ESCO has: no acronym rule would apply without CAPITALS_ONLY.
+    const it = await add(TEST_SKILLS[4], [{ language: "en", name: "it", isCanonical: true }]);
+    resetCatalogueMatcher();
+    assert.ok(!(await matchInText("skill", "Send your resume by email or e-mail.", "en")).includes(email), "everyday words, in one or two tokens");
+    assert.ok(!(await matchInText("skill", "Make it happen with us.", "en")).includes(it), "the pronoun isn't IT");
+    assert.ok((await matchInText("skill", "Join our IT team.", "en")).includes(it), "IT in capitals is");
 
     const recruiting = (await prisma.skill.findFirstOrThrow({ where: { source: "manual", externalId: "recruitment" } })).id;
     assert.ok(!(await matchInText("skill", "Notre processus de recrutement est rapide.", "fr")).includes(recruiting), "generic in a description");

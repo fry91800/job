@@ -23,13 +23,24 @@ const TOKEN = /\.?[\p{L}\p{N}](?:[\p{L}\p{N}#+_.'’/]*[\p{L}\p{N}#+])?/gu;
 
 // Too ambiguous to be found in free text ("go" the language vs "go" the verb, "paris" the
 // city vs betting). They are still found when a source gives them as a skill label.
+// Measured again on 2026-10-24 (the words behind the most frequent skills): "histoire" in
+// "notre histoire", "email" in "envoyez votre CV par email", "saisie" (data entry) as
+// repossession, "IDE" (the nurse) as a development environment, "SaaS" as service-oriented
+// architecture, "design" as a creative mind, "électrique(s)" as electricity basics, "report"
+// as reporting facts.
 const AMBIGUOUS_IN_TEXT = new Set([
   "go", "c", "r", "d", "less", "make", "swift", "rust", "dart", "chef", "spring",
   "paris", "politique", "plan", "vue", "lead", "source", "transport", "transformer", "lecture", "passerelles", "physique", "communiquer",
+  "histoire", "history", "logique", "logic", "animation", "animations", "consultation", "consultations", "saisie",
+  "email", "e mail", "mail", "report", "design", "experiment", "innovate", "energy", "fuel",
+  "saas", "paas", "iaas", "ide", "électrique", "électriques",
 ]);
 
-// Generic in a description, meaningful in a title.
-const TITLE_ONLY = new Set(["recrutement", "recruitment", "recruiting", "communication", "informatique"]);
+// Generic in a description, meaningful in a title ("Chargé RSE"; "notre politique RSE").
+const TITLE_ONLY = new Set(["recrutement", "recruitment", "recruiting", "communication", "informatique", "rse", "csr"]);
+
+// Matched only when written in capitals ("équipe IT", not the English pronoun "it").
+const CAPITALS_ONLY = new Set(["it"]);
 
 export function tokenize(text: string): string[] {
   return normalizeCatalogueName(text).match(TOKEN) ?? [];
@@ -166,8 +177,10 @@ export async function matchInText(kind: Kind, text: string, language?: string | 
     for (let start = 0; start < tokens.length; start++) {
       for (let length = 1; length <= index.maxTokens && start + length <= tokens.length; length++) {
         const phrase = tokens.slice(start, start + length).join(" ");
-        if (length === 1 && (phrase.length < 2 || (kind === "skill" && AMBIGUOUS_IN_TEXT.has(phrase)))) continue;
+        if (length === 1 && phrase.length < 2) continue;
+        if (kind === "skill" && AMBIGUOUS_IN_TEXT.has(phrase)) continue;
         if (length === 1 && kind === "skill" && !options.title && TITLE_ONLY.has(phrase)) continue;
+        if (kind === "skill" && CAPITALS_ONLY.has(phrase) && !isAcronym(original.slice(start, start + length).join(" "))) continue;
         const key = `${lang}|${phrase}`;
         const ids = index.byKey.get(key);
         if (!ids) continue;

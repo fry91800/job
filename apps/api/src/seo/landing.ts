@@ -24,7 +24,7 @@ export const SCOPES: Scope[] = [
 
 // --- The index: counts of open public offers by job, place and job in place ---------------
 
-type Occupation = { id: number; slug: string; name: string; total: number };
+type Occupation = { id: number; slug: string; name: string; total: number; parentId: number | null };
 export type PlaceKind = "city" | "county" | "region";
 type Place = { kind: PlaceKind; key: string; slug: string; name: string; label: string; total: number; countyKey: string | null; regionKey: string | null; locationId?: number; countyCode?: string; regionName?: string };
 type Index = { at: number; occupations: Map<string, Occupation>; byOccupationId: Map<number, Occupation>; places: Map<string, Place>; bySlug: Map<string, Place>; pairs: Map<string, number> };
@@ -68,13 +68,17 @@ async function buildIndex(scope: Scope): Promise<Index> {
   const occupationTotals = new Map<number, number>();
   for (const row of pairRows) occupationTotals.set(row.occupation_id, (occupationTotals.get(row.occupation_id) ?? 0) + Number(row.count));
   const occupationIds = [...occupationTotals].filter(([, total]) => total >= minOccupation).map(([id]) => id);
-  const names = await prisma.occupationName.findMany({ where: { occupationId: { in: occupationIds }, isCanonical: true, language: "fr" }, select: { occupationId: true, name: true } });
+  const [names, parents] = await Promise.all([
+    prisma.occupationName.findMany({ where: { occupationId: { in: occupationIds }, isCanonical: true, language: "fr" }, select: { occupationId: true, name: true } }),
+    prisma.occupation.findMany({ where: { id: { in: occupationIds } }, select: { id: true, parentId: true } }),
+  ]);
+  const parentOf = new Map(parents.map((row) => [row.id, row.parentId]));
   const occupations = new Map<string, Occupation>();
   const byOccupationId = new Map<number, Occupation>();
   for (const { occupationId, name } of names) {
     const slug = slugify(name);
     if (!slug || occupations.has(slug)) continue;
-    const occupation = { id: occupationId, slug, name, total: occupationTotals.get(occupationId) ?? 0 };
+    const occupation = { id: occupationId, slug, name, total: occupationTotals.get(occupationId) ?? 0, parentId: parentOf.get(occupationId) ?? null };
     occupations.set(slug, occupation);
     byOccupationId.set(occupationId, occupation);
   }
@@ -135,6 +139,7 @@ export async function landingIndex(scope: Scope): Promise<Index> {
 // Tests.
 export function resetLandingIndex(): void {
   cached.clear();
+  statsCache.clear();
 }
 
 // --- Addresses ------------------------------------------------------------------------------
@@ -221,6 +226,183 @@ function offerList(offers: ListedOffer[]): string {
     .join("")}</ul>`;
 }
 
+// --- What the page's offers say: contracts, salaries, remote work, employers, skills ---------
+
+type Stats = {
+  total: number;
+  recent: number; // published in the last 7 days
+  contracts: [string, number][];
+  remote: number; // fully remote or hybrid
+  salary: { count: number; low: number; median: number; high: number } | null; // yearly, gross, EUR
+  employers: { name: string; count: number }[];
+  skills: string[];
+};
+
+const STATS_TTL_MS = 3600 * 1000;
+const STATS_KEPT = 5000;
+const statsCache = new Map<string, { at: number; stats: Stats }>();
+
+// The page's offers as SQL: the scope's contract, the job, the place.
+function offerFilter(scope: Scope, filter: { occupationId?: number; place?: Place }) {
+  const place = filter.place;
+  return Prisma.sql`o.is_public AND o.closed_at IS NULL
+    ${scope.contract ? Prisma.sql`AND o.contract_type = ${scope.contract}::contract_type` : Prisma.empty}
+    ${filter.occupationId !== undefined ? Prisma.sql`AND EXISTS (SELECT 1 FROM offer_occupations oo WHERE oo.offer_id = o.id AND oo.occupation_id = ${filter.occupationId})` : Prisma.empty}
+    ${place?.kind === "city" ? Prisma.sql`AND o.location_id = ${place.locationId}` : Prisma.empty}
+    ${place?.kind === "county" ? Prisma.sql`AND o.location_id IN (SELECT id FROM locations WHERE country_code = 'FR' AND county_code = ${place.countyCode})` : Prisma.empty}
+    ${place?.kind === "region" ? Prisma.sql`AND o.location_id IN (SELECT id FROM locations WHERE country_code = 'FR' AND region_name = ${place.regionName})` : Prisma.empty}`;
+}
+
+// A salary as a yearly gross amount: the middle of its range, times the hours, days or months
+// of a full-time year (1 607 h, 218 days).
+const YEARLY = Prisma.sql`(CASE o.salary_period WHEN 'year' THEN 1 WHEN 'month' THEN 12 WHEN 'day' THEN 218 WHEN 'hour' THEN 1607 END)
+  * (coalesce(o.salary_min, o.salary_max) + coalesce(o.salary_max, o.salary_min)) / 2.0`;
+
+export async function pageStats(scope: Scope, filter: { occupationId?: number; place?: Place }): Promise<Stats> {
+  const key = `${scope.key}|${filter.occupationId ?? ""}|${filter.place?.key ?? ""}`;
+  const hit = statsCache.get(key);
+  if (hit && Date.now() - hit.at < STATS_TTL_MS) return hit.stats;
+  const where = offerFilter(scope, filter);
+  // Internships and apprenticeships pay a few hundred euros a month: a lower floor.
+  const floor = scope.contract ? 3000 : 12000;
+  const [contractRows, salaryRows, employerRows, skillRows] = await Promise.all([
+    prisma.$queryRaw<{ contract: string | null; count: bigint; remote: bigint; recent: bigint }[]>`
+      SELECT o.contract_type::text AS contract, count(*) AS count,
+        count(*) FILTER (WHERE o.remote_type IN ('remote', 'hybrid')) AS remote,
+        count(*) FILTER (WHERE coalesce(o.published_at, o.created_at) > now() - interval '7 days') AS recent
+      FROM offers o WHERE ${where} GROUP BY 1`,
+    prisma.$queryRaw<{ count: bigint; low: number | null; median: number | null; high: number | null }[]>`
+      SELECT count(*) AS count,
+        percentile_cont(0.25) WITHIN GROUP (ORDER BY yearly) AS low,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY yearly) AS median,
+        percentile_cont(0.75) WITHIN GROUP (ORDER BY yearly) AS high
+      FROM (SELECT ${YEARLY} AS yearly FROM offers o
+            WHERE ${where} AND o.salary_currency = 'EUR' AND o.salary_period IS NOT NULL AND coalesce(o.salary_min, o.salary_max) IS NOT NULL) s
+      WHERE yearly BETWEEN ${floor} AND 300000`,
+    prisma.$queryRaw<{ name: string; count: bigint }[]>`
+      SELECT coalesce(c.name, o.company_name) AS name, count(*) AS count
+      FROM offers o LEFT JOIN companies c ON c.id = o.company_id
+      WHERE ${where} AND coalesce(c.name, o.company_name) IS NOT NULL
+      GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 8`,
+    filter.occupationId === undefined
+      ? Promise.resolve([] as { name: string }[])
+      : prisma.$queryRaw<{ name: string; count: bigint }[]>`
+      SELECT sn.name, count(*) AS count FROM offer_skills os
+      JOIN offers o ON o.id = os.offer_id
+      JOIN skill_names sn ON sn.skill_id = os.skill_id AND sn.language = 'fr' AND sn.is_canonical
+      WHERE ${where} GROUP BY sn.name ORDER BY count(*) DESC, sn.name LIMIT 20`,
+  ]);
+  const total = contractRows.reduce((sum, row) => sum + Number(row.count), 0);
+  const salary = salaryRows[0] && Number(salaryRows[0].count) >= config.seo.landing.minSalaries && salaryRows[0].median !== null ? { count: Number(salaryRows[0].count), low: salaryRows[0].low!, median: salaryRows[0].median, high: salaryRows[0].high! } : null;
+  const stats: Stats = {
+    total,
+    recent: contractRows.reduce((sum, row) => sum + Number(row.recent), 0),
+    remote: contractRows.reduce((sum, row) => sum + Number(row.remote), 0),
+    contracts: contractRows.filter((row) => row.contract).map((row) => [row.contract!, Number(row.count)] as [string, number]).sort((a, b) => b[1] - a[1]),
+    salary,
+    employers: employerRows.map((row) => ({ name: row.name, count: Number(row.count) })),
+    skills: commonSkills(skillRows.map((row) => ({ name: row.name, count: Number("count" in row ? row.count : 0) })), total),
+  };
+  if (statsCache.size >= STATS_KEPT) statsCache.delete(statsCache.keys().next().value!);
+  statsCache.set(key, { at: Date.now(), stats });
+  return stats;
+}
+
+// Skills found in enough of the page's offers (5 %, at least 3: fewer is noise from the
+// skill matching), one of each family ("Travail en équipe", "travailler en équipe").
+// Skills the matching finds in ordinary words ("notre histoire"): not shown.
+const NOISY_SKILLS = new Set(["histoire", "modelisation-orientee-services", "communication-electronique"]);
+
+export function commonSkills(rows: { name: string; count: number }[], total: number): string[] {
+  const kept: string[] = [];
+  const stems = new Set<string>();
+  for (const { name, count } of rows) {
+    if (count < Math.max(3, total * 0.05) || NOISY_SKILLS.has(slugify(name))) continue;
+    const stem = slugify(name).split("-").map((word) => word.slice(0, 5)).join("-");
+    if (stems.has(stem)) continue;
+    stems.add(stem);
+    kept.push(name.charAt(0).toUpperCase() + name.slice(1));
+  }
+  return kept.slice(0, 10);
+}
+
+const percent = (part: number, whole: number) => Math.round((100 * part) / whole);
+const euros = (amount: number) => `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(amount / 100) * 100)} €`;
+
+// The page's summary in sentences: only what the data supports.
+export function summary(scope: Scope, stats: Stats, where: string): string {
+  if (!stats.total) return "";
+  const sentences: string[] = [];
+  sentences.push(`${counted(scope, stats.total, " en cours")} ${where}${stats.recent ? `, dont ${number(stats.recent)} publiée${stats.recent > 1 ? "s" : ""} ces 7 derniers jours` : ""}.`);
+  if (!scope.contract) {
+    const typed = stats.contracts.reduce((sum, [, count]) => sum + count, 0);
+    const shares = stats.contracts.filter(([, count]) => typed >= 10 && percent(count, typed) >= 5).slice(0, 4).map(([contract, count]) => `${percent(count, typed)} % ${CONTRACT_PHRASES[contract] ?? contract}`);
+    if (shares.length >= 2) sentences.push(`Contrats proposés : ${shares.join(", ")}.`);
+  }
+  if (stats.total >= 10 && percent(stats.remote, stats.total) >= 5) sentences.push(`${percent(stats.remote, stats.total)} % des offres permettent le télétravail, complet ou partiel.`);
+  if (stats.salary) {
+    const { low, median, high, count } = stats.salary;
+    const monthly = !!scope.contract;
+    const unit = monthly ? "brut par mois" : "brut par an";
+    const show = (amount: number) => euros(monthly ? amount / 12 : amount);
+    sentences.push(
+      low === high
+        ? `Salaire annoncé : ${show(median)} ${unit} (sur ${number(count)} offres qui l'indiquent).`
+        : `Salaire annoncé : entre ${show(low)} et ${show(high)} ${unit} pour la moitié des offres qui l'indiquent, ${show(median)} en valeur médiane (sur ${number(count)} offres).`,
+    );
+  }
+  const employers = stats.employers.filter((employer) => employer.count >= 2).slice(0, 5);
+  if (employers.length >= 2) sentences.push(`Employeurs qui recrutent le plus : ${employers.map((employer) => `${employer.name} (${number(employer.count)})`).join(", ")}.`);
+  if (stats.skills.length >= 3) sentences.push(`Compétences les plus demandées : ${stats.skills.slice(0, 8).join(", ")}.`);
+  return `<h2>En bref</h2><p class="landing-summary">${sentences.map(escapeHtml).join(" ")}</p>`;
+}
+
+const CONTRACT_PHRASES: Record<string, string> = { permanent: "en CDI", fixed_term: "en CDD", temporary: "en intérim", freelance: "en freelance", internship: "en stage", apprenticeship: "en alternance", other: "autres contrats" };
+
+// Short descriptions for search results: the count, the salary when known.
+function metaDescription(scope: Scope, stats: Stats, count: number, what: string): string {
+  const salary = stats.salary ? ` Salaire médian annoncé : ${euros(scope.contract ? stats.salary.median / 12 : stats.salary.median)} ${scope.contract ? "brut/mois" : "brut/an"}.` : "";
+  return `${counted(scope, count)} ${what}, mises à jour chaque jour.${salary} Postulez avec un CV adapté à chaque offre.`;
+}
+
+// Jobs next to this one in the ROME catalogue (same parent), as links in the same place
+// when that page exists, else across France.
+function relatedJobs(scope: Scope, index: Index, occupation: Occupation, place?: Place) {
+  if (occupation.parentId === null) return [];
+  return [...index.occupations.values()]
+    .filter((other) => other !== occupation && other.parentId === occupation.parentId)
+    .map((other) => {
+      const count = place ? index.pairs.get(pairKey(other.id, place.key)) : undefined;
+      return place && pairShown(count) ? { href: pairPath(scope, other, place), label: `${other.name} (${number(count!)})`, count: count! } : { href: occupationPath(scope, other), label: `${other.name} (${number(other.total)})`, count: other.total };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+}
+
+// The trail above the heading, and the same as schema.org BreadcrumbList.
+type Crumb = { name: string; path: string };
+function breadcrumbs(crumbs: Crumb[]): { html: string; data: Record<string, unknown> } {
+  const html = `<nav class="landing-crumbs" aria-label="Fil d'Ariane">${crumbs.map((crumb, position) => (position === crumbs.length - 1 ? `<span>${escapeHtml(crumb.name)}</span>` : `<a href="${escapeHtml(crumb.path)}">${escapeHtml(crumb.name)}</a>`)).join(" › ")}</nav>`;
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((crumb, position) => ({ "@type": "ListItem", position: position + 1, name: crumb.name, item: `${config.webBaseUrl}${crumb.path}` })),
+  };
+  return { html, data };
+}
+
+// The trail of a place: its region and département when their pages exist, then itself.
+function placeCrumbs(scope: Scope, index: Index, place: Place, occupation?: Occupation): Crumb[] {
+  const chain = [place.regionKey, place.countyKey].map((key) => (key ? index.places.get(key) : undefined)).filter((item): item is Place => !!item);
+  const crumbs: Crumb[] = [];
+  // A département named like its town (Paris) isn't repeated.
+  for (const item of [...chain.filter((item) => item.name !== place.name), place]) {
+    const shown = occupation ? pairShown(index.pairs.get(pairKey(occupation.id, item.key))) : placeShown(item);
+    if (shown || item === place) crumbs.push({ name: item.kind === "city" ? item.name : item.label, path: occupation ? pairPath(scope, occupation, item) : placePath(scope, item) });
+  }
+  return crumbs;
+}
+
 const linkList = (title: string, links: { href: string; label: string }[]) =>
   links.length ? `<h2>${escapeHtml(title)}</h2><ul class="landing-links">${links.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul>` : "";
 
@@ -239,8 +421,11 @@ function analyticsTag(): string {
   return `<script defer src="/u/script.js" data-website-id="${escapeHtml(id)}" data-domains="${escapeHtml(new URL(config.webBaseUrl).hostname)}" data-exclude-search="true" data-do-not-track="true"></script>`;
 }
 
+// Structured data in the page, unable to end its block early.
+const jsonLd = (data: Record<string, unknown>) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
+
 // The page around the content: the app's stylesheet and theme, a header, links at the end.
-function document(input: { title: string; description: string; path: string; body: string; noindex?: boolean }): string {
+function document(input: { title: string; description: string; path: string; body: string; noindex?: boolean; data?: Record<string, unknown>[] }): string {
   const template = appTemplate() ?? "";
   const styles = [...template.matchAll(/<link rel="stylesheet"[^>]*>/g)].map((match) => match[0]).join("\n    ");
   const canonical = `${config.webBaseUrl}${input.path}`;
@@ -263,6 +448,7 @@ function document(input: { title: string; description: string; path: string; bod
     <script src="/theme-init.js"></script>
     ${analyticsTag()}
     ${styles}
+    ${(input.data ?? []).map(jsonLd).join("\n    ")}
   </head>
   <body>
     <main class="landing">
@@ -280,8 +466,6 @@ const notFound = (scope: Scope): LandingPage => ({
   status: 404,
   html: document({ title: "Page introuvable", description: "Cette page n'existe pas ou plus.", path: scope.prefix, noindex: true, body: `<h1>Page introuvable</h1><p>Il n'y a pas (ou plus) assez d'offres pour cette recherche. <a href="${scope.prefix}">Voir les ${escapeHtml(scope.noun.toLowerCase())} par métier et par lieu</a>.</p>` }),
 });
-
-const description = (scope: Scope, count: number, what: string) => `${counted(scope, count)} ${what}, mises à jour chaque jour. Postulez avec un CV adapté à chaque offre.`;
 
 // The places of one kind, by count, as links (to the place, or to the job in the place).
 function placeLinks(scope: Scope, index: Index, kind: PlaceKind, options: { occupation?: Occupation; within?: Place; except?: Place; limit?: number } = {}) {
@@ -323,11 +507,15 @@ async function otherScopes(scope: Scope, occupationSlug?: string, placeSlug?: { 
   return links;
 }
 
+const hubCrumb = (scope: Scope): Crumb => ({ name: scope.noun, path: scope.prefix });
+
 export async function hubPage(scope: Scope): Promise<LandingPage> {
   const index = await landingIndex(scope);
   const { linksShown } = config.seo.landing;
+  const stats = await pageStats(scope, {});
   const body = `<h1>${escapeHtml(scope.hubTitle)}</h1>
 <p>Les offres publiées par les employeurs, réunies sur ${escapeHtml(config.seo.siteName)} : choisissez un métier ou un lieu, puis adaptez votre CV à chaque offre.</p>
+${summary(scope, stats, "en France")}
 ${linkList("Métiers", occupationLinks(scope, index, undefined, undefined, linksShown * 3))}
 ${linkList("Régions", placeLinks(scope, index, "region", { limit: 30 }))}
 ${linkList("Départements", placeLinks(scope, index, "county", { limit: linksShown * 2 }))}
@@ -340,38 +528,41 @@ export async function occupationPage(scope: Scope, occupationSlug: string): Prom
   const index = await landingIndex(scope);
   const occupation = index.occupations.get(occupationSlug);
   if (!occupation) return notFound(scope);
-  const offers = await newestOffers(scope, { occupationId: occupation.id });
+  const [offers, stats] = await Promise.all([newestOffers(scope, { occupationId: occupation.id }), pageStats(scope, { occupationId: occupation.id })]);
   const title = heading(scope, occupation);
-  const body = `<h1>${escapeHtml(title)}</h1>
-<p>${counted(scope, occupation.total, " en cours")} en France. Les plus récentes :</p>
+  const trail = breadcrumbs([hubCrumb(scope), { name: occupation.name, path: occupationPath(scope, occupation) }]);
+  const body = `${trail.html}
+<h1>${escapeHtml(title)}</h1>
+${summary(scope, stats, "en France")}
+<h2>Les offres les plus récentes</h2>
 ${offerList(offers)}
 <p><a href="${escapeHtml(searchLink(scope, occupation.name))}">Rechercher et filtrer toutes les offres ${escapeHtml(occupation.name)}</a></p>
 ${linkList(`${occupation.name} par région`, placeLinks(scope, index, "region", { occupation, limit: 30 }))}
 ${linkList(`${occupation.name} par département`, placeLinks(scope, index, "county", { occupation }))}
 ${linkList(`${occupation.name} par ville`, placeLinks(scope, index, "city", { occupation }))}
+${linkList("Métiers proches", relatedJobs(scope, index, occupation))}
 ${linkList("Voir aussi", await otherScopes(scope, occupation.slug))}`;
-  return { status: 200, html: document({ title, description: description(scope, occupation.total, `${occupation.name} en France`), path: occupationPath(scope, occupation), body }) };
+  return { status: 200, html: document({ title, description: metaDescription(scope, stats, occupation.total, `${occupation.name} en France`), path: occupationPath(scope, occupation), body, data: [trail.data] }) };
 }
 
 export async function placePage(scope: Scope, kind: PlaceKind, placeSlug: string): Promise<LandingPage> {
   const index = await landingIndex(scope);
   const place = index.bySlug.get(slugKey(kind, placeSlug));
   if (!place || !placeShown(place)) return notFound(scope);
-  const offers = await newestOffers(scope, { place });
+  const [offers, stats] = await Promise.all([newestOffers(scope, { place }), pageStats(scope, { place })]);
   const title = heading(scope, undefined, place);
-  const county = place.countyKey ? index.places.get(place.countyKey) : undefined;
-  const region = place.regionKey ? index.places.get(place.regionKey) : undefined;
-  const up = [county, region].filter((item): item is Place => !!item && placeShown(item)).map((item) => `<a href="${placePath(scope, item)}">${escapeHtml(heading(scope, undefined, item))}</a>`);
-  const body = `<h1>${escapeHtml(title)}</h1>
-<p>${counted(scope, place.total, " en cours")} ${escapeHtml(placePhrase(place))}. Les plus récentes :</p>
+  const trail = breadcrumbs([hubCrumb(scope), ...placeCrumbs(scope, index, place)]);
+  const body = `${trail.html}
+<h1>${escapeHtml(title)}</h1>
+${summary(scope, stats, placePhrase(place))}
+<h2>Les offres les plus récentes</h2>
 ${offerList(offers)}
 ${place.kind === "city" ? `<p><a href="${escapeHtml(searchLink(scope, "", place))}">Rechercher autour de ${escapeHtml(place.name)}, avec un rayon et des filtres</a></p>` : ""}
 ${linkList(`Métiers qui recrutent ${placePhrase(place)}`, occupationLinks(scope, index, place, undefined, config.seo.landing.linksShown * 2))}
 ${place.kind === "region" ? linkList("Départements", placeLinks(scope, index, "county", { within: place })) : ""}
 ${place.kind !== "city" ? linkList("Villes", placeLinks(scope, index, "city", { within: place })) : ""}
-${up.length ? `<p>${up.join(" · ")}</p>` : ""}
 ${linkList("Voir aussi", await otherScopes(scope, undefined, { kind, slug: place.slug }))}`;
-  return { status: 200, html: document({ title, description: description(scope, place.total, `${placePhrase(place)}, tous métiers`), path: placePath(scope, place), body }) };
+  return { status: 200, html: document({ title, description: metaDescription(scope, stats, place.total, `${placePhrase(place)}, tous métiers`), path: placePath(scope, place), body, data: [trail.data] }) };
 }
 
 export async function pairPage(scope: Scope, occupationSlug: string, kind: PlaceKind, placeSlug: string): Promise<LandingPage> {
@@ -380,19 +571,19 @@ export async function pairPage(scope: Scope, occupationSlug: string, kind: Place
   const place = index.bySlug.get(slugKey(kind, placeSlug));
   const count = occupation && place ? (index.pairs.get(pairKey(occupation.id, place.key)) ?? 0) : 0;
   if (!occupation || !place || !pairShown(count)) return notFound(scope);
-  const offers = await newestOffers(scope, { occupationId: occupation.id, place });
+  const [offers, stats] = await Promise.all([newestOffers(scope, { occupationId: occupation.id, place }), pageStats(scope, { occupationId: occupation.id, place })]);
   const title = heading(scope, occupation, place);
-  const wider = [place.countyKey, place.regionKey]
-    .map((key) => (key ? index.places.get(key) : undefined))
-    .filter((item): item is Place => !!item && pairShown(index.pairs.get(pairKey(occupation.id, item.key))))
-    .map((item) => `<a href="${pairPath(scope, occupation, item)}">${escapeHtml(heading(scope, occupation, item))}</a>`);
-  const body = `<h1>${escapeHtml(title)}</h1>
-<p>${counted(scope, count, " en cours")} ${escapeHtml(placePhrase(place))}. Les plus récentes :</p>
+  const trail = breadcrumbs([hubCrumb(scope), { name: occupation.name, path: occupationPath(scope, occupation) }, ...placeCrumbs(scope, index, place, occupation)]);
+  const body = `${trail.html}
+<h1>${escapeHtml(title)}</h1>
+${summary(scope, stats, placePhrase(place))}
+<h2>Les offres les plus récentes</h2>
 ${offerList(offers)}
 <p><a href="${escapeHtml(searchLink(scope, occupation.name, place))}">${place.kind === "city" ? `Rechercher autour de ${escapeHtml(place.name)}, avec un rayon et des filtres` : `Rechercher et filtrer toutes les offres ${escapeHtml(occupation.name)}`}</a></p>
 ${linkList(`${occupation.name} : autres lieux`, placeLinks(scope, index, place.kind, { occupation, except: place }))}
+${linkList(`Métiers proches ${placePhrase(place)}`, relatedJobs(scope, index, occupation, place))}
 ${linkList(`Autres métiers ${placePhrase(place)}`, occupationLinks(scope, index, place, occupation))}
-<p>${[...wider, `<a href="${occupationPath(scope, occupation)}">${escapeHtml(heading(scope, occupation))} en France</a>`, ...(placeShown(place) ? [`<a href="${placePath(scope, place)}">${escapeHtml(heading(scope, undefined, place))}</a>`] : [])].join(" · ")}</p>
+<p><a href="${occupationPath(scope, occupation)}">${escapeHtml(heading(scope, occupation))} en France</a>${placeShown(place) ? ` · <a href="${placePath(scope, place)}">${escapeHtml(heading(scope, undefined, place))}</a>` : ""}</p>
 ${linkList("Voir aussi", await otherScopes(scope, occupation.slug, { kind, slug: place.slug }))}`;
-  return { status: 200, html: document({ title, description: description(scope, count, `${occupation.name} ${placePhrase(place)}`), path: pairPath(scope, occupation, place), body }) };
+  return { status: 200, html: document({ title, description: metaDescription(scope, stats, count, `${occupation.name} ${placePhrase(place)}`), path: pairPath(scope, occupation, place), body, data: [trail.data] }) };
 }

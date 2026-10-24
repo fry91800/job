@@ -11,6 +11,26 @@ import { normalizeCompanyName } from "../pipeline/text";
 // offers become active (collected); the others are checked again later (recheckDays).
 
 
+// Boards an employer keeps to feed a job board ("artefactlinkedin": "LinkedIn Job
+// Wrapping", "artefactjobs": "Welcome to the Jungle"): the same offers as its own board,
+// under the job board's name. The job boards' own boards (LinkedIn hiring for itself) stay.
+const JOB_BOARDS: { name: RegExp; own: RegExp }[] = [
+  { name: /\bwelcome to the jungle\b/i, own: /^welcome/i },
+  { name: /\blinkedin\b/i, own: /^linkedin$/i },
+  { name: /\bindeed\b/i, own: /^indeed$/i },
+  { name: /\bhellowork\b/i, own: /^hellowork/i },
+  { name: /\bjobteaser\b/i, own: /^jobteaser/i },
+  { name: /\bjob wrapping\b|\bexternal feed\b/i, own: /^$/ },
+];
+
+export function isJobBoardFeed(slug: string, companyName: string | null): boolean {
+  const id = slug.split("/")[0].split(".")[0];
+  return JOB_BOARDS.some((board) => board.name.test(companyName ?? "") && !board.own.test(id));
+}
+
+export const UNREACHABLE = /site unreachable|unknown host/i;
+const UNREACHABLE_CONFIRM_MS = 3 * 24 * 3600 * 1000;
+
 export type CheckResult = { status: string; jobCount: number | null; franceJobCount: number | null };
 
 export async function checkBoard(board: CompanySource): Promise<CheckResult> {
@@ -20,7 +40,8 @@ export async function checkBoard(board: CompanySource): Promise<CheckResult> {
     const result = await adapter.check(board.slug);
     // Sandbox accounts hold fake offers: set aside, never collected or re-checked.
     const sandbox = /sandbox$/i.test(board.slug) || /\bsandbox\b/i.test(result.companyName ?? "");
-    const status = sandbox ? "paused" : result.jobCount === 0 ? "empty" : result.franceJobCount === 0 ? "no-france" : "active";
+    const feed = isJobBoardFeed(board.slug, result.companyName);
+    const status = sandbox ? "paused" : feed ? "duplicate" : result.jobCount === 0 ? "empty" : result.franceJobCount === 0 ? "no-france" : "active";
     let companyId = board.companyId;
     if (status === "active" && !companyId) {
       const name = result.companyName ?? nameFromSlug(board.slug);
@@ -28,14 +49,19 @@ export async function checkBoard(board: CompanySource): Promise<CheckResult> {
     }
     await prisma.companySource.update({
       where: { id: board.id },
-      data: { status, jobCount: result.jobCount, franceJobCount: result.franceJobCount, checkedAt: new Date(), companyId, lastError: null },
+      data: { status, jobCount: result.jobCount, franceJobCount: result.franceJobCount, checkedAt: new Date(), companyId, lastError: feed ? "a job board's feed of an employer's offers (collected from the employer's own board)" : null },
     });
     return { status, jobCount: result.jobCount, franceJobCount: result.franceJobCount };
   } catch (error) {
-    const gone = error instanceof NotFoundError;
+    const message = String(error instanceof Error ? error.message : error).slice(0, 500);
+    // An unreachable host (no DNS answer, no connection) is often a passing failure: the
+    // board is invalid only when it was already unreachable at a check days earlier.
+    const unreachable = UNREACHABLE.test(message);
+    const stillUnreachable = unreachable && UNREACHABLE.test(board.lastError ?? "") && !!board.checkedAt && Date.now() - board.checkedAt.getTime() >= UNREACHABLE_CONFIRM_MS;
+    const gone = (error instanceof NotFoundError && !unreachable) || stillUnreachable;
     await prisma.companySource.update({
       where: { id: board.id },
-      data: { checkedAt: new Date(), lastError: String(error instanceof Error ? error.message : error).slice(0, 500), ...(gone && { status: "invalid" }) },
+      data: { checkedAt: new Date(), lastError: message, ...(gone && { status: "invalid" }) },
     });
     return { status: gone ? "invalid" : board.status, jobCount: null, franceJobCount: null };
   }
@@ -66,10 +92,13 @@ export async function checkBoards(options: { ats?: string; limit?: number; concu
   const duplicates = await markDuplicateBoards();
   if (duplicates) log(`${duplicates} duplicate board(s) set aside`);
   const day = 24 * 3600 * 1000;
-  const due = Object.entries(collectorConfig.discovery.recheckDays).map(([status, days]) => ({
+  const due: Prisma.CompanySourceWhereInput[] = Object.entries(collectorConfig.discovery.recheckDays).map(([status, days]) => ({
     status,
     checkedAt: { lt: new Date(Date.now() - days * day) },
   }));
+  // Boards made invalid by an unreachable host: checked again after a few days, not months
+  // (they used to be made invalid at the first failure: Decathlon, 2026-10-18).
+  due.push({ status: "invalid", lastError: { contains: "unreachable" }, checkedAt: { lt: new Date(Date.now() - UNREACHABLE_CONFIRM_MS) } });
   const scope = { ...options.where, ...(options.ats && { ats: options.ats }) };
   const limit = options.limit ?? 200;
   // Candidates with French-language pages first (discovery marks them ":fr"), then the

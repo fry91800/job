@@ -46,9 +46,25 @@ async function pruneRawOffers(now: Date): Promise<number> {
   return olderVersions + withoutOffer;
 }
 
-export async function runMaintenance(now = new Date()): Promise<{ expiredSources: number; closedOffers: number; prunedRawRecords: number }> {
+// Sources from boards no longer collected (set aside as a duplicate, a feed or a test site,
+// paused, gone for good, no offer in France any more): no run closes their offers, so they are closed
+// here. Only boards that were collected (they got a company) are looked at; a board's offers
+// are "{source}" + "{slug}:…".
+async function closeSourcesOfInactiveBoards(now: Date): Promise<number> {
+  return prisma.$executeRaw`
+    UPDATE offer_sources s SET closed_at = ${now}
+    FROM company_sources cs
+    WHERE cs.status <> 'active' AND cs.status <> 'candidate' AND cs.company_id IS NOT NULL
+      -- Unreachable for now isn't gone: such boards are checked again within days.
+      AND NOT (cs.status = 'invalid' AND coalesce(cs.last_error, '') ~* 'unreachable|unknown host')
+      AND s.source = cs.ats AND s.closed_at IS NULL
+      AND left(s.external_id, length(cs.slug) + 1) = cs.slug || ':'`;
+}
+
+export async function runMaintenance(now = new Date()): Promise<{ expiredSources: number; inactiveBoardSources: number; closedOffers: number; prunedRawRecords: number }> {
   const expired = await prisma.offerSource.findMany({ where: { closedAt: null, expiresAt: { lt: now } }, select: { id: true } });
   await prisma.offerSource.updateMany({ where: { id: { in: expired.map((row) => row.id) } }, data: { closedAt: now } });
+  const inactiveBoardSources = await closeSourcesOfInactiveBoards(now);
 
   // Collected offers (they have sources) whose sources are all closed.
   const orphans = await prisma.offer.findMany({
@@ -56,5 +72,5 @@ export async function runMaintenance(now = new Date()): Promise<{ expiredSources
     select: { id: true },
   });
   const { count } = await prisma.offer.updateMany({ where: { id: { in: orphans.map((row) => row.id) } }, data: { closedAt: now } });
-  return { expiredSources: expired.length, closedOffers: count, prunedRawRecords: await pruneRawOffers(now) };
+  return { expiredSources: expired.length, inactiveBoardSources, closedOffers: count, prunedRawRecords: await pruneRawOffers(now) };
 }

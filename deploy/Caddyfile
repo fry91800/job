@@ -44,7 +44,7 @@ www.{$DOMAIN} {
 
 	# Pages for search engines (SEO.md): offer pages rendered by the API on the app's page,
 	# landing pages by job and town, sitemaps, robots.txt.
-	@seo path /offers/* /emplois /emplois/* /alternance /alternance/* /stage /stage/* /sitemap.xml /sitemaps/* /robots.txt /indexnow/*
+	@seo path /offers/* /emplois /emplois/* /alternance /alternance/* /stage /stage/* /sitemap.xml /sitemaps/* /robots.txt /*.txt
 	handle @seo {
 		import app_csp
 		reverse_proxy api:3000

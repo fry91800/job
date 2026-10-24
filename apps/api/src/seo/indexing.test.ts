@@ -88,7 +88,7 @@ describe("search engine notifications", () => {
     assert.equal(result?.sent, 3);
     const body = JSON.parse(received.find((request) => request.path === "/indexnow")!.body);
     assert.equal(body.key, "0123456789abcdef0123456789abcdef");
-    assert.match(body.keyLocation, /\/indexnow\/0123456789abcdef0123456789abcdef\.txt$/);
+    assert.match(body.keyLocation, /^https?:\/\/[^/]+\/0123456789abcdef0123456789abcdef\.txt$/, "at the root: a key file only covers its own folder");
     for (const id of [withPage, noPlace, closed]) assert.ok(body.urlList.some((url: string) => url.endsWith(`/offers/${id}`)), id);
     assert.ok(!body.urlList.some((url: string) => url.endsWith(hidden)), "private offers are never sent");
     received = [];
@@ -110,6 +110,17 @@ describe("search engine notifications", () => {
       [[withPage, "URL_UPDATED"], [closed, "URL_DELETED"]].sort(),
     );
     assert.equal((await prisma.searchIndexing.findUniqueOrThrow({ where: { engine: "google" } })).sentToday, 2);
+  });
+
+  test("Google: a key cut short says so, without showing any of it", async () => {
+    const whole = JSON.stringify({ client_email: "indexing@monposte.iam.gserviceaccount.com", private_key: privateKey });
+    const saved = config.seo.indexing.googleCredentials;
+    config.seo.indexing.googleCredentials = Buffer.from(whole.slice(0, 900)).toString("base64");
+    try {
+      await assert.rejects(notifyGoogle(), (error: Error) => /doesn't decode to a whole key file \(900 characters/.test(error.message) && !error.message.includes("PRIVATE KEY"));
+    } finally {
+      config.seo.indexing.googleCredentials = saved;
+    }
   });
 
   test("Google: a refused notification leaves the cursor, so the next run tries again", async () => {

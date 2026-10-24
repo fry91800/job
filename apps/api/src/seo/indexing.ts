@@ -10,7 +10,8 @@ import { prisma } from "../lib/prisma";
 //   first and a quarter of the quota is kept for closed ones; what doesn't fit is left to the
 //   sitemaps;
 // * IndexNow (Bing, Yandex, Seznam, Naver…): every new or closed offer page, up to 10 000
-//   addresses a request, proven ours by the key file /indexnow/{key}.txt.
+//   addresses a request, proven ours by the key file /{key}.txt (at the root: a key file only
+//   covers the addresses under its folder; IndexNow answered 422 with it in /indexnow/).
 // Each engine keeps a cursor (search_indexing): offers opened or closed after it are told on
 // the next run; a failed run leaves the cursor, so the next one tries again.
 
@@ -62,7 +63,7 @@ export async function notifyIndexNow(now = new Date()): Promise<{ sent: number }
     const response = await fetch(endpoints.indexNow, {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ host, key, keyLocation: `${config.webBaseUrl}/indexnow/${key}.txt`, urlList: urls.slice(start, start + INDEXNOW_BATCH) }),
+      body: JSON.stringify({ host, key, keyLocation: `${config.webBaseUrl}/${key}.txt`, urlList: urls.slice(start, start + INDEXNOW_BATCH) }),
       signal: AbortSignal.timeout(30_000),
     });
     // 200: received; 202: received, key check pending.
@@ -79,7 +80,14 @@ type ServiceAccount = { client_email: string; private_key: string };
 function serviceAccount(): ServiceAccount | null {
   const encoded = config.seo.indexing.googleCredentials;
   if (!encoded) return null;
-  const account = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as Partial<ServiceAccount>;
+  // The key's content never goes into an error: only its decoded length.
+  const decoded = Buffer.from(encoded.trim(), "base64").toString("utf8");
+  let account: Partial<ServiceAccount>;
+  try {
+    account = JSON.parse(decoded) as Partial<ServiceAccount>;
+  } catch {
+    throw new Error(`GOOGLE_INDEXING_CREDENTIALS_BASE64 doesn't decode to a whole key file (${decoded.length} characters decoded; a service account key has about 2 400): set it again (SEO.md)`);
+  }
   if (!account.client_email || !account.private_key) throw new Error("GOOGLE_INDEXING_CREDENTIALS_BASE64: not a service account key (client_email, private_key)");
   return account as ServiceAccount;
 }

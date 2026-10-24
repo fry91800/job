@@ -88,8 +88,10 @@ seoRouter.get("/sitemaps/offers-:n.xml", async (req, res) => {
   );
 });
 
-// GET /indexnow/{key}.txt — proves to IndexNow that the key is ours (seo/indexing.ts).
-seoRouter.get("/indexnow/:file", (req, res) => {
+// GET /{key}.txt — proves to IndexNow that the key is ours (seo/indexing.ts). At the root:
+// a key file only covers the addresses under its own folder.
+seoRouter.get("/:file", (req, res, next) => {
+  if (!req.params.file.endsWith(".txt") || req.params.file === "robots.txt") return next();
   const key = config.seo.indexing.indexNowKey;
   if (!key || req.params.file !== `${key}.txt`) return res.status(404).type("text").send("Not found");
   res.set("Cache-Control", "public, max-age=86400").type("text").send(key);
